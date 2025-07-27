@@ -1,0 +1,1 @@
+BASE_URL_POLYMARKET = "https://gamma-api.polymarket.com"
