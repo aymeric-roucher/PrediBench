@@ -12,9 +12,15 @@ class PolymarketMarket:
     active: bool
     closed: bool
     createdAt: datetime
-    volumeNum: float
+    volumeNum: float | None = None
     liquidityNum: float | None = None
     json: dict | None = None
+    
+    def is_market_open(self) -> bool:
+        """
+        This is in fact a complexe question, because there are mistakes in the API, so one must also look at the volume (which might still be > 0 for some reasons or look at the outcome price)
+        """
+        return self.closed 
 
 @dataclass
 class PolymarketMarketEvent:
@@ -26,6 +32,9 @@ class PolymarketMarketEvent:
     endDate: datetime | None = None
     json: dict | None = None
     markets: list[PolymarketMarket] | None = None
+    
+    def is_event_open(self) -> bool:
+        return any(market.is_market_open() for market in self.markets)
     
 def convert_polymarket_time_to_datetime(time_str: str) -> datetime:
     """Convert a Polymarket time string to a datetime object."""
