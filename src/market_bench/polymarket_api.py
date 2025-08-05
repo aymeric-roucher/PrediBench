@@ -220,19 +220,15 @@ def get_market_events(limit: int = 500, offset: int = 0) -> list[Event]:
     return events
 
 
-def _get_open_markets(request: MarketRequest | None = None) -> list[dict]:
-    """Get markets from Polymarket with filtering and sorting options."""
-    url = f"{BASE_URL_POLYMARKET}/markets"
+def get_open_markets(request: MarketRequest) -> list[Market]:
+    """Get open markets from Polymarket, sorted by volume.
 
-    if request is None:
-        request = MarketRequest(
-            limit=500,
-            offset=0,
-            active=True,
-            closed=False,
-            order="volume_num_max",
-            ascending=False,
-        )
+    There is a limit of 500 markets per request, one must use pagination to get all markets.
+
+    Args:
+        request: MarketRequest object with full filtering and sorting options
+    """
+    url = f"{BASE_URL_POLYMARKET}/markets"
 
     if request.limit and request.limit > 500:
         assert False, "Limit must be less than or equal to 500"
@@ -250,29 +246,6 @@ def _get_open_markets(request: MarketRequest | None = None) -> list[dict]:
     response = requests.get(url, params=params)
     response.raise_for_status()
     output = response.json()
-    return output
-
-
-def get_open_markets(request: MarketRequest | None = None) -> list[Market]:
-    """Get open markets from Polymarket, sorted by volume.
-
-    There is a limit of 500 markets per request, one must use pagination to get all markets.
-
-    Args:
-        limit: Number of markets to retrieve (for backward compatibility)
-        request: MarketRequest object with full filtering and sorting options
-    """
-    if request is None:
-        request = MarketRequest(
-            limit=500,
-            offset=0,
-            active=True,
-            closed=False,
-            order="volumeNum",
-            ascending=False,
-        )
-
-    output = _get_open_markets(request)
     return [_json_to_polymarket_market(market) for market in output]
 
 

@@ -1,15 +1,14 @@
 from market_bench.polymarket_api import (
     MarketRequest,
     _get_events,
-    _get_open_markets,
     convert_polymarket_time_to_datetime,
     get_open_markets,
 )
 
 
-def test__get_open_markets():
+def test_get_open_markets():
     """Test basic market retrieval."""
-    markets = _get_open_markets()
+    markets = get_open_markets(MarketRequest(limit=500))
     for market in markets:
         assert len(market["events"]) == 1
     assert len(markets) == 500
@@ -35,12 +34,6 @@ def test__get_market_events():
                 # assert market["closed"] == True
 
     assert len(events) == 500
-
-
-def test_get_open_markets():
-    """Test basic market retrieval."""
-    markets = get_open_markets()
-    assert len(markets) == 500
 
 
 def test_get_open_markets_field_values():

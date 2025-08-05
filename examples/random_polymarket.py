@@ -159,12 +159,6 @@ def get_market_sample(n_markets: int = 10) -> list[Market]:
     markets = get_open_markets(request)
     print(f"Retrieved {len(markets)} markets")
 
-    for i, market in enumerate(markets[:5]):
-        print(f"  {i + 1}. {market.question[:60]}...")
-        print(f"     Created: {market.createdAt}")
-        print(f"     Volume: ${market.volume:,.2f}")
-        print(market)
-
     return markets
 
 
