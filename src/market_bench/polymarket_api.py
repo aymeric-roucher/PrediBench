@@ -1,10 +1,27 @@
+import json
+from datetime import datetime, timedelta
+from typing import Literal
+
+import plotly.graph_objects as go
 import requests
-from dataclasses import dataclass
-from datetime import datetime
+
+# TODO: respect rate limits:
+# **API Rate Limits**
+# Endpoint	Limit	Notes
+# /books (website)	300 requests / 10s	Throttle requests over the maximum configured rate
+# /books	50 requests / 10s	Throttle requests over the maximum configured rate
+# /price	100 requests / 10s	Throttle requests over the maximum configured rate
+# markets/0x	50 requests / 10s	Throttle requests over the maximum configured rate
+# POST /order	500 requests / 10s (50/s)	Burst; throttle requests over the maximum configured rate
+# POST /order	3000 requests / 10 min (5/s)	Throttle requests over the maximum configured rate
+# DELETE /order	500 requests / 10s (50/s)	Burst; throttle requests over the maximum configured rate
+# DELETE /order	3000 requests / 10 min (5/s)	Throttle requests over the maximum configured rate
+from pydantic import BaseModel
+
 from market_bench.common import BASE_URL_POLYMARKET
 
-@dataclass
-class PolymarketMarket:
+
+class Market(BaseModel):
     id: str
     question: str
     slug: str
@@ -12,47 +29,114 @@ class PolymarketMarket:
     active: bool
     closed: bool
     createdAt: datetime
-    volumeNum: float
-    liquidityNum: float | None = None
-    json: dict | None = None
+    volume: float
+    liquidity: float
+    clob_token_ids: list[str]
 
-@dataclass
-class PolymarketMarketEvent:
+
+class MarketEvent(BaseModel):
     id: str
     ticker: str
     title: str
     description: str
     createdAt: datetime
     endDate: datetime | None = None
-    json: dict | None = None
-    markets: list[PolymarketMarket] | None = None
-    
+    markets: list[Market] | None = None
+
+
+class MarketRequest(BaseModel):
+    limit: int | None = None
+    offset: int | None = None
+    order: str | None = None
+    ascending: bool | None = None
+    id: int | None = None
+    slug: str | None = None
+    archived: bool | None = None
+    active: bool | None = None
+    closed: bool | None = None
+    clob_token_ids: str | None = None
+    condition_ids: str | None = None
+    liquidity_num_min: float | None = None
+    liquidity_num_max: float | None = None
+    volume_num_min: float | None = None
+    volume_num_max: float | None = None
+    start_date_min: datetime | None = None
+    start_date_max: datetime | None = None
+    end_date_min: datetime | None = None
+    end_date_max: datetime | None = None
+    tag_id: int | None = None
+    related_tags: bool | None = None
+
+
+class HistoricalTimeSeriesRequest(BaseModel):
+    market: str
+    interval: Literal["1m", "1w", "1d", "6h", "1h", "max"] = "1d"
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    fidelity_minutes: int = 60 * 24  # default to daily
+
+
+class HistoricalTimeSeriesDataPoint(BaseModel):
+    timestamp: datetime
+    price: float
+
+
+class HistoricalTimeSeriesData(BaseModel):
+    series: list[HistoricalTimeSeriesDataPoint]
+
+
+class OrderLevel(BaseModel):
+    price: str
+    size: str
+
+
+class OrderBook(BaseModel):
+    market: str
+    asset_id: str
+    hash: str
+    timestamp: str
+    min_order_size: str
+    neg_risk: bool
+    tick_size: str
+    bids: list[OrderLevel]
+    asks: list[OrderLevel]
+
+
 def convert_polymarket_time_to_datetime(time_str: str) -> datetime:
     """Convert a Polymarket time string to a datetime object."""
-    return datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+    return datetime.fromisoformat(time_str.replace("Z", "+00:00"))
 
 
-def _json_to_polymarket_market(market_data: dict) -> PolymarketMarket:
+def _json_to_polymarket_market(market_data: dict) -> Market:
     """Convert a market JSON object to a PolymarketMarket dataclass."""
-    closed = bool(market_data['closed']) if isinstance(market_data['closed'], bool) else market_data['closed'].lower() == 'true'
-    active = bool(market_data['active']) if isinstance(market_data['active'], bool) else market_data['active'].lower() == 'true'
-    return PolymarketMarket(
-        id=market_data['id'],
-        question=market_data['question'],
-        slug=market_data['slug'],
-        description=market_data['description'],
+    closed = (
+        bool(market_data["closed"])
+        if isinstance(market_data["closed"], bool)
+        else market_data["closed"].lower() == "true"
+    )
+    active = (
+        bool(market_data["active"])
+        if isinstance(market_data["active"], bool)
+        else market_data["active"].lower() == "true"
+    )
+    return Market(
+        id=market_data["id"],
+        question=market_data["question"],
+        clob_token_ids=json.loads(market_data["clobTokenIds"]),
+        slug=market_data["slug"],
+        description=market_data["description"],
         active=active,
         closed=closed,
-        createdAt=convert_polymarket_time_to_datetime(market_data['createdAt']),
-        volumeNum=float(market_data['volumeNum']) if 'volumeNum' in market_data else None,
-        liquidityNum=float(market_data['liquidityNum']) if 'liquidityNum' in market_data else None,
-        json=market_data
+        createdAt=convert_polymarket_time_to_datetime(market_data["createdAt"]),
+        volume=float(market_data["volume"]),
+        liquidity=float(market_data["liquidity"]),
+        # json=market_data,
     )
-    
-    
+
+
 def _get_market_events(limit: int = 500, offset: int = 0) -> list[dict]:
     """Get open markets from Polymarket, sorted by volume.
-    
+
     There is a limit of 500 markets per request, one must use pagination to get all markets.
     """
     url = f"{BASE_URL_POLYMARKET}/events"
@@ -63,69 +147,238 @@ def _get_market_events(limit: int = 500, offset: int = 0) -> list[dict]:
         "active": "true",
         "closed": "false",
         "order": "volume",
-        "ascending": "false"
+        "ascending": "false",
     }
     response = requests.get(url, params=params)
     response.raise_for_status()
     output = response.json()
     return output
 
-def get_market_events(limit: int = 500, offset: int = 0) -> list[PolymarketMarketEvent]:
+
+def get_market_events(limit: int = 500, offset: int = 0) -> list[MarketEvent]:
     """Get market events from Polymarket, sorted by volume.
-    
+
     There is a limit of 500 markets per request, one must use pagination to get all markets.
     """
     output = _get_market_events(limit, offset)
     events = []
     for event in output:
         end_date = None
-        if event.get('endDate'):
-            end_date = convert_polymarket_time_to_datetime(event['endDate'])
-        
+        if event.get("endDate"):
+            end_date = convert_polymarket_time_to_datetime(event["endDate"])
+
         markets = None
-        if event.get('markets'):
-            markets = [_json_to_polymarket_market(market_data) for market_data in event['markets']]
-        
-        polymarket_event = PolymarketMarketEvent(
-            id=event['id'],
-            ticker=event['ticker'],
-            title=event['title'],
-            description=event['description'],
-            createdAt=convert_polymarket_time_to_datetime(event['createdAt']),
+        if event.get("markets"):
+            markets = [
+                _json_to_polymarket_market(market_data)
+                for market_data in event["markets"]
+            ]
+
+        polymarket_event = MarketEvent(
+            id=event["id"],
+            ticker=event["ticker"],
+            title=event["title"],
+            description=event["description"],
+            createdAt=convert_polymarket_time_to_datetime(event["createdAt"]),
             endDate=end_date,
-            json=event,
-            markets=markets
+            markets=markets,
         )
         events.append(polymarket_event)
-    
+
     return events
 
 
-def _get_open_markets(limit: int = 500, offset: int = 0) -> list[dict]:
-    """Get open markets from Polymarket, sorted by volume.
-    
-    There is a limit of 500 markets per request, one must use pagination to get all markets.
-    """
+def _get_open_markets(request: MarketRequest | None = None) -> list[dict]:
+    """Get markets from Polymarket with filtering and sorting options."""
     url = f"{BASE_URL_POLYMARKET}/markets"
-    assert limit <= 500, "Limit must be less than or equal to 500"
-    params = {
-        "limit": limit,
-        "offset": offset,
-        "active": "true",
-        "closed": "false",
-        "order": "volumeNum",
-        "ascending": "false"
-    }
+
+    if request is None:
+        request = MarketRequest(
+            limit=500,
+            offset=0,
+            active=True,
+            closed=False,
+            order="volume_num_max",
+            ascending=False,
+        )
+
+    if request.limit and request.limit > 500:
+        assert False, "Limit must be less than or equal to 500"
+
+    params = {}
+    for field_name, value in request.__dict__.items():
+        if value is not None:
+            if isinstance(value, bool):
+                params[field_name] = "true" if value else "false"
+            elif isinstance(value, datetime):
+                params[field_name] = value.isoformat()
+            else:
+                params[field_name] = value
+
     response = requests.get(url, params=params)
     response.raise_for_status()
     output = response.json()
     return output
 
-def get_open_markets(limit: int = 500) -> list[PolymarketMarket]:
+
+def get_open_markets(request: MarketRequest | None = None) -> list[Market]:
     """Get open markets from Polymarket, sorted by volume.
-    
+
     There is a limit of 500 markets per request, one must use pagination to get all markets.
+
+    Args:
+        limit: Number of markets to retrieve (for backward compatibility)
+        request: MarketRequest object with full filtering and sorting options
     """
-    output = _get_open_markets(limit)
+    if request is None:
+        request = MarketRequest(
+            limit=500,
+            offset=0,
+            active=True,
+            closed=False,
+            order="volumeNum",
+            ascending=False,
+        )
+
+    output = _get_open_markets(request)
     return [_json_to_polymarket_market(market) for market in output]
 
+
+def get_token_timeseries(
+    request: HistoricalTimeSeriesRequest,
+) -> HistoricalTimeSeriesData:
+    """Get token timeseries data from Polymarket CLOB API.
+
+    Args:
+        request: TokenTimeseriesRequest with market token ID and optional parameters
+
+    Returns:
+        HistoricalTimeSeriesData containing historical price data points
+    """
+    url = "https://clob.polymarket.com/prices-history"
+
+    params = {"market": request.market}
+
+    if request.start_time is not None:
+        params["startTs"] = int(request.start_time.timestamp())
+    if request.end_time is not None:
+        params["endTs"] = int(request.end_time.timestamp())
+    params["interval"] = request.interval
+    params["fidelity"] = str(request.fidelity_minutes)
+
+    response = requests.get(url, params=params)
+    response.raise_for_status()
+    data = response.json()
+
+    series = [
+        HistoricalTimeSeriesDataPoint(
+            timestamp=datetime.fromtimestamp(point["t"]), price=point["p"]
+        )
+        for point in data["history"]
+    ]
+
+    return HistoricalTimeSeriesData(series=series)
+
+
+def get_order_book(token_id: str) -> OrderBook:
+    """Get order book for a specific token ID from Polymarket CLOB API.
+
+    Args:
+        token_id: Token ID of the market to get the book for
+
+    Returns:
+        OrderBook containing bids, asks, and market information
+    """
+    url = "https://clob.polymarket.com/book"
+    params = {"token_id": token_id}
+
+    response = requests.get(url, params=params)
+    response.raise_for_status()
+    data = response.json()
+
+    bids = [OrderLevel(price=bid["price"], size=bid["size"]) for bid in data["bids"]]
+    asks = [OrderLevel(price=ask["price"], size=ask["size"]) for ask in data["asks"]]
+
+    return OrderBook(
+        market=data["market"],
+        asset_id=data["asset_id"],
+        hash=data["hash"],
+        timestamp=data["timestamp"],
+        min_order_size=data["min_order_size"],
+        neg_risk=data["neg_risk"],
+        tick_size=data["tick_size"],
+        bids=bids,
+        asks=asks,
+    )
+
+
+if __name__ == "__main__":
+    markets = get_open_markets(MarketRequest(limit=1))
+    top_market = markets[0]
+    print(f"Getting data for market: {top_market.question}")
+    print(f"Market ID: {top_market.id}")
+    print(f"Market created: {top_market.createdAt}")
+    print(f"Market active: {top_market.active}")
+    print(f"Market closed: {top_market.closed}")
+    print(f"CLOB token IDs: {top_market.clob_token_ids}")
+    print(f"Number of tokens in market: {len(top_market.clob_token_ids)}")
+
+    # Get a market that's actually open (active and not closed)
+    market_request = MarketRequest(
+        limit=10, active=True, closed=False, order="volumeNum", ascending=False
+    )
+    all_markets = get_open_markets(market_request)
+
+    # Find the first market that's truly open
+    open_market = None
+    for market in all_markets:
+        print(
+            f"Checking market: {market.question[:50]}... (created: {market.createdAt.year}, closed: {market.closed})"
+        )
+        open_market = market
+        break
+
+    if not open_market:
+        print("No suitable open markets found, using first market anyway")
+        open_market = all_markets[0]
+
+    print(f"\nUsing market: {open_market.question}")
+    print(f"Created: {open_market.createdAt}")
+    print(f"Closed: {open_market.closed}")
+    print(f"Token IDs: {open_market.clob_token_ids}")
+
+    # Get order book for the first token
+    token_id = open_market.clob_token_ids[1]
+    print(f"\nGetting order book for token: {token_id}")
+
+    order_book = get_order_book(token_id)
+    print(f"Order book timestamp: {order_book.timestamp}")
+    print(f"Best bid: {order_book.bids[0].price if order_book.bids else 'None'}")
+    print(f"Best ask: {order_book.asks[0].price if order_book.asks else 'None'}")
+    print(f"Tick size: {order_book.tick_size}")
+
+    request = HistoricalTimeSeriesRequest(
+        market=token_id,
+        start_time=datetime.now() - timedelta(days=10),
+        end_time=datetime.now(),
+        interval="1d",
+    )
+    timeseries = get_token_timeseries(request)
+
+    print(f"Found {len(timeseries.series)} data points")
+    for point in timeseries.series[-5:]:  # Print last 5 points
+        print(f"  {point.timestamp}: ${point.price:.4f}")
+
+    timestamps = [point.timestamp for point in timeseries.series]
+    prices = [point.price for point in timeseries.series]
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(x=timestamps, y=prices, mode="lines+markers", name="Price")
+    )
+    fig.update_layout(
+        title=f"Price History - {open_market.question}",
+        xaxis_title="Time",
+        yaxis_title="Price",
+    )
+    fig.write_image("timeseries.png")
