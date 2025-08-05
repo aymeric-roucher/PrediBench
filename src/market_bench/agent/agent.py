@@ -140,8 +140,8 @@ def run_agent(question: str, cutoff_date: datetime) -> ToolCallingAgent:
     prompt = f"""Let's say we are the {cutoff_date.strftime("%B %d, %Y")}.
     Please answer the below question by yes or no. But first, run a detailed analysis. You can search the web for information.
     One good method for analyzing is to break down the question into sub-parts, like a tree, and assign probabilities to each sub-branch of the tree, to get a total probability of the question being true.
-    Here is the question: {question}
-    You can either buy yes or no, or do nothing.
+    Here is the question:
+    {question}
 
     What would you decide: buy yes, buy no, or do nothing?
     """

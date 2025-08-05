@@ -15,7 +15,7 @@ class PnlCalculator:
         vol_targeting_window: str = "30D",
     ):
         """
-        positions: Daily positions: pd.DataFrame with columns as markets and index as dates
+        positions: Daily positions: pd.DataFrame with columns as markets and index as dates. A position noted with date D as index is the position at the end of day D, which will be impacted by returns of day D+1
         returns: Daily returns: pd.DataFrame with columns as markets and index as dates
         to_vol_target: bool, if True, will target volatility
         vol_targeting_window: str, window for volatility targeting
@@ -34,6 +34,16 @@ class PnlCalculator:
             and idx.time() == pd.Timestamp("00:00:00").time()
             for idx in df.index
         ), "All index values must be dates without time component"
+
+    def _get_positions_begin_next_day(self, col: str):
+        """
+        Align positions with returns by shifting position dates forward by 1 day.
+        Position held at end of day D should capture returns on day D+1.
+        """
+        positions_series = self.positions[col].copy()
+        # Shift index forward by 1 day to align with when returns are realized
+        positions_series.index = positions_series.index + pd.Timedelta(days=1)
+        return positions_series
 
     def calculate_pnl(self):
         if self.to_vol_target:
@@ -62,9 +72,9 @@ class PnlCalculator:
         else:
             pnls_ = pd.concat(
                 [
-                    self.positions[col]
-                    .reindex(self.returns[col].dropna().index)
-                    .shift(1)
+                    self._get_positions_begin_next_day(col).reindex(
+                        self.returns[col].dropna().index, fill_value=0
+                    )
                     * self.returns[col]
                     for col in self.positions
                 ],

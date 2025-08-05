@@ -83,12 +83,12 @@ def get_historical_returns(markets: list[Market], days_back: int = 1) -> pd.Data
 
 def agent_invest_positions(
     returns_df: pd.DataFrame,
-    investment_probability: float = 0.3,
 ) -> pd.DataFrame:
     """Create investment positions DataFrame with 1s where investments are made"""
-    print(
-        f"\nCreating investment positions with probability {investment_probability}..."
-    )
+    print("\nCreating investment positions with agent...")
+
+    positions_df = pd.DataFrame(0.0, index=returns_df.index, columns=returns_df.columns)
+
     for date in returns_df.index:
         for question in returns_df.columns:
             if np.isnan(returns_df.loc[date, question]):
@@ -96,15 +96,15 @@ def agent_invest_positions(
 
             full_question = (
                 question
-                + f"Here are the latest rates for the 'yes' to that question, to guide you:\n{returns_df.loc[:date, question].dropna()}\nInvest in yes only if you think the yes is underrated, and invest in no only if you think that the yes is overrated."
+                + f" Here are the latest rates for the 'yes' to that question, to guide you:\n{returns_df.loc[:date, question].dropna().to_string(index=True, header=False)}\nInvest in yes only if you think the yes is underrated, and invest in no only if you think that the yes is overrated."
             )
             response = run_agent(
                 full_question,
                 cutoff_date=date,
             )
             position = 0 if response == "nothing" else (1 if response == "yes" else -1)
-            returns_df.loc[date, question] = position
-    return returns_df
+            positions_df.loc[date, question] = position
+    return positions_df
 
 
 def invest_on_random_positions(
@@ -210,23 +210,14 @@ def analyze_portfolio_performance(positions_df: pd.DataFrame, returns_df: pd.Dat
     return cumulative_pnl
 
 
-def main(random: bool = False):
-    """Main execution function"""
+if __name__ == "__main__":
+    test_timestamp_extraction()
+
     markets = get_market_sample(1)
     returns_df = get_historical_returns(markets, days_back=10)
     print(returns_df)
 
-    if random:
-        positions_df = invest_on_random_positions(
-            returns_df, investment_probability=0.3
-        )
-    else:
-        positions_df = agent_invest_positions(returns_df, investment_probability=0.3)
+    # positions_df = invest_on_random_positions(returns_df, investment_probability=1)
+    positions_df = agent_invest_positions(returns_df)
 
     analyze_portfolio_performance(positions_df, returns_df)
-
-
-if __name__ == "__main__":
-    test_timestamp_extraction()
-
-    main()
