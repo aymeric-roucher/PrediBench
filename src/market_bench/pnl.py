@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 
 
 class PnlCalculator:
@@ -72,8 +73,6 @@ class PnlCalculator:
             return pnls_
 
     def plot_pnl(self, stock_details: bool = False):
-        import plotly.graph_objects as go
-
         if not stock_details:
             cumulative_pnl = self.pnl.sum(axis=1).cumsum()
             fig = px.line(
@@ -196,3 +195,19 @@ class PnlCalculator:
             / self.positions.abs().sum(axis=1).sum()
         )
         return turnover
+
+    def get_performance_metrics(self) -> pd.DataFrame:
+        return pd.DataFrame.from_dict(
+            {
+                "Sharpe Ratio (Daily)": [self.sharpe_daily()],
+                "Sharpe Ratio (Annualized)": [self.sharpe_annualized()],
+                "Volatility (Daily)": [self.vol_pnl_daily()],
+                "Volatility (Annualized)": [self.vol_pnl_annualized()],
+                "Sortino Ratio": [self.compute_sortino_ratio()],
+                "Maximum Drawdown": [self.max_drawdown()],
+                "Calmar Ratio": [self.compute_calmar_ratio()],
+                "Turnover (%)": [self.turnover()],
+            },
+            columns=["Value"],
+            orient="index",
+        )

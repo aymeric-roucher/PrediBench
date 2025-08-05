@@ -184,17 +184,9 @@ def analyze_portfolio_performance(positions_df: pd.DataFrame, returns_df: pd.Dat
 
     engine = PnlCalculator(positions_df, returns_df)
 
-    print("\n=== Performance Metrics ===\n")
-    print(f"Sharpe Ratio (Daily): {engine.sharpe_daily():.4f}")
-    print(f"Sharpe Ratio (Annualized): {engine.sharpe_annualized():.4f}")
-    print(f"Volatility (Daily): {engine.vol_pnl_daily():.4f}")
-    print(f"Volatility (Annualized): {engine.vol_pnl_annualized():.4f}")
-    print(f"Sortino Ratio: {engine.compute_sortino_ratio():.4f}")
-    print(f"Maximum Drawdown: {engine.max_drawdown():.4f}")
-    print(f"Calmar Ratio: {engine.compute_calmar_ratio():.4f}")
-    print(f"Turnover: {engine.turnover():.2f}%")
-
     fig = engine.plot_pnl(stock_details=True)
+
+    print(engine.get_performance_metrics().round(2))
 
     output_path = "/Users/aymeric/Documents/Code/market-bench/portfolio_performance"
     fig.write_html(output_path + ".html")
