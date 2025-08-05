@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 
+from market_bench.agent.agent import run_agent
 from market_bench.pnl import PnlCalculator
 from market_bench.polymarket_api import (
     HistoricalTimeSeriesRequest,
@@ -15,7 +16,7 @@ from market_bench.polymarket_api import (
 )
 
 
-def get_historical_returns(markets: list[Market], days_back: int = 30) -> pd.DataFrame:
+def get_historical_returns(markets: list[Market], days_back: int = 1) -> pd.DataFrame:
     """Get historical returns directly from timeseries data"""
     print(f"\nGetting historical returns over {days_back} days...")
 
@@ -27,7 +28,7 @@ def get_historical_returns(markets: list[Market], days_back: int = 30) -> pd.Dat
         selected_tokens.append(
             {
                 "question": market.question,
-                "first_choice_token_id": market.clob_token_ids[0],
+                "first_choice_token_id": market.outcomes[0].clob_token_id,
             }
         )
 
@@ -80,7 +81,33 @@ def get_historical_returns(markets: list[Market], days_back: int = 30) -> pd.Dat
     return returns_df
 
 
-def create_investment_positions(
+def agent_invest_positions(
+    returns_df: pd.DataFrame,
+    investment_probability: float = 0.3,
+) -> pd.DataFrame:
+    """Create investment positions DataFrame with 1s where investments are made"""
+    print(
+        f"\nCreating investment positions with probability {investment_probability}..."
+    )
+    for date in returns_df.index:
+        for question in returns_df.columns:
+            if np.isnan(returns_df.loc[date, question]):
+                continue
+
+            full_question = (
+                question
+                + f"Here are the latest rates for the 'yes' to that question, to guide you:\n{returns_df.loc[:date, question].dropna()}\nInvest in yes only if you think the yes is underrated, and invest in no only if you think that the yes is overrated."
+            )
+            response = run_agent(
+                full_question,
+                cutoff_date=date,
+            )
+            position = 0 if response == "nothing" else (1 if response == "yes" else -1)
+            returns_df.loc[date, question] = position
+    return returns_df
+
+
+def invest_on_random_positions(
     returns_df: pd.DataFrame, investment_probability: float = 0.3
 ) -> pd.DataFrame:
     """Create investment positions DataFrame with 1s where investments are made"""
@@ -136,29 +163,9 @@ def get_market_sample(n_markets: int = 10) -> list[Market]:
         print(f"  {i + 1}. {market.question[:60]}...")
         print(f"     Created: {market.createdAt}")
         print(f"     Volume: ${market.volume:,.2f}")
-        print(f"     Tokens: {len(market.clob_token_ids)}")
         print(market)
-    quit()
 
     return markets
-
-
-def build_portfolio_data(
-    markets: list[Market], days_back: int = 30
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Build positions and returns DataFrames for PnlCalculator"""
-    print(f"\nBuilding portfolio data over {days_back} days...")
-
-    # Get historical returns from actual timeseries data
-    returns_df = get_historical_returns(markets, days_back)
-
-    # Create investment positions (1s where we invest)
-    positions_df = create_investment_positions(returns_df, investment_probability=0.3)
-
-    print(f"\nBuilt positions table: {positions_df.shape}")
-    print(f"Built returns table: {returns_df.shape}")
-
-    return positions_df, returns_df
 
 
 def analyze_portfolio_performance(positions_df: pd.DataFrame, returns_df: pd.DataFrame):
@@ -203,11 +210,18 @@ def analyze_portfolio_performance(positions_df: pd.DataFrame, returns_df: pd.Dat
     return cumulative_pnl
 
 
-def main():
+def main(random: bool = False):
     """Main execution function"""
-    markets = get_market_sample(10)
+    markets = get_market_sample(1)
+    returns_df = get_historical_returns(markets, days_back=10)
+    print(returns_df)
 
-    positions_df, returns_df = build_portfolio_data(markets, days_back=14)
+    if random:
+        positions_df = invest_on_random_positions(
+            returns_df, investment_probability=0.3
+        )
+    else:
+        positions_df = agent_invest_positions(returns_df, investment_probability=0.3)
 
     analyze_portfolio_performance(positions_df, returns_df)
 

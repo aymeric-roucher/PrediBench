@@ -107,7 +107,7 @@ def final_answer(
     Provides a final answer to the given problem.
 
     Args:
-        answer: The final answer to the question
+        answer: The final investment or non-investment decision. Do not invest in any outcome if you don't have a clear preference.
     """
     print(f"Final answer: {answer}")
     return answer
