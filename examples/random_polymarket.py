@@ -137,6 +137,8 @@ def get_market_sample(n_markets: int = 10) -> list[Market]:
         print(f"     Created: {market.createdAt}")
         print(f"     Volume: ${market.volume:,.2f}")
         print(f"     Tokens: {len(market.clob_token_ids)}")
+        print(market)
+    quit()
 
     return markets
 

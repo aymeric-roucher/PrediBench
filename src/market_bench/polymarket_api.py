@@ -21,6 +21,12 @@ from pydantic import BaseModel
 from market_bench.common import BASE_URL_POLYMARKET
 
 
+class MarketOutcome(BaseModel):
+    clob_token_id: str
+    name: str
+    price: float
+
+
 class Market(BaseModel):
     id: str
     question: str
@@ -31,7 +37,7 @@ class Market(BaseModel):
     createdAt: datetime
     volume: float
     liquidity: float
-    clob_token_ids: list[str]
+    outcomes: list[MarketOutcome]
 
 
 class Event(BaseModel):
@@ -120,10 +126,25 @@ def _json_to_polymarket_market(market_data: dict) -> Market:
         if isinstance(market_data["active"], bool)
         else market_data["active"].lower() == "true"
     )
+    print("\n\n=======\n", market_data)
+    outcomes = json.loads(market_data["outcomes"])
+    if len(outcomes) != 2:
+        print("FOR MARKET:\n", market_data["id"])
+        raise ValueError(f"Expected 2 outcomes, got {len(outcomes)}")
+    outcome_names = json.loads(market_data["outcomes"])
+    outcome_prices = json.loads(market_data["outcomePrices"])
+    outcome_clob_token_ids = json.loads(market_data["clobTokenIds"])
     return Market(
         id=market_data["id"],
         question=market_data["question"],
-        clob_token_ids=json.loads(market_data["clobTokenIds"]),
+        outcomes=[
+            MarketOutcome(
+                clob_token_id=outcome_clob_token_ids[i],
+                name=outcome_names[i],
+                price=outcome_prices[i],
+            )
+            for i in range(len(outcomes))
+        ],
         slug=market_data["slug"],
         description=market_data["description"],
         active=active,
@@ -331,8 +352,7 @@ if __name__ == "__main__":
     print(f"Market created: {top_market.createdAt}")
     print(f"Market active: {top_market.active}")
     print(f"Market closed: {top_market.closed}")
-    print(f"CLOB token IDs: {top_market.clob_token_ids}")
-    print(f"Number of tokens in market: {len(top_market.clob_token_ids)}")
+    print(f"Outcomes: {top_market.outcomes}")
 
     # Get a market that's actually open (active and not closed)
     market_request = MarketRequest(
@@ -346,20 +366,17 @@ if __name__ == "__main__":
         print(
             f"Checking market: {market.question[:50]}... (created: {market.createdAt.year}, closed: {market.closed})"
         )
-        open_market = market
-        break
-
-    if not open_market:
-        print("No suitable open markets found, using first market anyway")
-        open_market = all_markets[0]
+        if not market.closed:
+            open_market = market
+            break
+    assert open_market is not None, "No open market found"
 
     print(f"\nUsing market: {open_market.question}")
     print(f"Created: {open_market.createdAt}")
     print(f"Closed: {open_market.closed}")
-    print(f"Token IDs: {open_market.clob_token_ids}")
 
     # Get order book for the first token
-    token_id = open_market.clob_token_ids[1]
+    token_id = open_market.outcomes[0].clob_token_id
     print(f"\nGetting order book for token: {token_id}")
 
     order_book = get_order_book(token_id)

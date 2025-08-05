@@ -90,3 +90,4 @@ def test_get_market_events_offset():
 if __name__ == "__main__":
     test__get_events()
     test_get_open_markets_limit()
+    test_get_market_events_offset()

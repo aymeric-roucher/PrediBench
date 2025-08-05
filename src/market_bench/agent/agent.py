@@ -1,8 +1,9 @@
 import os
 from datetime import datetime
+from typing import Literal
 
 from dotenv import load_dotenv
-from smolagents import OpenAIModel, Tool, ToolCallingAgent
+from smolagents import OpenAIModel, Tool, ToolCallingAgent, tool
 
 load_dotenv()
 
@@ -98,6 +99,20 @@ class GoogleSearchTool(Tool):
         return "## Search Results\n" + "\n\n".join(web_snippets)
 
 
+@tool
+def final_answer(
+    answer: Literal["yes", "no", "nothing"],
+) -> Literal["yes", "no", "nothing"]:
+    """
+    Provides a final answer to the given problem.
+
+    Args:
+        answer: The final answer to the question
+    """
+    print(f"Final answer: {answer}")
+    return answer
+
+
 if __name__ == "__main__":
     tool = GoogleSearchTool(provider="serper", cutoff_date=datetime(2024, 6, 1))
     results_with_filter = tool.forward("OpenAI GPT-5 news")
@@ -110,17 +125,32 @@ if __name__ == "__main__":
 
 def run_agent(question: str, cutoff_date: datetime) -> ToolCallingAgent:
     model = OpenAIModel(
-        model="gpt-4.1",
+        model_id="gpt-4.1-mini",
         api_key=os.getenv("OPENAI_API_KEY"),
     )
-    tools = [GoogleSearchTool(provider="serper", cutoff_date=cutoff_date)]
+    tools = [
+        GoogleSearchTool(provider="serper", cutoff_date=cutoff_date),
+        final_answer,
+    ]
     agent = ToolCallingAgent(
         tools=tools,
         model=model,
     )
-    prompt = """Please answer the below question by yes or no. But first, analyze it. You can search the web for information.
+    print(agent.tools["final_answer"].inputs)
+    prompt = f"""Let's say we are the {cutoff_date.strftime("%B %d, %Y")}.
+    Please answer the below question by yes or no. But first, run a detailed analysis. You can search the web for information.
     One good method for analyzing is to break down the question into sub-parts, like a tree, and assign probabilities to each sub-branch of the tree, to get a total probability of the question being true.
     Here is the question: {question}
+    You can either buy yes or no, or do nothing.
+
+    What would you decide: buy yes, buy no, or do nothing?
     """
     response = agent.run(prompt)
     return response
+
+
+if __name__ == "__main__":
+    run_agent(
+        "Will the S&P 500 close above 4,500 by the end of the year?",
+        datetime(2024, 6, 1),
+    )
