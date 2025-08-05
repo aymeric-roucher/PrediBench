@@ -1,8 +1,8 @@
 from market_bench.polymarket_api import (
-    _get_market_events,
+    MarketRequest,
+    _get_events,
     _get_open_markets,
     convert_polymarket_time_to_datetime,
-    get_market_events,
     get_open_markets,
 )
 
@@ -17,7 +17,7 @@ def test__get_open_markets():
 
 def test__get_market_events():
     """Test basic market event retrieval."""
-    events = _get_market_events()
+    events = _get_events()
     for event in events:
         # ticker is sometimes different from slug
         assert event["ticker"] in event["slug"]
@@ -45,7 +45,7 @@ def test_get_open_markets():
 
 def test_get_open_markets_field_values():
     """Test that field values are reasonable."""
-    markets = get_open_markets(limit=5)
+    markets = get_open_markets(MarketRequest(limit=5))
 
     for market in markets:
         assert len(market.id) > 0
@@ -60,24 +60,24 @@ def test_get_open_markets_field_values():
 
 def test_get_open_markets_limit():
     """Test that limit parameter works correctly."""
-    markets_small = get_open_markets(limit=5)
-    markets_large = get_open_markets(limit=20)
+    markets_small = get_open_markets(MarketRequest(limit=5))
+    markets_large = get_open_markets(MarketRequest(limit=20))
 
     assert len(markets_small) == 5
     assert len(markets_large) == 20
     assert len(markets_large) > len(markets_small)
 
 
-def test_get_market_events():
+def test__get_events():
     """Test basic market event retrieval."""
-    events = get_market_events()
+    events = _get_events()
     assert len(events) == 500
 
 
 def test_get_market_events_offset():
     """Test that offset parameter works correctly."""
-    events_first = get_market_events(limit=5, offset=0)
-    events_second = get_market_events(limit=5, offset=5)
+    events_first = _get_events(limit=5, offset=0)
+    events_second = _get_events(limit=5, offset=5)
 
     assert len(events_first) == 5
     assert len(events_second) == 5
@@ -88,4 +88,5 @@ def test_get_market_events_offset():
 
 
 if __name__ == "__main__":
-    test_get_market_events()
+    test__get_events()
+    test_get_open_markets_limit()

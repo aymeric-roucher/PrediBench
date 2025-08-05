@@ -1,7 +1,8 @@
+import os
 from datetime import datetime
 
 from dotenv import load_dotenv
-from smolagents import Tool
+from smolagents import OpenAIModel, Tool, ToolCallingAgent
 
 load_dotenv()
 
@@ -105,3 +106,21 @@ if __name__ == "__main__":
     results_without_filter = tool.forward("OpenAI GPT-5 news")
 
     assert results_with_filter != results_without_filter
+
+
+def run_agent(question: str, cutoff_date: datetime) -> ToolCallingAgent:
+    model = OpenAIModel(
+        model="gpt-4.1",
+        api_key=os.getenv("OPENAI_API_KEY"),
+    )
+    tools = [GoogleSearchTool(provider="serper", cutoff_date=cutoff_date)]
+    agent = ToolCallingAgent(
+        tools=tools,
+        model=model,
+    )
+    prompt = """Please answer the below question by yes or no. But first, analyze it. You can search the web for information.
+    One good method for analyzing is to break down the question into sub-parts, like a tree, and assign probabilities to each sub-branch of the tree, to get a total probability of the question being true.
+    Here is the question: {question}
+    """
+    response = agent.run(prompt)
+    return response

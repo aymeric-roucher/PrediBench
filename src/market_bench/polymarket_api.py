@@ -34,14 +34,15 @@ class Market(BaseModel):
     clob_token_ids: list[str]
 
 
-class MarketEvent(BaseModel):
+class Event(BaseModel):
     id: str
-    ticker: str
+    slug: str
     title: str
-    description: str
-    createdAt: datetime
-    endDate: datetime | None = None
-    markets: list[Market] | None = None
+    liquidity: float
+    volume: float
+    start_date: datetime
+    end_date: datetime
+    tags: list[str]
 
 
 class MarketRequest(BaseModel):
@@ -134,7 +135,25 @@ def _json_to_polymarket_market(market_data: dict) -> Market:
     )
 
 
-def _get_market_events(limit: int = 500, offset: int = 0) -> list[dict]:
+def _json_to_polymarket_event(market_event_data: dict) -> Event:
+    return Event(
+        id=market_event_data["id"],
+        slug=market_event_data["slug"],
+        title=market_event_data["title"],
+        liquidity=float(market_event_data["liquidity"]),
+        volume=float(market_event_data["volume"]),
+        start_date=convert_polymarket_time_to_datetime(market_event_data["startDate"]),
+        end_date=convert_polymarket_time_to_datetime(market_event_data["endDate"]),
+        tags=market_event_data["tags"],
+    )
+
+
+def _get_events(
+    limit: int = 500,
+    offset: int = 0,
+    end_date_min: datetime | None = None,
+    end_date_max: datetime | None = None,
+) -> list[dict]:
     """Get open markets from Polymarket, sorted by volume.
 
     There is a limit of 500 markets per request, one must use pagination to get all markets.
@@ -148,6 +167,8 @@ def _get_market_events(limit: int = 500, offset: int = 0) -> list[dict]:
         "closed": "false",
         "order": "volume",
         "ascending": "false",
+        "end_date_min": end_date_min.isoformat() if end_date_min else None,
+        "end_date_max": end_date_max.isoformat() if end_date_max else None,
     }
     response = requests.get(url, params=params)
     response.raise_for_status()
@@ -155,33 +176,23 @@ def _get_market_events(limit: int = 500, offset: int = 0) -> list[dict]:
     return output
 
 
-def get_market_events(limit: int = 500, offset: int = 0) -> list[MarketEvent]:
+def get_market_events(limit: int = 500, offset: int = 0) -> list[Event]:
     """Get market events from Polymarket, sorted by volume.
 
     There is a limit of 500 markets per request, one must use pagination to get all markets.
     """
-    output = _get_market_events(limit, offset)
+    output = _get_events(limit, offset)
     events = []
     for event in output:
-        end_date = None
-        if event.get("endDate"):
-            end_date = convert_polymarket_time_to_datetime(event["endDate"])
-
-        markets = None
-        if event.get("markets"):
-            markets = [
-                _json_to_polymarket_market(market_data)
-                for market_data in event["markets"]
-            ]
-
-        polymarket_event = MarketEvent(
+        polymarket_event = Event(
             id=event["id"],
-            ticker=event["ticker"],
+            slug=event["slug"],
             title=event["title"],
-            description=event["description"],
-            createdAt=convert_polymarket_time_to_datetime(event["createdAt"]),
-            endDate=end_date,
-            markets=markets,
+            liquidity=float(event["liquidity"]),
+            volume=float(event["volume"]),
+            start_date=convert_polymarket_time_to_datetime(event["startDate"]),
+            end_date=convert_polymarket_time_to_datetime(event["endDate"]),
+            tags=event["tags"],
         )
         events.append(polymarket_event)
 
