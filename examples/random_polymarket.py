@@ -203,15 +203,11 @@ def analyze_portfolio_performance(positions_df: pd.DataFrame, returns_df: pd.Dat
 
 def main():
     """Main execution function"""
-    print("=== Market Bench Portfolio Analysis with PnlCalculator ===\n")
-
     markets = get_market_sample(10)
 
     positions_df, returns_df = build_portfolio_data(markets, days_back=14)
 
     analyze_portfolio_performance(positions_df, returns_df)
-
-    print("\n=== Analysis Complete ===")
 
 
 if __name__ == "__main__":
