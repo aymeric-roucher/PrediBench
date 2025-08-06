@@ -32,6 +32,7 @@ class Market(BaseModel):
     question: str
     slug: str
     description: str
+    end_date: datetime
     active: bool
     closed: bool
     createdAt: datetime
@@ -111,7 +112,7 @@ class OrderBook(BaseModel):
 
 def convert_polymarket_time_to_datetime(time_str: str) -> datetime:
     """Convert a Polymarket time string to a datetime object."""
-    return datetime.fromisoformat(time_str.replace("Z", "+00:00"))
+    return datetime.fromisoformat(time_str.replace("Z", "")).replace(tzinfo=None)
 
 
 def _json_to_polymarket_market(market_data: dict) -> Market:
@@ -147,6 +148,7 @@ def _json_to_polymarket_market(market_data: dict) -> Market:
         ],
         slug=market_data["slug"],
         description=market_data["description"],
+        end_date=convert_polymarket_time_to_datetime(market_data["endDate"]),
         active=active,
         closed=closed,
         createdAt=convert_polymarket_time_to_datetime(market_data["createdAt"]),
@@ -239,14 +241,20 @@ def get_open_markets(request: MarketRequest) -> list[Market]:
             if isinstance(value, bool):
                 params[field_name] = "true" if value else "false"
             elif isinstance(value, datetime):
-                params[field_name] = value.isoformat()
+                params[field_name] = value.date().isoformat()
             else:
                 params[field_name] = value
 
     response = requests.get(url, params=params)
     response.raise_for_status()
     output = response.json()
-    return [_json_to_polymarket_market(market) for market in output]
+    markets = [_json_to_polymarket_market(market) for market in output]
+    if request.end_date_min:
+        assert all(
+            request.end_date_min <= market.end_date <= request.end_date_max
+            for market in markets
+        ), "Some markets were created after the end date"
+    return markets
 
 
 def get_token_timeseries(
@@ -318,18 +326,14 @@ def get_order_book(token_id: str) -> OrderBook:
 
 
 if __name__ == "__main__":
-    markets = get_open_markets(MarketRequest(limit=1))
-    top_market = markets[0]
-    print(f"Getting data for market: {top_market.question}")
-    print(f"Market ID: {top_market.id}")
-    print(f"Market created: {top_market.createdAt}")
-    print(f"Market active: {top_market.active}")
-    print(f"Market closed: {top_market.closed}")
-    print(f"Outcomes: {top_market.outcomes}")
-
     # Get a market that's actually open (active and not closed)
     market_request = MarketRequest(
-        limit=10, active=True, closed=False, order="volumeNum", ascending=False
+        limit=10,
+        active=True,
+        closed=False,
+        order="volumeNum",
+        ascending=False,
+        liquidity_num_min=1000,
     )
     all_markets = get_open_markets(market_request)
 

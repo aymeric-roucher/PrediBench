@@ -8,6 +8,7 @@ dependencies = [
     "ipykernel>=6.30.0",
     "kaleido>=1.0.0",
     "litellm>=1.74.15.post1",
+    "markdownify>=1.1.0",
     "matplotlib>=3.10.5",
     "numpy>=1.24.0",
     "openai>=1.98.0",

@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Literal
 
 from dotenv import load_dotenv
-from smolagents import OpenAIModel, Tool, ToolCallingAgent, tool
+from smolagents import OpenAIModel, Tool, ToolCallingAgent, VisitWebpageTool, tool
 
 load_dotenv()
 
@@ -46,8 +46,6 @@ class GoogleSearchTool(Tool):
             }
             if self.cutoff_date is not None:
                 params["tbs"] = f"cdr:1,cd_max:{self.cutoff_date.strftime('%m/%d/%Y')}"
-                print(f"Applied cutoff date: {self.cutoff_date.strftime('%m/%d/%Y')}")
-                print(params)
 
             response = requests.get("https://serpapi.com/search.json", params=params)
         else:
@@ -56,8 +54,6 @@ class GoogleSearchTool(Tool):
             }
             if self.cutoff_date is not None:
                 payload["tbs"] = f"cdr:1,cd_max:{self.cutoff_date.strftime('%m/%d/%Y')}"
-                print(f"Applied cutoff date: {self.cutoff_date.strftime('%m/%d/%Y')}")
-                print(payload)
 
             headers = {"X-API-KEY": self.api_key, "Content-Type": "application/json"}
             response = requests.post(
@@ -123,18 +119,20 @@ if __name__ == "__main__":
     assert results_with_filter != results_without_filter
 
 
-def run_agent(question: str, cutoff_date: datetime) -> ToolCallingAgent:
+def run_smolagent(question: str, cutoff_date: datetime) -> ToolCallingAgent:
     model = OpenAIModel(
         model_id="gpt-4.1-mini",
         api_key=os.getenv("OPENAI_API_KEY"),
     )
     tools = [
         GoogleSearchTool(provider="serper", cutoff_date=cutoff_date),
+        VisitWebpageTool(),
         final_answer,
     ]
     agent = ToolCallingAgent(
         tools=tools,
         model=model,
+        max_steps=40,
     )
     print(agent.tools["final_answer"].inputs)
     prompt = f"""Let's say we are the {cutoff_date.strftime("%B %d, %Y")}.
@@ -150,7 +148,7 @@ def run_agent(question: str, cutoff_date: datetime) -> ToolCallingAgent:
 
 
 if __name__ == "__main__":
-    run_agent(
+    run_smolagent(
         "Will the S&P 500 close above 4,500 by the end of the year?",
         datetime(2024, 6, 1),
     )
