@@ -119,9 +119,11 @@ if __name__ == "__main__":
     assert results_with_filter != results_without_filter
 
 
-def run_smolagent(question: str, cutoff_date: datetime) -> ToolCallingAgent:
+def run_smolagent(
+    model_id: str, question: str, cutoff_date: datetime
+) -> ToolCallingAgent:
     model = OpenAIModel(
-        model_id="gpt-4.1-mini",
+        model_id=model_id,
         api_key=os.getenv("OPENAI_API_KEY"),
     )
     tools = [
@@ -134,7 +136,6 @@ def run_smolagent(question: str, cutoff_date: datetime) -> ToolCallingAgent:
         model=model,
         max_steps=40,
     )
-    print(agent.tools["final_answer"].inputs)
     prompt = f"""Let's say we are the {cutoff_date.strftime("%B %d, %Y")}.
     Please answer the below question by yes or no. But first, run a detailed analysis. You can search the web for information.
     One good method for analyzing is to break down the question into sub-parts, like a tree, and assign probabilities to each sub-branch of the tree, to get a total probability of the question being true.
@@ -143,9 +144,15 @@ def run_smolagent(question: str, cutoff_date: datetime) -> ToolCallingAgent:
 
     What would you decide: buy yes, buy no, or do nothing?
     """
-    response = agent.run(prompt)
-    return response
+    return agent.run(prompt, return_full_output=True)
 
+
+# visit_webpage_tool = VisitWebpageTool()
+# print(
+#     visit_webpage_tool.forward(
+#         "https://www.axios.com/2025/07/24/openai-gpt-5-august-2025"
+#     )
+# )
 
 if __name__ == "__main__":
     run_smolagent(

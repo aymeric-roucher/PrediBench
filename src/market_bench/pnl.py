@@ -29,11 +29,11 @@ class PnlCalculator:
         self.pnl = self.calculate_pnl()
 
     def _assert_index_is_date(self, df: pd.DataFrame):
-        assert all(
-            isinstance(idx, pd.Timestamp)
-            and idx.time() == pd.Timestamp("00:00:00").time()
-            for idx in df.index
-        ), "All index values must be dates without time component"
+        from datetime import date
+
+        assert all(isinstance(idx, date) for idx in df.index), (
+            "All index values must be date objects or timestamps without time component"
+        )
 
     def _get_positions_begin_next_day(self, col: str):
         """
@@ -86,7 +86,7 @@ class PnlCalculator:
         if not stock_details:
             cumulative_pnl = self.pnl.sum(axis=1).cumsum()
             fig = px.line(
-                x=cumulative_pnl.index.date,
+                x=cumulative_pnl.index,
                 y=cumulative_pnl.values,
                 labels={"x": "Date", "y": "Cumulative PnL"},
             )
@@ -107,7 +107,7 @@ class PnlCalculator:
                 cumulative_pnl = self.pnl[col].cumsum()
                 fig.add_trace(
                     go.Scatter(
-                        x=cumulative_pnl.index.date,
+                        x=cumulative_pnl.index,
                         y=cumulative_pnl.values,
                         mode="markers+lines",
                         name=col,
@@ -119,10 +119,10 @@ class PnlCalculator:
                 pnl_at_position_changes = cumulative_pnl.loc[position_changes.index]
                 fig.add_trace(
                     go.Scatter(
-                        x=position_changes.index.date,
+                        x=position_changes.index,
                         y=pnl_at_position_changes.values,
                         text=position_changes.values,
-                        hovertemplate="Taking Position: %{text:.2f}<extra></extra>",
+                        hovertemplate="Position: %{text:.2f}<extra></extra>",
                         mode="markers",
                         marker=dict(
                             symbol=[

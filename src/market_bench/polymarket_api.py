@@ -133,7 +133,6 @@ def _json_to_polymarket_market(market_data: dict) -> Market:
         if isinstance(market_data["active"], bool)
         else market_data["active"].lower() == "true"
     )
-    print("\n\n=======\n", market_data)
     outcomes = json.loads(market_data["outcomes"])
     if len(outcomes) != 2:
         print("FOR MARKET:\n", market_data["id"])
