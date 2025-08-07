@@ -1,5 +1,4 @@
 import json
-import os
 import textwrap
 from datetime import datetime, timedelta
 from typing import Literal
@@ -459,8 +458,8 @@ def filter_interesting_questions(questions: list[str]) -> list[str]:
         questions: list[str]
 
     model = LiteLLMModel(
-        model_id="gpt-4.1",
-        api_key=os.getenv("OPENAI_API_KEY"),
+        model_id="gpt-4.1-mini",
+        requests_per_minute=10,
     )
     output = model.generate(
         [

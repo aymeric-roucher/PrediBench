@@ -1,6 +1,7 @@
 import json
 import os
 import textwrap
+from dataclasses import asdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -70,6 +71,8 @@ def agent_invest_positions(
                 token_usage=TokenUsage(0, 0),
                 timing=Timing(0.0),
             )
+            for message in response.messages:
+                message["model_input_messages"] = "removed"  # Clean logs
             model_id = "test"
 
         output_dir = OUTPUT_PATH / f"smolagent_{model_id}" / date.strftime("%Y-%m-%d")
@@ -78,10 +81,11 @@ def agent_invest_positions(
             json.dump(
                 {
                     "question": question,
-                    "response": response.output,
-                    "messages": response.messages,
+                    "choice": response.output,
+                    "full_result": asdict(response),
                 },
                 f,
+                default=str,
             )
         position = 0 if response == "nothing" else (1 if response == "yes" else -1)
         positions[question] = position
@@ -152,8 +156,8 @@ if __name__ == "__main__":
     target_dates = [today - timedelta(days=14), today - timedelta(days=7)]
 
     for model_id in [
-        "gpt-4.1-mini",
         "gpt-4.1",
+        "gpt-4.1-mini",
         "gpt-4o",
         # "anthropic/claude-sonnet-4-20250514",
         "huggingface/openai/gpt-oss-120b",

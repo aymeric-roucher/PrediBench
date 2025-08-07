@@ -18,7 +18,6 @@ class GoogleSearchTool(Tool):
 
     def __init__(self, provider: str = "serpapi", cutoff_date: datetime | None = None):
         super().__init__()
-        import os
 
         self.provider = provider
         if provider == "serpapi":
@@ -124,7 +123,7 @@ def run_smolagent(
 ) -> ToolCallingAgent:
     model = OpenAIModel(
         model_id=model_id,
-        api_key=os.getenv("OPENAI_API_KEY"),
+        requests_per_minute=10,
     )
     tools = [
         GoogleSearchTool(provider="serper", cutoff_date=cutoff_date),
@@ -132,9 +131,7 @@ def run_smolagent(
         final_answer,
     ]
     agent = ToolCallingAgent(
-        tools=tools,
-        model=model,
-        max_steps=40,
+        tools=tools, model=model, max_steps=40, return_full_result=True
     )
     prompt = f"""Let's say we are the {cutoff_date.strftime("%B %d, %Y")}.
     Please answer the below question by yes or no. But first, run a detailed analysis. You can search the web for information.
@@ -144,7 +141,7 @@ def run_smolagent(
 
     What would you decide: buy yes, buy no, or do nothing?
     """
-    return agent.run(prompt, return_full_output=True)
+    return agent.run(prompt)
 
 
 # visit_webpage_tool = VisitWebpageTool()
