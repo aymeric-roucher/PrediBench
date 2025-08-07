@@ -92,7 +92,7 @@ class GoogleSearchTool(Tool):
                 redacted_version = f"{idx}. [{page['title']}]({page['link']}){date_published}{source}\n{snippet}"
                 web_snippets.append(redacted_version)
 
-        return "## Search Results\n" + "\n\n".join(web_snippets)
+        return f"## Search Results for '{query}'\n" + "\n\n".join(web_snippets)
 
 
 @tool

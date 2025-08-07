@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta
 from typing import Literal
 
+import pandas as pd
 import plotly.graph_objects as go
 import requests
 
@@ -27,7 +28,7 @@ class MarketOutcome(BaseModel):
     price: float
 
 
-class Market(BaseModel):
+class Market(BaseModel, arbitrary_types_allowed=True):
     id: str
     question: str
     slug: str
@@ -39,6 +40,7 @@ class Market(BaseModel):
     volume: float
     liquidity: float
     outcomes: list[MarketOutcome]
+    timeseries: pd.Series | None = None
 
 
 class Event(BaseModel):
@@ -222,14 +224,19 @@ def get_market_events(limit: int = 500, offset: int = 0) -> list[Event]:
     return events
 
 
-def get_open_markets(request: MarketRequest) -> list[Market]:
+def get_open_markets(
+    request: MarketRequest,
+    add_timeseries: tuple[datetime, datetime] | None = None,
+) -> list[Market]:
     """Get open markets from Polymarket, sorted by volume.
 
     There is a limit of 500 markets per request, one must use pagination to get all markets.
 
     Args:
         request: MarketRequest object with full filtering and sorting options
+        add_timeseries: tuple of datetime objects representing the start and end dates of the timeseries to add
     """
+
     url = f"{BASE_URL_POLYMARKET}/markets"
 
     if request.limit and request.limit > 500:
@@ -254,12 +261,23 @@ def get_open_markets(request: MarketRequest) -> list[Market]:
             request.end_date_min <= market.end_date <= request.end_date_max
             for market in markets
         ), "Some markets were created after the end date"
+
+    if add_timeseries:
+        start_date, end_date = add_timeseries
+        for market in markets:
+            ts_request = HistoricalTimeSeriesRequest(
+                market=market.outcomes[0].clob_token_id,
+                start_time=start_date,
+                end_time=end_date,
+                interval="1d",
+            )
+            market.timeseries = get_token_daily_timeseries(ts_request)
     return markets
 
 
-def get_token_timeseries(
+def get_token_daily_timeseries(
     request: HistoricalTimeSeriesRequest,
-) -> HistoricalTimeSeriesData:
+) -> pd.Series:
     """Get token timeseries data from Polymarket CLOB API.
 
     Args:
@@ -283,14 +301,18 @@ def get_token_timeseries(
     response.raise_for_status()
     data = response.json()
 
-    series = [
-        HistoricalTimeSeriesDataPoint(
-            timestamp=datetime.fromtimestamp(point["t"]), price=point["p"]
+    timeseries = (
+        pd.Series(
+            [point["p"] for point in data["history"]],
+            index=[datetime.fromtimestamp(point["t"]) for point in data["history"]],
         )
-        for point in data["history"]
-    ]
-
-    return HistoricalTimeSeriesData(series=series)
+        .sort_index()
+        .resample("1D")
+        .last()
+        .ffill()
+    )
+    timeseries.index = timeseries.index.tz_localize(None).date
+    return timeseries
 
 
 def get_order_book(token_id: str) -> OrderBook:
@@ -328,7 +350,7 @@ def get_order_book(token_id: str) -> OrderBook:
 if __name__ == "__main__":
     # Get a market that's actually open (active and not closed)
     market_request = MarketRequest(
-        limit=10,
+        limit=20,
         active=True,
         closed=False,
         order="volumeNum",
@@ -368,18 +390,17 @@ if __name__ == "__main__":
         end_time=datetime.now(),
         interval="1d",
     )
-    timeseries = get_token_timeseries(request)
+    timeseries = get_token_daily_timeseries(request)
 
-    print(f"Found {len(timeseries.series)} data points")
-    for point in timeseries.series[-5:]:  # Print last 5 points
-        print(f"  {point.timestamp}: ${point.price:.4f}")
-
-    timestamps = [point.timestamp for point in timeseries.series]
-    prices = [point.price for point in timeseries.series]
+    print(f"Found {len(timeseries)} data points")
+    for point in timeseries.iloc[-5:]:  # Print last 5 points
+        print(f"  {point.name}: ${point.values:.4f}")
 
     fig = go.Figure()
     fig.add_trace(
-        go.Scatter(x=timestamps, y=prices, mode="lines+markers", name="Price")
+        go.Scatter(
+            x=timeseries.index, y=timeseries.values, mode="lines+markers", name="Price"
+        )
     )
     fig.update_layout(
         title=f"Price History - {open_market.question}",

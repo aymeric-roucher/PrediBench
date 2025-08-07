@@ -1,110 +1,89 @@
+import json
+import os
 import random
-from datetime import datetime, timedelta
+import textwrap
+from datetime import date, datetime, timedelta
 
 import numpy as np
 import pandas as pd
+from smolagents import ChatMessage, LiteLLMModel
 
 from market_bench.agent.agent import run_smolagent
 from market_bench.pnl import PnlCalculator
 from market_bench.polymarket_api import (
-    HistoricalTimeSeriesRequest,
     Market,
     MarketRequest,
     get_open_markets,
-    get_token_timeseries,
 )
 
 
-def get_historical_returns(markets: list[Market], days_back: int = 1) -> pd.DataFrame:
+def get_historical_returns(markets: list[Market]) -> pd.DataFrame:
     """Get historical returns directly from timeseries data"""
-    print(f"\nGetting historical returns over {days_back} days...")
 
-    end_date = datetime.today()
-    start_date = end_date - timedelta(days=days_back)
-
-    selected_tokens = []
-    for market in markets:
-        selected_tokens.append(
-            {
-                "question": market.question,
-                "first_choice_token_id": market.outcomes[0].clob_token_id,
-            }
-        )
-
-    print(f"Selected {len(selected_tokens)} tokens for returns calculation")
-
-    all_dates = pd.date_range(start=start_date, end=end_date, freq="D", normalize=True)
     returns_df = pd.DataFrame(
         np.nan,
-        index=all_dates,
-        columns=[token["question"] for token in selected_tokens],
+        index=markets[0].timeseries.index,
+        columns=[market.question for market in markets],
     )
     prices_df = pd.DataFrame(
         np.nan,
-        index=all_dates,
-        columns=[token["question"] for token in selected_tokens],
+        index=markets[0].timeseries.index,
+        columns=[market.question for market in markets],
     )
 
-    for i, token_info in enumerate(selected_tokens):
-        ts_request = HistoricalTimeSeriesRequest(
-            market=token_info["first_choice_token_id"],
-            start_time=start_date,
-            end_time=end_date,
-            interval="1d",
-        )
+    for i, market in enumerate(markets):
+        prices_df[market.question] = market.timeseries
 
-        timeseries = get_token_timeseries(ts_request)
-
-        # Create price series
-        prices_df[token_info["question"]] = (
-            pd.Series(
-                [point.price for point in timeseries.series],
-                index=[point.timestamp for point in timeseries.series],
-            )
-            .sort_index()
-            .resample("1D")
-            .last()
-            .ffill()
-        )
-
-        # Calculate returns
-        token_returns = prices_df[token_info["question"]].pct_change().dropna()
-
-        # Align with our date range - match by date only (ignore time)
-        for ts_date, return_val in token_returns.items():
-            for date in all_dates:
-                if date.date() == ts_date.date():
-                    returns_df.loc[date, token_info["question"]] = return_val
-                    break
-
-        filled_returns = returns_df[token_info["question"]].notna().sum()
-        print(
-            f"  Token {i + 1}/{len(selected_tokens)}: {token_info['question'][:8]}... - {len(token_returns)} returns, {filled_returns} aligned"
-        )
+        token_returns = market.timeseries.pct_change(periods=1)
+        returns_df[market.question] = token_returns
 
     return returns_df, prices_df
 
 
+def filter_out_resolved_markets(
+    markets: list[Market], threshold: float = 0.02
+) -> list[Market]:
+    """Filter out markets that are already close to 0 or 1, as these are probably already resolved"""
+    return [
+        market
+        for market in markets
+        if not (
+            market.timeseries[-10:].mean() > 1 - threshold
+            or market.timeseries[-10:].mean() < threshold
+        )
+    ]
+
+
 def agent_invest_positions(
-    prices_df: pd.DataFrame, start_date: datetime, end_date: datetime
+    markets: list[Market],
+    prices_df: pd.DataFrame,
+    start_date: date,
+    end_date: date,
 ) -> pd.DataFrame:
     """Create investment positions DataFrame: 1 to buy, -1 to sell, 0 to do nothing"""
     print("\nCreating investment positions with agent...")
+    assert start_date in markets[0].timeseries.index
+    assert end_date in markets[0].timeseries.index
 
     positions_df = pd.DataFrame(
         0.0,
-        index=pd.date_range(start=start_date, end=end_date, freq="D"),
+        index=pd.date_range(start=start_date, end=end_date, freq="D").date,
         columns=prices_df.columns,
     )
 
     for date in positions_df.index:
-        for question in prices_df.columns:
+        for i, question in enumerate(prices_df.columns):
+            market = markets[i]
+            assert market.question == question
             if np.isnan(prices_df.loc[date, question]):
                 continue
 
             full_question = (
-                question
-                + f" Here are the latest rates for the 'yes' to that question (out of 1), to guide you:\n{prices_df.loc[:date, question].dropna().to_string(index=True, header=False)}\nInvest in yes only if you think the yes is underrated, and invest in no only if you think that the yes is overrated."
+                market.question
+                + "\nMore details: "
+                + market.description
+                + "\n\n"
+                + f" Here are the latest rates for the 'yes' to that question (rates for 'yes' and 'no' sum to 1), to guide you:\n{prices_df.loc[:date, question].dropna().to_string(index=True, header=False)}\nInvest in yes only if you think the yes is underrated, and invest in no only if you think that the yes is overrated."
             )
             response = run_smolagent(
                 full_question,
@@ -137,6 +116,57 @@ def invest_on_random_positions(
     )
 
     return positions_df
+
+
+def filter_interesting_questions(questions: list[str]) -> list[str]:
+    """Get interesting questions from markets"""
+
+    from pydantic import BaseModel
+
+    class InterestingQuestions(BaseModel):
+        questions: list[str]
+
+    # model = OpenAIModel(
+    #     model_id="gpt-4.1",
+    #     api_key=os.getenv("OPENAI_API_KEY"),
+    # )
+
+    # print(
+    #     model.generate(
+    #         [
+    #             ChatMessage(
+    #                 role="user",
+    #                 content=f"Please select the most interesting deduplicated questions out of the following list:\n{[market.question for market in markets]}.\nDeduplicated means that you should remove any successive question that has the same content and only a different end date than another one. Interesting means: remove crypto questions.",
+    #             )
+    #         ],
+    #     )
+    # )
+    # quit()
+
+    model = LiteLLMModel(
+        model_id="gpt-4.1",
+        api_key=os.getenv("OPENAI_API_KEY"),
+    )
+    output = model.generate(
+        [
+            ChatMessage(
+                role="user",
+                content=textwrap.dedent(f"""Please select the most interesting deduplicated questions out of the following list:
+                {questions}
+                2 questions being deduplicated means that one of them gives >70% info on the other one. In that case, remove all but the first occurence.
+                For instance in "Winnie the Pooh becomes US president by October 2025?" and "Winnie the Pooh becomes US president by November 2025?" and "Piglet gets over 50% of the vote in the 2025 US presidential election?", you should remove the second and third one - the second because it is just a later date so heavily impacted by the first, and the third because Winne and Piglet winning is mutually exclusive so one gives out the other.
+                Interesting means: remove crypto questions."""),
+            )
+        ],
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "response",
+                "schema": InterestingQuestions.model_json_schema(),
+            },
+        },
+    )
+    return json.loads(output.content)["questions"]
 
 
 def analyze_portfolio_performance(positions_df: pd.DataFrame, returns_df: pd.DataFrame):
@@ -184,21 +214,31 @@ def analyze_portfolio_performance(positions_df: pd.DataFrame, returns_df: pd.Dat
 if __name__ == "__main__":
     today = datetime.now().replace(tzinfo=None).date()
     request = MarketRequest(
-        limit=2,
+        limit=50,
         active=True,
         closed=False,
         order="volumeNum",
         ascending=False,
         end_date_min=today + timedelta(days=1),
-        end_date_max=today + timedelta(days=7),
+        end_date_max=today + timedelta(days=30),
     )
-    markets = get_open_markets(request)
-    returns_df, prices_df = get_historical_returns(markets, days_back=15)
-    end_date = today
-    start_date = today - timedelta(days=10)
-    print(returns_df)
+    markets = get_open_markets(
+        request, add_timeseries=[today - timedelta(days=20), today]
+    )
+    markets = filter_out_resolved_markets(markets)
+
+    interesting_questions = filter_interesting_questions(
+        [market.question for market in markets]
+    )
+    markets = [market for market in markets if market.question in interesting_questions]
+    markets = markets[:10]
+
+    returns_df, prices_df = get_historical_returns(markets)
+    print("\n".join([market.question for market in markets]))
 
     # positions_df = invest_on_random_positions(returns_df, investment_probability=1)
-    positions_df = agent_invest_positions(prices_df, start_date, today)
+    positions_df = agent_invest_positions(
+        markets, prices_df, today - timedelta(days=10), today
+    )
 
     analyze_portfolio_performance(positions_df, returns_df)
