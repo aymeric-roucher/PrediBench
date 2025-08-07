@@ -1,57 +1,19 @@
-import json
-import os
 import random
-import textwrap
 from datetime import date, datetime, timedelta
 
 import numpy as np
 import pandas as pd
-from smolagents import ChatMessage, LiteLLMModel
 
 from market_bench.agent.agent import run_smolagent
 from market_bench.pnl import PnlCalculator
 from market_bench.polymarket_api import (
     Market,
     MarketRequest,
+    filter_interesting_questions,
+    filter_out_resolved_markets,
+    get_historical_returns,
     get_open_markets,
 )
-
-
-def get_historical_returns(markets: list[Market]) -> pd.DataFrame:
-    """Get historical returns directly from timeseries data"""
-
-    returns_df = pd.DataFrame(
-        np.nan,
-        index=markets[0].timeseries.index,
-        columns=[market.question for market in markets],
-    )
-    prices_df = pd.DataFrame(
-        np.nan,
-        index=markets[0].timeseries.index,
-        columns=[market.question for market in markets],
-    )
-
-    for i, market in enumerate(markets):
-        prices_df[market.question] = market.timeseries
-
-        token_returns = market.timeseries.pct_change(periods=1)
-        returns_df[market.question] = token_returns
-
-    return returns_df, prices_df
-
-
-def filter_out_resolved_markets(
-    markets: list[Market], threshold: float = 0.02
-) -> list[Market]:
-    """Filter out markets that are already close to 0 or 1, as these are probably already resolved"""
-    return [
-        market
-        for market in markets
-        if not (
-            market.timeseries[-10:].mean() > 1 - threshold
-            or market.timeseries[-10:].mean() < threshold
-        )
-    ]
 
 
 def agent_invest_positions(
@@ -116,57 +78,6 @@ def invest_on_random_positions(
     )
 
     return positions_df
-
-
-def filter_interesting_questions(questions: list[str]) -> list[str]:
-    """Get interesting questions from markets"""
-
-    from pydantic import BaseModel
-
-    class InterestingQuestions(BaseModel):
-        questions: list[str]
-
-    # model = OpenAIModel(
-    #     model_id="gpt-4.1",
-    #     api_key=os.getenv("OPENAI_API_KEY"),
-    # )
-
-    # print(
-    #     model.generate(
-    #         [
-    #             ChatMessage(
-    #                 role="user",
-    #                 content=f"Please select the most interesting deduplicated questions out of the following list:\n{[market.question for market in markets]}.\nDeduplicated means that you should remove any successive question that has the same content and only a different end date than another one. Interesting means: remove crypto questions.",
-    #             )
-    #         ],
-    #     )
-    # )
-    # quit()
-
-    model = LiteLLMModel(
-        model_id="gpt-4.1",
-        api_key=os.getenv("OPENAI_API_KEY"),
-    )
-    output = model.generate(
-        [
-            ChatMessage(
-                role="user",
-                content=textwrap.dedent(f"""Please select the most interesting deduplicated questions out of the following list:
-                {questions}
-                2 questions being deduplicated means that one of them gives >70% info on the other one. In that case, remove all but the first occurence.
-                For instance in "Winnie the Pooh becomes US president by October 2025?" and "Winnie the Pooh becomes US president by November 2025?" and "Piglet gets over 50% of the vote in the 2025 US presidential election?", you should remove the second and third one - the second because it is just a later date so heavily impacted by the first, and the third because Winne and Piglet winning is mutually exclusive so one gives out the other.
-                Interesting means: remove crypto questions."""),
-            )
-        ],
-        response_format={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "response",
-                "schema": InterestingQuestions.model_json_schema(),
-            },
-        },
-    )
-    return json.loads(output.content)["questions"]
 
 
 def analyze_portfolio_performance(positions_df: pd.DataFrame, returns_df: pd.DataFrame):
