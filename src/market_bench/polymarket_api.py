@@ -306,7 +306,9 @@ def get_token_daily_timeseries(
     timeseries = (
         pd.Series(
             [point["p"] for point in data["history"]],
-            index=[datetime.fromtimestamp(point["t"]) for point in data["history"]],
+            index=pd.to_datetime(
+                [datetime.fromtimestamp(point["t"]) for point in data["history"]]
+            ),
         )
         .sort_index()
         .resample("1D")

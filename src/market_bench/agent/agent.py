@@ -3,7 +3,14 @@ from datetime import datetime
 from typing import Literal
 
 from dotenv import load_dotenv
-from smolagents import OpenAIModel, Tool, ToolCallingAgent, VisitWebpageTool, tool
+from smolagents import (
+    InferenceClientModel,
+    OpenAIModel,
+    Tool,
+    ToolCallingAgent,
+    VisitWebpageTool,
+    tool,
+)
 
 load_dotenv()
 
@@ -71,7 +78,7 @@ class GoogleSearchTool(Tool):
                 f"No results found for query: '{query}'. Use a less restrictive query."
             )
         if len(results[self.organic_key]) == 0:
-            return f"No results found for '{query}'. Try with a more general query, or remove the year filter."
+            return f"No results found for '{query}'. Try with a more general query."
 
         web_snippets = []
         if self.organic_key in results:
@@ -121,10 +128,16 @@ if __name__ == "__main__":
 def run_smolagent(
     model_id: str, question: str, cutoff_date: datetime
 ) -> ToolCallingAgent:
-    model = OpenAIModel(
-        model_id=model_id,
-        requests_per_minute=10,
-    )
+    if model_id.startswith("huggingface/"):
+        model = InferenceClientModel(
+            model_id=model_id.replace("huggingface/", ""),
+            requests_per_minute=10,
+        )
+    else:
+        model = OpenAIModel(
+            model_id=model_id,
+            requests_per_minute=10,
+        )
     tools = [
         GoogleSearchTool(provider="serper", cutoff_date=cutoff_date),
         VisitWebpageTool(),
@@ -133,15 +146,7 @@ def run_smolagent(
     agent = ToolCallingAgent(
         tools=tools, model=model, max_steps=40, return_full_result=True
     )
-    prompt = f"""Let's say we are the {cutoff_date.strftime("%B %d, %Y")}.
-    Please answer the below question by yes or no. But first, run a detailed analysis. You can search the web for information.
-    One good method for analyzing is to break down the question into sub-parts, like a tree, and assign probabilities to each sub-branch of the tree, to get a total probability of the question being true.
-    Here is the question:
-    {question}
-
-    What would you decide: buy yes, buy no, or do nothing?
-    """
-    return agent.run(prompt)
+    return agent.run(question)
 
 
 # visit_webpage_tool = VisitWebpageTool()
@@ -153,6 +158,7 @@ def run_smolagent(
 
 if __name__ == "__main__":
     run_smolagent(
+        "gpt-4.1",
         "Will the S&P 500 close above 4,500 by the end of the year?",
         datetime(2024, 6, 1),
     )

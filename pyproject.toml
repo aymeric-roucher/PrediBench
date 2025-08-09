@@ -10,6 +10,7 @@ dependencies = [
     "litellm>=1.74.15.post1",
     "markdownify>=1.1.0",
     "matplotlib>=3.10.5",
+    "nbformat>=5.10.4",
     "numpy>=1.24.0",
     "openai>=1.98.0",
     "pandas>=2.0.0",
@@ -17,11 +18,14 @@ dependencies = [
     "py-clob-client>=0.24.0",
     "pydantic>=2.0.0",
     "requests>=2.32.4",
-    "smolagents>=1.20.0",
+    "smolagents @ git+https://github.com/huggingface/smolagents.git@main",
 ]
 
 [project.scripts]
 hello = "market_bench:hello"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [build-system]
 requires = ["hatchling"]

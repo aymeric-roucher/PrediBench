@@ -102,20 +102,22 @@ class PnlCalculator:
 
             colors = px.colors.qualitative.Plotly
             columns = list(self.pnl.columns)
-            for i, col in enumerate(columns):
+            for i, question in enumerate(columns):
                 col_color = colors[i % len(colors)]
-                cumulative_pnl = self.pnl[col].cumsum()
+                cumulative_pnl = self.pnl[question].cumsum()
                 fig.add_trace(
                     go.Scatter(
                         x=cumulative_pnl.index,
                         y=cumulative_pnl.values,
                         mode="markers+lines",
-                        name=col,
+                        name=question[:40],
                         line=dict(color=col_color),
                     )
                 )
                 # Add markers for positions taken
-                position_changes = self.positions[col][self.positions[col] != 0]
+                position_changes = self.positions[question][
+                    self.positions[question] != 0
+                ]
                 pnl_at_position_changes = cumulative_pnl.loc[position_changes.index]
                 fig.add_trace(
                     go.Scatter(
