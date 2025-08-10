@@ -1,5 +1,5 @@
 [project]
-name = "predibench-core"
+name = "predibench"
 version = "0.1.0"
 description = "Core package for PrediBench agent predictions on Polymarket"
 readme = "README.md"
