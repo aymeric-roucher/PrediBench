@@ -43,7 +43,7 @@ class Market(BaseModel, arbitrary_types_allowed=True):
     volume: float
     liquidity: float
     outcomes: list[MarketOutcome]
-    timeseries: pd.Series | None = None
+    prices: pd.Series | None = None
 
 
 class Event(BaseModel):
@@ -273,7 +273,7 @@ def get_open_markets(
                 end_time=end_date,
                 interval="1d",
             )
-            market.timeseries = get_token_daily_timeseries(ts_request)
+            market.prices = get_token_daily_timeseries(ts_request)
     return markets
 
 
@@ -414,24 +414,24 @@ if __name__ == "__main__":
     fig.write_image("timeseries.png")
 
 
-def get_historical_returns(markets: list[Market]) -> pd.DataFrame:
+def get_historical_returns(markets: list[Market]) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Get historical returns directly from timeseries data"""
 
     returns_df = pd.DataFrame(
         np.nan,
-        index=markets[0].timeseries.index,
+        index=markets[0].prices.index,
         columns=[market.question for market in markets],
     )
     prices_df = pd.DataFrame(
         np.nan,
-        index=markets[0].timeseries.index,
+        index=markets[0].prices.index,
         columns=[market.question for market in markets],
     )
 
     for i, market in enumerate(markets):
-        prices_df[market.question] = market.timeseries
+        prices_df[market.question] = market.prices
 
-        token_returns = market.timeseries.pct_change(periods=1)
+        token_returns = market.prices.pct_change(periods=1)
         returns_df[market.question] = token_returns
 
     return returns_df, prices_df
@@ -445,8 +445,8 @@ def filter_out_resolved_markets(
         market
         for market in markets
         if not (
-            market.timeseries[-10:].mean() > 1 - threshold
-            or market.timeseries[-10:].mean() < threshold
+            market.prices[-10:].mean() > 1 - threshold
+            or market.prices[-10:].mean() < threshold
         )
     ]
 

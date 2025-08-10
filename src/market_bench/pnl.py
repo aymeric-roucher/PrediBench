@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 
 class PnlCalculator:
@@ -10,13 +11,15 @@ class PnlCalculator:
     def __init__(
         self,
         positions: pd.DataFrame,
-        returns: pd.DataFrame,
+        returns: pd.DataFrame = None,
+        prices: pd.DataFrame = None,
         to_vol_target: bool = False,
         vol_targeting_window: str = "30D",
     ):
         """
         positions: Daily positions: pd.DataFrame with columns as markets and index as dates. A position noted with date D as index is the position at the end of day D, which will be impacted by returns of day D+1
         returns: Daily returns: pd.DataFrame with columns as markets and index as dates
+        prices: Price data: pd.DataFrame with columns as markets and index as dates
         to_vol_target: bool, if True, will target volatility
         vol_targeting_window: str, window for volatility targeting
         """
@@ -24,6 +27,8 @@ class PnlCalculator:
         self._assert_index_is_date(self.positions)
         self.returns = returns
         self._assert_index_is_date(self.returns)
+        self.prices = prices
+        self._assert_index_is_date(self.prices)
         self.to_vol_target = to_vol_target
         self.vol_targeting_window = vol_targeting_window
         self.pnl = self.calculate_pnl()
@@ -70,6 +75,7 @@ class PnlCalculator:
             )
             return pnls_
         else:
+            print("COLL", self.positions.columns, self.returns.columns)
             pnls_ = pd.concat(
                 [
                     self._get_positions_begin_next_day(col).reindex(
@@ -97,54 +103,86 @@ class PnlCalculator:
             )
             return fig
         else:
-            # Plot each stock's cumulative pnl as a separate line
-            fig = go.Figure()
+            # Create subplots: Prices on top, PnL on bottom (equal height)
+            fig = make_subplots(
+                rows=2, cols=1,
+                row_heights=[0.5, 0.5],  # Equal height for both subplots
+                subplot_titles=('Price Evolution', 'Cumulative PnL'),
+                vertical_spacing=0.08
+            )
 
             colors = px.colors.qualitative.Plotly
             columns = list(self.pnl.columns)
             for i, question in enumerate(columns):
                 col_color = colors[i % len(colors)]
                 cumulative_pnl = self.pnl[question].cumsum()
+                
+                # Add price evolution trace to subplot 1 (top)
+                if question in self.prices.columns:
+                    price_data = self.prices[question].dropna()
+                    fig.add_trace(
+                        go.Scatter(
+                            x=price_data.index,
+                            y=price_data.values,
+                            mode="lines",
+                            name=question[:40],
+                            line=dict(color=col_color),
+                            legendgroup=question[:40],
+                        ),
+                        row=1, col=1
+                    )
+                    
+                    # Add markers for positions taken on the price chart
+                    position_changes = self.positions[question][
+                        self.positions[question] != 0
+                    ]
+                    if len(position_changes) > 0:
+                        # Get price values at position change dates
+                        prices_at_position_changes = price_data.loc[
+                            price_data.index.isin(position_changes.index)
+                        ]
+                        fig.add_trace(
+                            go.Scatter(
+                                x=prices_at_position_changes.index,
+                                y=prices_at_position_changes.values,
+                                text=position_changes.values,
+                                hovertemplate="Position: %{text:.2f}<br>Price: %{y:.3f}<extra></extra>",
+                                mode="markers",
+                                marker=dict(
+                                    symbol=[
+                                        "triangle-up" if pos > 0 else "triangle-down"
+                                        for pos in position_changes.values
+                                    ],
+                                    size=10,
+                                    color=col_color,
+                                    line=dict(width=1, color="black"),
+                                ),
+                                showlegend=False,
+                                legendgroup=question[:40],
+                            ),
+                            row=1, col=1
+                        )
+                
+                # Add PnL trace to subplot 2 (bottom)
                 fig.add_trace(
                     go.Scatter(
                         x=cumulative_pnl.index,
                         y=cumulative_pnl.values,
                         mode="markers+lines",
-                        name=question[:40],
                         line=dict(color=col_color),
-                    )
-                )
-                # Add markers for positions taken
-                position_changes = self.positions[question][
-                    self.positions[question] != 0
-                ]
-                pnl_at_position_changes = cumulative_pnl.loc[position_changes.index]
-                fig.add_trace(
-                    go.Scatter(
-                        x=position_changes.index,
-                        y=pnl_at_position_changes.values,
-                        text=position_changes.values,
-                        hovertemplate="Position: %{text:.2f}<extra></extra>",
-                        mode="markers",
-                        marker=dict(
-                            symbol=[
-                                "triangle-up" if pos > 0 else "triangle-down"
-                                for pos in position_changes.values
-                            ],
-                            size=10,
-                            color=col_color,
-                            line=dict(width=1, color="black"),
-                        ),
                         showlegend=False,
-                    )
+                        legendgroup=question[:40],
+                    ),
+                    row=2, col=1
                 )
+
+            fig.update_xaxes(title_text="Date", row=2, col=1)
+            fig.update_yaxes(title_text="Price", row=1, col=1)
+            fig.update_yaxes(title_text="Cumulative PnL", tickformat=".0%", row=2, col=1)
             fig.update_layout(
-                xaxis_title="Date",
-                yaxis_title="Cumulative PnL",
                 legend_title="Stock",
                 width=1200,
-                height=600,
-                yaxis=dict(tickformat=".0%"),
+                height=800,  # Increased height for two subplots
             )
             return fig
 

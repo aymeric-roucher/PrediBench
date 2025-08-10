@@ -1,7 +1,7 @@
 import json
 import os
 import textwrap
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -65,11 +65,11 @@ def agent_invest_positions(
     prices_df: pd.DataFrame,
     date: date,
     test_mode: bool = False,
-) -> dict[str, int]:
+) -> None:
     """Create investment positions: 1 to buy, -1 to sell, 0 to do nothing"""
     print("\nCreating investment positions with agent...")
-    print(date, markets[0].timeseries.index)
-    assert date in markets[0].timeseries.index
+    print(date, markets[0].prices.index)
+    assert date in markets[0].prices.index
 
     output_dir = (
         OUTPUT_PATH
@@ -77,7 +77,6 @@ def agent_invest_positions(
         / date.strftime("%Y-%m-%d")
     )
     os.makedirs(output_dir, exist_ok=True)
-    positions = {}
     for i, question in enumerate(prices_df.columns):
         if (output_dir / f"{question[:50]}.json").exists():
             print(
@@ -146,26 +145,79 @@ def agent_invest_positions(
                     f,
                     default=str,
                 )
-        position = 0 if choice == "nothing" else (1 if choice == "yes" else -1)
-        positions[question] = position
-    return positions
+    return
 
 
-def get_filtered_markets(today: date, n_markets: int = 10) -> list[Market]:
+def validate_continuous_returns(
+    returns_df: pd.DataFrame, start_date: date, end_date: date
+) -> None:
+    """Validate that returns data is continuous for the given date range.
+
+    Args:
+        returns_df: DataFrame with returns data indexed by date
+        start_date: First date that should have data
+        end_date: Last date that should have data
+
+    Raises:
+        ValueError: If any dates are missing from the range
+    """
+    expected_date_range = pd.date_range(start=start_date, end=end_date, freq="D").date
+    actual_dates = set(returns_df.index)
+    expected_dates = set(expected_date_range)
+
+    missing_dates = expected_dates - actual_dates
+    if missing_dates:
+        raise ValueError(f"Missing returns data for dates: {sorted(missing_dates)}")
+
+
+def collect_investment_choices(output_path: Path = OUTPUT_PATH) -> pd.DataFrame:
+    positions = []
+    for agent_name in os.listdir(output_path):
+        if os.path.isdir(output_path / agent_name):
+            for date_folder in os.listdir(output_path / agent_name):
+                for file in os.listdir(output_path / agent_name / date_folder):
+                    if file.endswith(".json"):
+                        with open(
+                            output_path / agent_name / date_folder / file, "r"
+                        ) as f:
+                            data = json.load(f)
+                        try:
+                            positions.append(
+                                {
+                                    "agent_name": agent_name,
+                                    "date": date.fromisoformat(date_folder),
+                                    "question": data["question"],
+                                    "choice": (
+                                        0
+                                        if data["choice"] == "nothing"
+                                        else (1 if data["choice"] == "yes" else -1)
+                                    ),
+                                    "question_id": data["id"],
+                                }
+                            )
+                        except Exception as e:
+                            print(f"Error for {file}: {e}")
+                            print(data)
+                            raise e
+                            continue
+    return pd.DataFrame.from_records(positions)
+
+
+def choose_markets(end_date: date, n_markets: int = 10) -> list[Market]:
     request = MarketRequest(
         limit=n_markets * 10,
         active=True,
         closed=False,
         order="volumeNum",
         ascending=False,
-        end_date_min=today + timedelta(days=1),
-        end_date_max=today + timedelta(days=21),
+        end_date_min=end_date + timedelta(days=1),
+        end_date_max=end_date + timedelta(days=21),
     )
     markets = get_open_markets(
         request,
         add_timeseries=[
-            today - timedelta(days=15),
-            today,
+            end_date - timedelta(days=15),
+            end_date,
         ],  # 15 days back is the maximum allowed by the API
     )
     markets = filter_out_resolved_markets(markets)
@@ -173,36 +225,95 @@ def get_filtered_markets(today: date, n_markets: int = 10) -> list[Market]:
     output_dir = OUTPUT_PATH
     output_dir.mkdir(exist_ok=True)
     questions_file = output_dir / "interesting_questions.json"
+    old_questions_file = output_dir / "interesting_questions_old.json"
 
-    if questions_file.exists():
+    if old_questions_file.exists():
         print("LOADING INTERESTING QUESTIONS FROM FILE")
-        with open(questions_file, "r") as f:
+        with open(old_questions_file, "r") as f:
             interesting_questions = json.load(f)
     else:
         interesting_questions = filter_interesting_questions(
             [market.question for market in markets]
         )
-        with open(questions_file, "w") as f:
-            json.dump(interesting_questions, f, indent=2)
     markets = [market for market in markets if market.question in interesting_questions]
+
+    with open(questions_file, "w") as f:
+        json.dump(
+            {
+                market.id: market.model_dump(mode="json", exclude={"prices"})
+                for market in markets
+            },
+            f,
+            indent=2,
+        )
     markets = markets[:n_markets]
     assert len(markets) == n_markets
     return markets
 
 
+def compute_cumulative_pnl(
+    positions_agent_df: pd.DataFrame, returns_df: pd.DataFrame, prices_df: pd.DataFrame
+) -> pd.DataFrame:
+    # Convert positions_agent_df to have date as index, question as columns, and choice as values
+    positions_agent_df = positions_agent_df.pivot(
+        index="date", columns="question", values="choice"
+    )
+
+    # Forward-fill positions to all daily dates in the returns range
+    daily_index = returns_df.index[returns_df.index >= investment_dates[0]]
+    positions_agent_df = positions_agent_df.reindex(daily_index, method="ffill")
+    positions_agent_df = positions_agent_df.loc[
+        positions_agent_df.index >= investment_dates[0]
+    ]
+    returns_df = returns_df.loc[returns_df.index >= investment_dates[0]]
+
+    positions_agent_df = positions_agent_df.loc[
+        :, positions_agent_df.columns.isin(returns_df.columns)
+    ]
+    print("\nAnalyzing portfolio performance with PnlCalculator...")
+
+    print("\nPositions Table (first 15 rows):")
+    print(positions_agent_df.head(15))
+    print(f"\nPositions shape: {positions_agent_df.shape}")
+
+    print("\nReturns Table (first 15 rows):")
+    print(returns_df.head(15))
+    print(f"\nReturns shape: {returns_df.shape}")
+
+    print("\nData summary:")
+    print(
+        f"  Investment positions: {(positions_agent_df != 0.0).sum().sum()} out of {positions_agent_df.size} possible"
+    )
+    print(
+        f"  Non-zero returns: {(returns_df != 0).sum().sum()} out of {returns_df.notna().sum().sum()} non-NaN"
+    )
+    print(
+        f"  Returns range: {returns_df.min().min():.4f} to {returns_df.max().max():.4f}"
+    )
+
+    engine = PnlCalculator(positions_agent_df, returns_df, prices_df)
+
+    fig = engine.plot_pnl(stock_details=True)
+
+    print(engine.get_performance_metrics().round(2))
+
+    cumulative_pnl = engine.pnl.sum(axis=1).cumsum()
+    return cumulative_pnl, fig
+
+
 if __name__ == "__main__":
     N_MARKETS = 10
 
-    today = datetime.now().replace(tzinfo=None).date()
-    markets = get_filtered_markets(today, n_markets=N_MARKETS)
-    print("\n".join([market.question for market in markets]))
+    # today = datetime.now().replace(tzinfo=None).date()
+    end_date = date(2025, 8, 1)
 
-    returns_df, prices_df = get_historical_returns(markets)
+    if False:
+        markets = choose_markets(end_date, n_markets=N_MARKETS)
+        returns_df, prices_df = get_historical_returns(markets)
 
-    target_dates = [date(2025, 7, 25), date(2025, 8, 1)]
-    final_pnls = {}
+    investment_dates = [date(2025, 7, 25), date(2025, 8, 1)]
 
-    for model_id in [
+    list_models = [
         "huggingface/openai/gpt-oss-120b",
         "huggingface/openai/gpt-oss-20b",
         "huggingface/Qwen/Qwen3-30B-A3B-Instruct-2507",
@@ -217,71 +328,76 @@ if __name__ == "__main__":
         "o3-deep-research",
         "test_random",
         # "anthropic/claude-sonnet-4-20250514",
-    ]:
-        list_positions = []
-        agent_name = f"smolagent_{model_id.replace('/', '--')}"
-        try:
-            for target_date in target_dates:
-                positions = agent_invest_positions(
-                    model_id, markets, prices_df, target_date
-                )
-                list_positions.append(positions)
-        except Exception as e:
-            print(f"Error for {model_id}: {e}")
-            continue
+    ]
 
-        # Create DataFrame with positions on target dates
-        print(list_positions, target_dates, len(list_positions), len(target_dates))
-        positions_df = pd.DataFrame(list_positions, index=target_dates)
+    def launch_agent_investments(list_models, investment_dates, prices_df, markets):
+        for model_id in list_models:
+            try:
+                for investment_date in investment_dates:
+                    agent_invest_positions(
+                        model_id, markets, prices_df, investment_date
+                    )
+            except Exception as e:
+                print(f"Error for {model_id}: {e}")
+                # raise e
+                continue
 
-        # Forward-fill positions to all daily dates in the returns range
-        daily_index = returns_df.index[returns_df.index >= target_dates[0]]
-        positions_df = positions_df.reindex(daily_index, method="ffill")
-        positions_df = positions_df.loc[positions_df.index >= target_dates[0]]
-        returns_df = returns_df.loc[returns_df.index >= target_dates[0]]
+    if False:
+        launch_agent_investments(list_models, investment_dates, prices_df, markets)
 
-        print("\nAnalyzing portfolio performance with PnlCalculator...")
+    def get_choices_compute_pnls(investment_dates, output_path: Path = OUTPUT_PATH):
+        # Validate that we have continuous returns data
+        expected_start = investment_dates[0]
+        expected_end = investment_dates[-1] + timedelta(days=7)
 
-        print("\nPositions Table (first 15 rows):")
-        print(positions_df.head(15))
-        print(f"\nPositions shape: {positions_df.shape}")
+        positions_df = collect_investment_choices(output_path)
+        markets = []
+        for question_id in positions_df["question_id"].unique():
+            request = MarketRequest(
+                id=question_id,
+            )
+            market = get_open_markets(
+                request,
+                add_timeseries=[
+                    expected_start,
+                    expected_end,
+                ],  # 15 days back is the maximum allowed by the API
+            )[0]
+            markets.append(market)
+        returns_df, prices_df = get_historical_returns(markets)
 
-        print("\nReturns Table (first 15 rows):")
-        print(returns_df.head(15))
-        print(f"\nReturns shape: {returns_df.shape}")
+        validate_continuous_returns(returns_df, expected_start, expected_end)
 
-        print("\nData summary:")
-        print(
-            f"  Investment positions: {(positions_df != 0.0).sum().sum()} out of {positions_df.size} possible"
-        )
-        print(
-            f"  Non-zero returns: {(returns_df != 0).sum().sum()} out of {returns_df.notna().sum().sum()} non-NaN"
-        )
-        print(
-            f"  Returns range: {returns_df.min().min():.4f} to {returns_df.max().max():.4f}"
-        )
+        final_pnls = {}
+        for agent_name in positions_df["agent_name"].unique():
+            positions_agent_df = positions_df[
+                positions_df["agent_name"] == agent_name
+            ].drop(columns=["agent_name"])
+            positions_agent_df = positions_agent_df.loc[
+                positions_agent_df["date"].isin(investment_dates)
+            ]
+            positions_agent_df = positions_agent_df.loc[
+                positions_df["question"].isin(returns_df.columns)
+            ]  # TODO: This should be removed when we can save
 
-        engine = PnlCalculator(positions_df, returns_df)
+            cumulative_pnl, fig = compute_cumulative_pnl(positions_agent_df, returns_df, prices_df)
 
-        fig = engine.plot_pnl(stock_details=True)
+            portfolio_output_path = f"./portfolio_performance/{agent_name}"
+            fig.write_html(portfolio_output_path + ".html")
+            fig.write_image(portfolio_output_path + ".png")
+            print(
+                f"\nPortfolio visualization saved to: {portfolio_output_path}.html and {portfolio_output_path}.png"
+            )
 
-        print(engine.get_performance_metrics().round(2))
+            final_pnl = float(cumulative_pnl.iloc[-1])
+            print(f"Final Cumulative PnL for {agent_name}: {final_pnl:.4f}")
+            print(cumulative_pnl)
 
-        output_path = f"./portfolio_performance/{agent_name}"
-        fig.write_html(output_path + ".html")
-        fig.write_image(output_path + ".png")
-        print(
-            f"\nPortfolio visualization saved to: {output_path}.html and {output_path}.png"
-        )
+            final_pnls[agent_name] = final_pnl
+        return final_pnls
 
-        cumulative_pnl = engine.pnl.sum(axis=1).cumsum()
-        if not cumulative_pnl.empty:
-            final_pnl = cumulative_pnl.iloc[-1]
-            print(f"Final Cumulative PnL: {final_pnl:.4f}")
+    final_pnls = get_choices_compute_pnls(investment_dates, output_path=OUTPUT_PATH)
 
-        final_pnls[agent_name] = final_pnl
-
-        print(cumulative_pnl)
     print("Final PnL per agent:")
 
-    print(json.dumps(final_pnls, indent=2))
+    print(final_pnls)
