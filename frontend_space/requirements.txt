@@ -1,0 +1,6 @@
+gradio
+pandas
+numpy
+datasets
+huggingface_hub
+plotly

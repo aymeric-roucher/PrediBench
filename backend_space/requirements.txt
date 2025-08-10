@@ -1,0 +1,11 @@
+gradio
+pandas
+numpy
+datasets
+huggingface_hub
+apscheduler
+python-dotenv
+plotly
+requests
+pydantic
+smolagents
