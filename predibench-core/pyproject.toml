@@ -1,7 +1,7 @@
 [project]
-name = "market-bench"
+name = "predibench-core"
 version = "0.1.0"
-description = "Add your description here"
+description = "Core package for PrediBench agent predictions on Polymarket"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.scripts]
-hello = "market_bench:hello"
+hello = "predibench:hello"
 
 [tool.hatch.metadata]
 allow-direct-references = true

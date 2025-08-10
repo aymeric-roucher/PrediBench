@@ -10,8 +10,7 @@ This test verifies that we can:
 from datetime import datetime
 
 import pandas as pd
-
-from market_bench.polymarket_api import (
+from predibench.polymarket_api import (
     MAX_INTERVAL_TIMESERIES,
     HistoricalTimeSeriesRequest,
     MarketRequest,

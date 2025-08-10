@@ -1,6 +1,5 @@
 import pandas as pd
-
-from market_bench.pnl import PnlCalculator
+from predibench.pnl import PnlCalculator
 
 
 def test_returns():
@@ -72,28 +71,26 @@ def test_lewis_hamilton_use_case():
 def test_complex_positions_and_price_changes():
     """Test with successive positions (2, -1, 0) and changing daily prices"""
     date_range = pd.date_range(start="2024-01-01", periods=7, freq="D")
-    
+
     # Positions: 2, 2, -1, -1, 0, 0, 0
     positions = pd.DataFrame(
-        data=[2, 2, -1, -1, 0, 0, 0],
-        index=date_range,
-        columns=["TestAsset"]
+        data=[2, 2, -1, -1, 0, 0, 0], index=date_range, columns=["TestAsset"]
     )
-    
+
     # Daily changing prices: starting at 1.0, then varying
     prices = pd.DataFrame(
         data=[1.0, 1.05, 1.10, 0.95, 1.00, 1.02, 0.98],
         index=date_range,
-        columns=["TestAsset"]
+        columns=["TestAsset"],
     )
-    
+
     # Calculate returns from price percentage changes
     price_changes = prices.pct_change()
     returns = price_changes.copy()
-    
+
     engine = PnlCalculator(positions, returns, prices)
     pnl_result = engine.calculate_pnl()
-    
+
     # Manual calculation for expected PnL:
     # Day 1: position=2, return=NaN (first day) -> PnL = 0
     # Day 2: position=2, return=0.05 (5% increase) -> PnL = 2 * 0.05 = 0.10
@@ -102,15 +99,15 @@ def test_complex_positions_and_price_changes():
     # Day 5: position=-1, return=0.052632 (1.00/0.95 - 1) -> PnL = -1 * 0.052632 = -0.052632
     # Day 6: position=0, return=0.02 (1.02/1.00 - 1) -> PnL = 0 * 0.02 = 0
     # Day 7: position=0, return=-0.039216 (0.98/1.02 - 1) -> PnL = 0 * -0.039216 = 0
-    
+
     expected_daily_pnl = [0.0, 0.10, 0.095238, 0.136364, -0.052632, 0.0, 0.0]
     expected_cumulative_pnl = sum(expected_daily_pnl[1:])  # Skip first day (NaN return)
-    
+
     actual_cumulative_pnl = pnl_result.sum(axis=1).cumsum().iloc[-1]
-    
+
     # Allow for small floating point differences
     assert abs(actual_cumulative_pnl - expected_cumulative_pnl) < 1e-4
-    
+
     # Verify shapes
     assert positions.shape == (7, 1)
     assert returns.shape == (7, 1)

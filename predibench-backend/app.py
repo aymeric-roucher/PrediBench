@@ -8,9 +8,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from datasets import Dataset
 from dotenv import load_dotenv
 from huggingface_hub import HfApi
-
-from market_bench.agent.agent import run_smolagent
-from market_bench.polymarket_api import (
+from predibench.agent.agent import run_smolagent
+from predibench.polymarket_api import (
     MarketRequest,
     filter_interesting_questions,
     filter_out_resolved_markets,

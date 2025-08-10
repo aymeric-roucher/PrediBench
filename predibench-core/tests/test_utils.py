@@ -1,4 +1,4 @@
-from market_bench.polymarket_api import convert_polymarket_time_to_datetime
+from predibench.polymarket_api import convert_polymarket_time_to_datetime
 
 
 def test_timestamp_extraction():

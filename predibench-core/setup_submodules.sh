@@ -74,8 +74,8 @@ pip install git+https://github.com/m-ric/predibench-core
 ## Usage
 
 ```python
-from market_bench.polymarket_api import get_open_markets
-from market_bench.agent.agent import run_smolagent
+from predibench.polymarket_api import get_open_markets
+from predibench.agent.agent import run_smolagent
 ```
 EOF
 
@@ -123,7 +123,7 @@ EOF
 
 # Update imports in app.py to use installed package
 if [ -f app.py ]; then
-    echo "Imports already use 'from market_bench...' - perfect!"
+    echo "Imports already use 'from predibench...' - perfect!"
 fi
 
 git init

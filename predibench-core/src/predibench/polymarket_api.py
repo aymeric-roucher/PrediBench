@@ -22,7 +22,7 @@ import requests
 from pydantic import BaseModel
 from smolagents import ChatMessage, LiteLLMModel
 
-from market_bench.common import BASE_URL_POLYMARKET
+from predibench.common import BASE_URL_POLYMARKET
 
 MAX_INTERVAL_TIMESERIES = timedelta(days=14, hours=23, minutes=0)
 # NOTE: above is refined by experience: seems independant from the resolution

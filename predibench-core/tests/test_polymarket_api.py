@@ -1,4 +1,4 @@
-from market_bench.polymarket_api import (
+from predibench.polymarket_api import (
     MarketRequest,
     _get_events,
     convert_polymarket_time_to_datetime,

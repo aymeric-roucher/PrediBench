@@ -7,11 +7,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
-from smolagents import RunResult, Timing, TokenUsage
-
-from market_bench.agent.agent import run_smolagent
-from market_bench.pnl import PnlCalculator
-from market_bench.polymarket_api import (
+from predibench.agent.agent import run_smolagent
+from predibench.pnl import PnlCalculator
+from predibench.polymarket_api import (
     MAX_INTERVAL_TIMESERIES,
     Market,
     MarketRequest,
@@ -20,6 +18,7 @@ from market_bench.polymarket_api import (
     get_historical_returns,
     get_open_markets,
 )
+from smolagents import RunResult, Timing, TokenUsage
 
 load_dotenv()
 

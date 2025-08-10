@@ -1,6 +1,5 @@
 gradio
-pandas
-numpy
 datasets
 huggingface_hub
 plotly
+git+https://github.com/m-ric/predibench-core
