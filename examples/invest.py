@@ -12,6 +12,7 @@ from smolagents import RunResult, Timing, TokenUsage
 from market_bench.agent.agent import run_smolagent
 from market_bench.pnl import PnlCalculator
 from market_bench.polymarket_api import (
+    MAX_INTERVAL_TIMESERIES,
     Market,
     MarketRequest,
     filter_interesting_questions,
@@ -218,9 +219,9 @@ def choose_markets(end_date: date, n_markets: int = 10) -> list[Market]:
     markets = get_open_markets(
         request,
         add_timeseries=[
-            end_date - timedelta(days=15),
+            end_date - MAX_INTERVAL_TIMESERIES,
             end_date,
-        ],  # 15 days back is the maximum allowed by the API
+        ],
     )
     markets = filter_out_resolved_markets(markets)
 

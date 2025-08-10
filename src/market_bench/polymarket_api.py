@@ -24,6 +24,9 @@ from smolagents import ChatMessage, LiteLLMModel
 
 from market_bench.common import BASE_URL_POLYMARKET
 
+MAX_INTERVAL_TIMESERIES = timedelta(days=14, hours=23, minutes=0)
+# NOTE: above is refined by experience: seems independant from the resolution
+
 
 class MarketOutcome(BaseModel):
     clob_token_id: str
@@ -41,7 +44,7 @@ class Market(BaseModel, arbitrary_types_allowed=True):
     closed: bool
     createdAt: datetime
     volume: float
-    liquidity: float
+    liquidity: float | None
     outcomes: list[MarketOutcome]
     prices: pd.Series | None = None
 
@@ -157,21 +160,10 @@ def _json_to_polymarket_market(market_data: dict) -> Market:
         closed=closed,
         createdAt=convert_polymarket_time_to_datetime(market_data["createdAt"]),
         volume=float(market_data["volume"]),
-        liquidity=float(market_data["liquidity"]),
+        liquidity=float(market_data["liquidity"])
+        if "liquidity" in market_data
+        else None,
         # json=market_data,
-    )
-
-
-def _json_to_polymarket_event(market_event_data: dict) -> Event:
-    return Event(
-        id=market_event_data["id"],
-        slug=market_event_data["slug"],
-        title=market_event_data["title"],
-        liquidity=float(market_event_data["liquidity"]),
-        volume=float(market_event_data["volume"]),
-        start_date=convert_polymarket_time_to_datetime(market_event_data["startDate"]),
-        end_date=convert_polymarket_time_to_datetime(market_event_data["endDate"]),
-        tags=market_event_data["tags"],
     )
 
 
@@ -297,7 +289,8 @@ def get_token_daily_timeseries(
     if request.end_time is not None:
         params["endTs"] = int(request.end_time.timestamp())
     params["interval"] = request.interval
-    params["fidelity"] = str(request.fidelity_minutes)
+    if request.fidelity_minutes is not None:
+        params["fidelity"] = str(request.fidelity_minutes)
 
     response = requests.get(url, params=params)
     response.raise_for_status()
