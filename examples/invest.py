@@ -66,7 +66,7 @@ def agent_invest_positions(
     date: date,
     test_mode: bool = False,
 ) -> None:
-    """Create investment positions: 1 to buy, -1 to sell, 0 to do nothing"""
+    """Let the agent decide on investment positions: 1 to buy, -1 to sell, 0 to do nothing"""
     print("\nCreating investment positions with agent...")
     print(date, markets[0].prices.index)
     assert date in markets[0].prices.index
@@ -171,6 +171,7 @@ def validate_continuous_returns(
 
 
 def collect_investment_choices(output_path: Path = OUTPUT_PATH) -> pd.DataFrame:
+    """Collect investment choices previously decided by agents and written to local files."""
     positions = []
     for agent_name in os.listdir(output_path):
         if os.path.isdir(output_path / agent_name):
@@ -204,6 +205,7 @@ def collect_investment_choices(output_path: Path = OUTPUT_PATH) -> pd.DataFrame:
 
 
 def choose_markets(end_date: date, n_markets: int = 10) -> list[Market]:
+    """Pick some interesting questions to invest in."""
     request = MarketRequest(
         limit=n_markets * 10,
         active=True,
@@ -380,7 +382,9 @@ if __name__ == "__main__":
                 positions_df["question"].isin(returns_df.columns)
             ]  # TODO: This should be removed when we can save
 
-            cumulative_pnl, fig = compute_cumulative_pnl(positions_agent_df, returns_df, prices_df)
+            cumulative_pnl, fig = compute_cumulative_pnl(
+                positions_agent_df, returns_df, prices_df
+            )
 
             portfolio_output_path = f"./portfolio_performance/{agent_name}"
             fig.write_html(portfolio_output_path + ".html")

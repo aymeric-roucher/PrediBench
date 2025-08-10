@@ -75,7 +75,6 @@ class PnlCalculator:
             )
             return pnls_
         else:
-            print("COLL", self.positions.columns, self.returns.columns)
             pnls_ = pd.concat(
                 [
                     self._get_positions_begin_next_day(col).reindex(
@@ -105,10 +104,11 @@ class PnlCalculator:
         else:
             # Create subplots: Prices on top, PnL on bottom (equal height)
             fig = make_subplots(
-                rows=2, cols=1,
+                rows=2,
+                cols=1,
                 row_heights=[0.5, 0.5],  # Equal height for both subplots
-                subplot_titles=('Price Evolution', 'Cumulative PnL'),
-                vertical_spacing=0.08
+                subplot_titles=("Price Evolution", "Cumulative PnL"),
+                vertical_spacing=0.08,
             )
 
             colors = px.colors.qualitative.Plotly
@@ -116,7 +116,7 @@ class PnlCalculator:
             for i, question in enumerate(columns):
                 col_color = colors[i % len(colors)]
                 cumulative_pnl = self.pnl[question].cumsum()
-                
+
                 # Add price evolution trace to subplot 1 (top)
                 if question in self.prices.columns:
                     price_data = self.prices[question].dropna()
@@ -129,9 +129,10 @@ class PnlCalculator:
                             line=dict(color=col_color),
                             legendgroup=question[:40],
                         ),
-                        row=1, col=1
+                        row=1,
+                        col=1,
                     )
-                    
+
                     # Add markers for positions taken on the price chart
                     position_changes = self.positions[question][
                         self.positions[question] != 0
@@ -160,9 +161,10 @@ class PnlCalculator:
                                 showlegend=False,
                                 legendgroup=question[:40],
                             ),
-                            row=1, col=1
+                            row=1,
+                            col=1,
                         )
-                
+
                 # Add PnL trace to subplot 2 (bottom)
                 fig.add_trace(
                     go.Scatter(
@@ -173,12 +175,15 @@ class PnlCalculator:
                         showlegend=False,
                         legendgroup=question[:40],
                     ),
-                    row=2, col=1
+                    row=2,
+                    col=1,
                 )
 
             fig.update_xaxes(title_text="Date", row=2, col=1)
             fig.update_yaxes(title_text="Price", row=1, col=1)
-            fig.update_yaxes(title_text="Cumulative PnL", tickformat=".0%", row=2, col=1)
+            fig.update_yaxes(
+                title_text="Cumulative PnL", tickformat=".0%", row=2, col=1
+            )
             fig.update_layout(
                 legend_title="Stock",
                 width=1200,
