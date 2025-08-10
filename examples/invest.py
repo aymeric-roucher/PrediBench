@@ -303,6 +303,69 @@ def compute_cumulative_pnl(
     return cumulative_pnl, fig
 
 
+def launch_agent_investments(list_models, investment_dates, prices_df, markets):
+    for model_id in list_models:
+        try:
+            for investment_date in investment_dates:
+                agent_invest_positions(model_id, markets, prices_df, investment_date)
+        except Exception as e:
+            print(f"Error for {model_id}: {e}")
+            # raise e
+            continue
+
+
+def compute_pnls(investment_dates, positions_df: pd.DataFrame):
+    # Validate that we have continuous returns data
+    expected_start = investment_dates[0]
+    expected_end = investment_dates[-1] + timedelta(days=7)
+    markets = []
+    for question_id in positions_df["question_id"].unique():
+        request = MarketRequest(
+            id=question_id,
+        )
+        market = get_open_markets(
+            request,
+            add_timeseries=[
+                expected_start,
+                expected_end,
+            ],  # 15 days back is the maximum allowed by the API
+        )[0]
+        markets.append(market)
+    returns_df, prices_df = get_historical_returns(markets)
+
+    validate_continuous_returns(returns_df, expected_start, expected_end)
+
+    final_pnls = {}
+    for agent_name in positions_df["agent_name"].unique():
+        positions_agent_df = positions_df[
+            positions_df["agent_name"] == agent_name
+        ].drop(columns=["agent_name"])
+        positions_agent_df = positions_agent_df.loc[
+            positions_agent_df["date"].isin(investment_dates)
+        ]
+        positions_agent_df = positions_agent_df.loc[
+            positions_df["question"].isin(returns_df.columns)
+        ]  # TODO: This should be removed when we can save
+
+        cumulative_pnl, fig = compute_cumulative_pnl(
+            positions_agent_df, returns_df, prices_df
+        )
+
+        portfolio_output_path = f"./portfolio_performance/{agent_name}"
+        fig.write_html(portfolio_output_path + ".html")
+        fig.write_image(portfolio_output_path + ".png")
+        print(
+            f"\nPortfolio visualization saved to: {portfolio_output_path}.html and {portfolio_output_path}.png"
+        )
+
+        final_pnl = float(cumulative_pnl.iloc[-1])
+        print(f"Final Cumulative PnL for {agent_name}: {final_pnl:.4f}")
+        print(cumulative_pnl)
+
+        final_pnls[agent_name] = final_pnl
+    return final_pnls
+
+
 if __name__ == "__main__":
     N_MARKETS = 10
 
@@ -332,75 +395,11 @@ if __name__ == "__main__":
         # "anthropic/claude-sonnet-4-20250514",
     ]
 
-    def launch_agent_investments(list_models, investment_dates, prices_df, markets):
-        for model_id in list_models:
-            try:
-                for investment_date in investment_dates:
-                    agent_invest_positions(
-                        model_id, markets, prices_df, investment_date
-                    )
-            except Exception as e:
-                print(f"Error for {model_id}: {e}")
-                # raise e
-                continue
-
     if False:
         launch_agent_investments(list_models, investment_dates, prices_df, markets)
 
-    def get_choices_compute_pnls(investment_dates, output_path: Path = OUTPUT_PATH):
-        # Validate that we have continuous returns data
-        expected_start = investment_dates[0]
-        expected_end = investment_dates[-1] + timedelta(days=7)
-
-        positions_df = collect_investment_choices(output_path)
-        markets = []
-        for question_id in positions_df["question_id"].unique():
-            request = MarketRequest(
-                id=question_id,
-            )
-            market = get_open_markets(
-                request,
-                add_timeseries=[
-                    expected_start,
-                    expected_end,
-                ],  # 15 days back is the maximum allowed by the API
-            )[0]
-            markets.append(market)
-        returns_df, prices_df = get_historical_returns(markets)
-
-        validate_continuous_returns(returns_df, expected_start, expected_end)
-
-        final_pnls = {}
-        for agent_name in positions_df["agent_name"].unique():
-            positions_agent_df = positions_df[
-                positions_df["agent_name"] == agent_name
-            ].drop(columns=["agent_name"])
-            positions_agent_df = positions_agent_df.loc[
-                positions_agent_df["date"].isin(investment_dates)
-            ]
-            positions_agent_df = positions_agent_df.loc[
-                positions_df["question"].isin(returns_df.columns)
-            ]  # TODO: This should be removed when we can save
-
-            cumulative_pnl, fig = compute_cumulative_pnl(
-                positions_agent_df, returns_df, prices_df
-            )
-
-            portfolio_output_path = f"./portfolio_performance/{agent_name}"
-            fig.write_html(portfolio_output_path + ".html")
-            fig.write_image(portfolio_output_path + ".png")
-            print(
-                f"\nPortfolio visualization saved to: {portfolio_output_path}.html and {portfolio_output_path}.png"
-            )
-
-            final_pnl = float(cumulative_pnl.iloc[-1])
-            print(f"Final Cumulative PnL for {agent_name}: {final_pnl:.4f}")
-            print(cumulative_pnl)
-
-            final_pnls[agent_name] = final_pnl
-        return final_pnls
-
-    final_pnls = get_choices_compute_pnls(investment_dates, output_path=OUTPUT_PATH)
+    positions_df = collect_investment_choices(output_path=OUTPUT_PATH)
+    final_pnls = compute_pnls(investment_dates, positions_df)
 
     print("Final PnL per agent:")
 
