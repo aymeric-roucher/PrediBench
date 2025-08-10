@@ -3,7 +3,7 @@ name = "predibench"
 version = "0.1.0"
 description = "Core package for PrediBench agent predictions on Polymarket"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 dependencies = [
     "ipykernel>=6.30.0",
     "kaleido>=1.0.0",
