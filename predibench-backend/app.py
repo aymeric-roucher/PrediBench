@@ -8,7 +8,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from datasets import Dataset
 from dotenv import load_dotenv
 from huggingface_hub import HfApi
-from predibench.agent.agent import run_smolagent
+from predibench.agent import run_smolagent
 from predibench.polymarket_api import (
     MarketRequest,
     filter_interesting_questions,
@@ -22,6 +22,23 @@ load_dotenv()
 WEEKLY_MARKETS_REPO = "m-ric/predibench-weekly-markets"
 AGENT_CHOICES_REPO = "m-ric/predibench-agent-choices"
 N_MARKETS = 10
+
+list_models = [
+    "huggingface/openai/gpt-oss-120b",
+    "huggingface/openai/gpt-oss-20b",
+    "huggingface/Qwen/Qwen3-30B-A3B-Instruct-2507",
+    "huggingface/deepseek-ai/DeepSeek-R1-0528",
+    "huggingface/Qwen/Qwen3-4B-Thinking-2507",
+    "gpt-4.1",
+    "gpt-4o",
+    "gpt-4.1-mini",
+    "o4-mini",
+    "gpt-5",
+    "gpt-5-mini",
+    "o3-deep-research",
+    "test_random",
+    # "anthropic/claude-sonnet-4-20250514",
+]
 
 
 def restart_space():

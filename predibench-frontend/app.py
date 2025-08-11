@@ -4,67 +4,42 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 import gradio as gr
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from datasets import Dataset
 from huggingface_hub import HfApi
+
+from predibench.pnl import compute_pnls
 
 # Configuration
 AGENT_CHOICES_REPO = "m-ric/predibench-agent-choices"
 
 def load_agent_choices():
     """Load agent choices from HuggingFace dataset"""
-    try:
-        dataset = Dataset.from_parquet(f"hf://datasets/{AGENT_CHOICES_REPO}")
-        return dataset.to_pandas()
-    except Exception as e:
-        print(f"Error loading dataset: {e}")
-        # Return dummy data for testing
-        return pd.DataFrame({
-            'agent_name': ['gpt-4o', 'claude-sonnet', 'test_random'],
-            'date': [date.today()] * 3,
-            'question': ['Sample question'] * 3,
-            'choice': [1, -1, 0],
-            'question_id': ['123'] * 3
-        })
+    dataset = Dataset.from_parquet(f"hf://datasets/{AGENT_CHOICES_REPO}")
+    return dataset.to_pandas()
 
 def calculate_pnl_and_performance(df: pd.DataFrame):
-    """Calculate PnL and performance metrics for each agent"""
-    # This is a simplified version - in production you'd need actual market returns
-    # For now, simulate returns based on random walk
-    np.random.seed(42)  # For reproducible results
+    """Calculate real PnL and performance metrics for each agent using historical market data"""
+    investment_dates = sorted(df['date'].unique())
+    final_pnls, cumulative_pnls, figures = compute_pnls(investment_dates, df)
     
+    # Convert to the format expected by frontend
     agents_performance = {}
-    
     for agent in df['agent_name'].unique():
         agent_data = df[df['agent_name'] == agent].copy()
-        
-        # Simulate daily PnL based on positions
-        # In real implementation, this would use actual market returns
-        daily_pnl = []
-        cumulative_pnl = 0
-        
-        for _, row in agent_data.iterrows():
-            # Simulate daily return based on position
-            if row['choice'] == 1:  # Long position
-                daily_return = np.random.normal(0.01, 0.1)  # Slightly positive expected return
-            elif row['choice'] == -1:  # Short position
-                daily_return = -np.random.normal(0.01, 0.1)  # Inverse return
-            else:  # No position
-                daily_return = 0
-            
-            daily_pnl.append(daily_return)
-            cumulative_pnl += daily_return
+        cumulative_pnl = cumulative_pnls[agent]
         
         agents_performance[agent] = {
             'total_decisions': len(agent_data),
             'long_positions': len(agent_data[agent_data['choice'] == 1]),
             'short_positions': len(agent_data[agent_data['choice'] == -1]),
             'no_positions': len(agent_data[agent_data['choice'] == 0]),
-            'cumulative_pnl': cumulative_pnl,
-            'sharpe_ratio': np.mean(daily_pnl) / (np.std(daily_pnl) + 1e-8) * np.sqrt(252),
-            'win_rate': len([x for x in daily_pnl if x > 0]) / len(daily_pnl) if daily_pnl else 0,
-            'daily_pnl': daily_pnl,
-            'dates': agent_data['date'].tolist()
+            'cumulative_pnl': final_pnls[agent],
+            'sharpe_ratio': 0.0,  # Would need more calculation for proper Sharpe
+            'win_rate': 0.0,      # Would need daily PnL for win rate
+            'daily_pnl': cumulative_pnl.tolist(),
+            'dates': cumulative_pnl.index.tolist(),
+            'figure': figures[agent]
         }
     
     return agents_performance
@@ -223,8 +198,14 @@ def refresh_data():
     pnl_plot = create_pnl_plot(performance_data)
     position_plot = create_position_breakdown_plot(performance_data)
     agent_list = get_agent_list(df)
+    portfolio_list = list(performance_data.keys())
+    first_portfolio_plot = performance_data[portfolio_list[0]]['figure'] if portfolio_list else None
     
-    return leaderboard, pnl_plot, position_plot, gr.update(choices=agent_list), f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    return (leaderboard, pnl_plot, position_plot, 
+            gr.update(choices=agent_list), 
+            gr.update(choices=portfolio_list, value=portfolio_list[0] if portfolio_list else None),
+            first_portfolio_plot,
+            f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # Initialize data
 df = load_agent_choices()
@@ -279,11 +260,38 @@ with gr.Blocks(title="PrediBench Leaderboard", theme=gr.themes.Soft()) as demo:
                 inputs=agent_dropdown,
                 outputs=pnl_plot
             )
+        
+        with gr.TabItem("📊 Portfolio Details"):
+            gr.Markdown("### Detailed Portfolio Analysis")
+            
+            with gr.Row():
+                portfolio_dropdown = gr.Dropdown(
+                    choices=[agent for agent in performance_data.keys()],
+                    value=list(performance_data.keys())[0] if performance_data else None,
+                    label="Select Agent Portfolio",
+                    scale=3
+                )
+            
+            portfolio_plot = gr.Plot(
+                value=performance_data[list(performance_data.keys())[0]]['figure'] if performance_data else None
+            )
+            
+            # Update portfolio plot when agent selection changes
+            def update_portfolio_plot(selected_agent):
+                if selected_agent and selected_agent in performance_data:
+                    return performance_data[selected_agent]['figure']
+                return None
+                
+            portfolio_dropdown.change(
+                fn=update_portfolio_plot,
+                inputs=portfolio_dropdown,
+                outputs=portfolio_plot
+            )
     
     # Refresh functionality
     refresh_btn.click(
         fn=refresh_data,
-        outputs=[leaderboard_table, pnl_plot, position_breakdown, agent_dropdown, last_updated]
+        outputs=[leaderboard_table, pnl_plot, position_breakdown, agent_dropdown, portfolio_dropdown, portfolio_plot, last_updated]
     )
 
 if __name__ == "__main__":

@@ -3,4 +3,4 @@ datasets
 huggingface_hub
 apscheduler
 python-dotenv
-git+https://github.com/m-ric/predibench-core
+git+https://github.com/aymeric-roucher/PrediBench#subdirectory=predibench-core

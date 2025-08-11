@@ -266,3 +266,133 @@ class PnlCalculator:
             columns=["Value"],
             orient="index",
         )
+
+
+def validate_continuous_returns(
+    returns_df: pd.DataFrame, start_date: date, end_date: date
+) -> None:
+    """Validate that returns data is continuous for the given date range.
+
+    Args:
+        returns_df: DataFrame with returns data indexed by date
+        start_date: First date that should have data
+        end_date: Last date that should have data
+
+    Raises:
+        ValueError: If any dates are missing from the range
+    """
+    expected_date_range = pd.date_range(start=start_date, end=end_date, freq="D").date
+    actual_dates = set(returns_df.index)
+    expected_dates = set(expected_date_range)
+
+    missing_dates = expected_dates - actual_dates
+    if missing_dates:
+        raise ValueError(f"Missing returns data for dates: {sorted(missing_dates)}")
+
+
+def compute_pnls(investment_dates, positions_df: pd.DataFrame):
+    # Validate that we have continuous returns data
+    expected_start = investment_dates[0]
+    expected_end = investment_dates[-1] + timedelta(days=7)
+    markets = []
+    for question_id in positions_df["question_id"].unique():
+        request = MarketRequest(
+            id=question_id,
+        )
+        market = get_open_markets(
+            request,
+            add_timeseries=[
+                expected_start,
+                expected_end,
+            ],  # 15 days back is the maximum allowed by the API
+        )[0]
+        markets.append(market)
+    returns_df, prices_df = get_historical_returns(markets)
+
+    validate_continuous_returns(returns_df, expected_start, expected_end)
+
+    final_pnls = {}
+    cumulative_pnls = {}
+    figures = {}
+    
+    for agent_name in positions_df["agent_name"].unique():
+        positions_agent_df = positions_df[
+            positions_df["agent_name"] == agent_name
+        ].drop(columns=["agent_name"])
+        positions_agent_df = positions_agent_df.loc[
+            positions_agent_df["date"].isin(investment_dates)
+        ]
+        positions_agent_df = positions_agent_df.loc[
+            positions_df["question"].isin(returns_df.columns)
+        ]  # TODO: This should be removed when we can save
+
+        cumulative_pnl, fig = compute_cumulative_pnl(
+            positions_agent_df, returns_df, prices_df
+        )
+
+        portfolio_output_path = f"./portfolio_performance/{agent_name}"
+        fig.write_html(portfolio_output_path + ".html")
+        fig.write_image(portfolio_output_path + ".png")
+        print(
+            f"\nPortfolio visualization saved to: {portfolio_output_path}.html and {portfolio_output_path}.png"
+        )
+
+        final_pnl = float(cumulative_pnl.iloc[-1])
+        print(f"Final Cumulative PnL for {agent_name}: {final_pnl:.4f}")
+        print(cumulative_pnl)
+
+        final_pnls[agent_name] = final_pnl
+        cumulative_pnls[agent_name] = cumulative_pnl
+        figures[agent_name] = fig
+        
+    return final_pnls, cumulative_pnls, figures
+
+
+def compute_cumulative_pnl(
+    positions_agent_df: pd.DataFrame, returns_df: pd.DataFrame, prices_df: pd.DataFrame
+) -> pd.DataFrame:
+    # Convert positions_agent_df to have date as index, question as columns, and choice as values
+    positions_agent_df = positions_agent_df.pivot(
+        index="date", columns="question", values="choice"
+    )
+
+    # Forward-fill positions to all daily dates in the returns range
+    daily_index = returns_df.index[returns_df.index >= investment_dates[0]]
+    positions_agent_df = positions_agent_df.reindex(daily_index, method="ffill")
+    positions_agent_df = positions_agent_df.loc[
+        positions_agent_df.index >= investment_dates[0]
+    ]
+    returns_df = returns_df.loc[returns_df.index >= investment_dates[0]]
+
+    positions_agent_df = positions_agent_df.loc[
+        :, positions_agent_df.columns.isin(returns_df.columns)
+    ]
+    print("\nAnalyzing portfolio performance with PnlCalculator...")
+
+    print("\nPositions Table (first 15 rows):")
+    print(positions_agent_df.head(15))
+    print(f"\nPositions shape: {positions_agent_df.shape}")
+
+    print("\nReturns Table (first 15 rows):")
+    print(returns_df.head(15))
+    print(f"\nReturns shape: {returns_df.shape}")
+
+    print("\nData summary:")
+    print(
+        f"  Investment positions: {(positions_agent_df != 0.0).sum().sum()} out of {positions_agent_df.size} possible"
+    )
+    print(
+        f"  Non-zero returns: {(returns_df != 0).sum().sum()} out of {returns_df.notna().sum().sum()} non-NaN"
+    )
+    print(
+        f"  Returns range: {returns_df.min().min():.4f} to {returns_df.max().max():.4f}"
+    )
+
+    engine = PnlCalculator(positions_agent_df, returns_df, prices_df)
+
+    fig = engine.plot_pnl(stock_details=True)
+
+    print(engine.get_performance_metrics().round(2))
+
+    cumulative_pnl = engine.pnl.sum(axis=1).cumsum()
+    return cumulative_pnl, fig

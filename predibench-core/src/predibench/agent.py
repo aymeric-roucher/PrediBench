@@ -1,11 +1,20 @@
+import json
 import os
-from datetime import datetime
+import textwrap
+from datetime import date, datetime
 from typing import Literal
 
+import numpy as np
+import pandas as pd
 from dotenv import load_dotenv
+from predibench.polymarket_api import Market
+from predibench.utils import OUTPUT_PATH
 from smolagents import (
     InferenceClientModel,
     OpenAIModel,
+    RunResult,
+    Timing,
+    TokenUsage,
     Tool,
     ToolCallingAgent,
     VisitWebpageTool,
@@ -155,6 +164,135 @@ def run_smolagent(
 #         "https://www.axios.com/2025/07/24/openai-gpt-5-august-2025"
 #     )
 # )
+
+
+def agent_invest_positions(
+    model_id: str,
+    markets: list[Market],
+    prices_df: pd.DataFrame,
+    date: date,
+    test_mode: bool = False,
+) -> None:
+    """Let the agent decide on investment positions: 1 to buy, -1 to sell, 0 to do nothing"""
+    print("\nCreating investment positions with agent...")
+    print(date, markets[0].prices.index)
+    assert date in markets[0].prices.index
+
+    output_dir = (
+        OUTPUT_PATH
+        / f"smolagent_{model_id}".replace("/", "--")
+        / date.strftime("%Y-%m-%d")
+    )
+    os.makedirs(output_dir, exist_ok=True)
+    for i, question in enumerate(prices_df.columns):
+        if (output_dir / f"{question[:50]}.json").exists():
+            print(
+                f"Getting the result for '{question}' for {model_id} on {date} from file."
+            )
+            response = json.load(open(output_dir / f"{question[:50]}.json"))
+            choice = response["choice"]
+        else:
+            print(f"NOT FOUND: {output_dir / f'{question[:50]}.json'}")
+            market = markets[i]
+            assert market.question == question
+            if np.isnan(prices_df.loc[date, question]):
+                continue
+            prices_str = (
+                prices_df.loc[:date, question]
+                .dropna()
+                .to_string(index=True, header=False)
+            )
+            full_question = textwrap.dedent(
+                f"""Let's say we are the {date.strftime("%B %d, %Y")}.
+                Please answer the below question by yes or no. But first, run a detailed analysis. You can search the web for information.
+                One good method for analyzing is to break down the question into sub-parts, like a tree, and assign probabilities to each sub-branch of the tree, to get a total probability of the question being true.
+                Here is the question:
+                {question}
+                More details:
+                {market.description}
+
+                Here are the latest rates for the 'yes' to that question (rates for 'yes' and 'no' sum to 1), to guide you:
+                {prices_str}
+
+                Invest in yes only if you think the yes is underrated, and invest in no only if you think that the yes is overrated.
+                What would you decide: buy yes, buy no, or do nothing?
+                """
+            )
+            if model_id.endswith("-deep-research"):
+                response = run_deep_research(
+                    model_id,
+                    full_question,
+                    cutoff_date=date,
+                )
+            elif model_id == "test_random":
+                response = RunResult(
+                    output=("yes" if np.random.random() < 0.3 else "nothing"),
+                    messages=[{"value": "ok here is the reasoning process"}],
+                    state={},
+                    token_usage=TokenUsage(0, 0),
+                    timing=Timing(0.0),
+                )
+            else:
+                response = run_smolagent(
+                    model_id,
+                    full_question,
+                    cutoff_date=date,
+                )
+                for message in response.messages:
+                    message["model_input_messages"] = "removed"  # Clean logs
+            choice = response.output
+
+            with open(output_dir / f"{question[:50]}.json", "w") as f:
+                json.dump(
+                    {
+                        "question": question,
+                        "choice": choice,
+                        "messages": response.messages,
+                    },
+                    f,
+                    default=str,
+                )
+    return
+
+
+def run_deep_research(
+    model_id: str,
+    question: str,
+    cutoff_date: date,
+) -> RunResult:
+    from openai import OpenAI
+
+    client = OpenAI(timeout=3600)
+
+    response = client.responses.create(
+        model=model_id,
+        input=question + "Preface your answer with 'ANSWER: '",
+        tools=[
+            {"type": "web_search_preview"},
+            {"type": "code_interpreter", "container": {"type": "auto"}},
+        ],
+    )
+    output_text = response.output_text
+    choice = output_text.split("ANSWER: ")[1].strip()
+    return RunResult(
+        output=choice,
+        steps=[],
+        state={},
+        token_usage=TokenUsage(0, 0),
+        timing=Timing(0.0),
+    )
+
+
+def launch_agent_investments(list_models, investment_dates, prices_df, markets):
+    for model_id in list_models:
+        try:
+            for investment_date in investment_dates:
+                agent_invest_positions(model_id, markets, prices_df, investment_date)
+        except Exception as e:
+            print(f"Error for {model_id}: {e}")
+            # raise e
+            continue
+
 
 if __name__ == "__main__":
     run_smolagent(
