@@ -1,6 +1,5 @@
 import os
-import textwrap
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 import gradio as gr
 import pandas as pd
@@ -8,13 +7,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from datasets import Dataset
 from dotenv import load_dotenv
 from huggingface_hub import HfApi
-from predibench.agent import run_smolagent
-from predibench.polymarket_api import (
-    MarketRequest,
-    filter_interesting_questions,
-    filter_out_resolved_markets,
-    get_open_markets,
-)
+from predibench.agent import agent_invest_positions
+from predibench.polymarket_api import get_historical_returns
+from predibench.utils import choose_markets
 
 load_dotenv()
 
@@ -52,32 +47,6 @@ def restart_space():
         print(f"Failed to restart space: {e}")
 
 
-def get_top_polymarket_questions(n_markets: int = 10) -> list:
-    """Fetch top questions from Polymarket API"""
-    end_date = date.today() + timedelta(days=7)
-
-    request = MarketRequest(
-        limit=n_markets * 10,
-        active=True,
-        closed=False,
-        order="volumeNum",
-        ascending=False,
-        end_date_min=end_date,
-        end_date_max=end_date + timedelta(days=21),
-    )
-
-    markets = get_open_markets(request)
-    markets = filter_out_resolved_markets(markets)
-
-    # Filter for interesting questions
-    interesting_questions = filter_interesting_questions(
-        [market.question for market in markets]
-    )
-    markets = [market for market in markets if market.question in interesting_questions]
-
-    return markets[:n_markets]
-
-
 def upload_weekly_markets(markets: list):
     """Upload weekly markets to HuggingFace dataset"""
     markets_data = []
@@ -113,73 +82,6 @@ def upload_weekly_markets(markets: list):
     print(f"Uploaded {len(markets_data)} markets to {WEEKLY_MARKETS_REPO}")
 
 
-def run_agent_decisions(markets: list, model_ids: list = None):
-    """Run agent decision-making logic on the selected markets"""
-    if model_ids is None:
-        model_ids = [
-            "gpt-4o",
-            "gpt-4.1",
-            "anthropic/claude-sonnet-4-20250514",
-            "huggingface/Qwen/Qwen3-30B-A3B-Instruct-2507",
-        ]
-
-    today = date.today()
-    decisions = []
-
-    for model_id in model_ids:
-        for market in markets:
-            # Create the investment decision prompt
-            full_question = textwrap.dedent(
-                f"""Let's say we are the {today.strftime("%B %d, %Y")}.
-                Please answer the below question by yes or no. But first, run a detailed analysis.
-                Here is the question:
-                {market.question}
-                More details:
-                {market.description}
-
-                Invest in yes only if you think the yes is underrated, and invest in no only if you think that the yes is overrated.
-                What would you decide: buy yes, buy no, or do nothing?
-                """
-            )
-
-            try:
-                response = run_smolagent(model_id, full_question, cutoff_date=today)
-                choice = response.output.lower()
-
-                # Standardize choice format
-                if "yes" in choice:
-                    choice_standardized = 1
-                    choice_raw = "yes"
-                elif "no" in choice:
-                    choice_standardized = -1
-                    choice_raw = "no"
-                else:
-                    choice_standardized = 0
-                    choice_raw = "nothing"
-
-                decisions.append(
-                    {
-                        "agent_name": f"smolagent_{model_id}".replace("/", "--"),
-                        "date": today,
-                        "question": market.question,
-                        "question_id": market.id,
-                        "choice": choice_standardized,
-                        "choice_raw": choice_raw,
-                        "messages_count": len(response.messages),
-                        "has_reasoning": len(response.messages) > 0,
-                        "timestamp": datetime.now(),
-                    }
-                )
-
-                print(f"Completed decision for {model_id} on {market.question[:50]}...")
-
-            except Exception as e:
-                print(f"Error processing {model_id} on {market.question[:50]}: {e}")
-                continue
-
-    return decisions
-
-
 def upload_agent_choices(decisions: list):
     """Upload agent choices to HuggingFace dataset"""
     df = pd.DataFrame(decisions)
@@ -190,7 +92,7 @@ def upload_agent_choices(decisions: list):
         existing_dataset = Dataset.from_parquet(f"hf://datasets/{AGENT_CHOICES_REPO}")
         combined_dataset = existing_dataset.concatenate(dataset)
         combined_dataset.push_to_hub(AGENT_CHOICES_REPO, private=False)
-    except:
+    except Exception:
         # If no existing dataset, create new one
         dataset.push_to_hub(AGENT_CHOICES_REPO, private=False)
 
@@ -200,21 +102,36 @@ def upload_agent_choices(decisions: list):
 def weekly_pipeline():
     """Main weekly pipeline that runs every Sunday"""
     print(f"Starting weekly pipeline at {datetime.now()}")
+    today_date = date.today()
 
     try:
         # 1. Get top 10 questions from Polymarket
-        markets = get_top_polymarket_questions(N_MARKETS)
+        markets = choose_markets(today_date, n_markets=N_MARKETS)
         print(f"Retrieved {len(markets)} markets from Polymarket")
 
         # 2. Upload to weekly markets dataset
         upload_weekly_markets(markets)
 
-        # 3. Run agent decision-making
-        decisions = run_agent_decisions(markets)
-        print(f"Generated {len(decisions)} agent decisions")
+        prices_df, returns_df = get_historical_returns(markets)
+
+        all_agent_choices = {}
+        for model_id in list_models:
+            try:
+                choices = agent_invest_positions(
+                    model_id, markets, prices_df, today_date
+                )
+                all_agent_choices[model_id] = choices
+            except Exception as e:
+                print(f"Error for {model_id}: {e}")
+                # raise e
+                continue
+
+            # 3. Run agent decision-making
 
         # 4. Upload agent choices
-        upload_agent_choices(decisions)
+
+        all_agent_choices_df = pd.DataFrame(all_agent_choices)
+        upload_agent_choices(all_agent_choices_df)
 
         print("Weekly pipeline completed successfully")
 

@@ -7,8 +7,6 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
-from predibench.polymarket_api import Market
-from predibench.utils import OUTPUT_PATH
 from smolagents import (
     InferenceClientModel,
     OpenAIModel,
@@ -20,6 +18,9 @@ from smolagents import (
     VisitWebpageTool,
     tool,
 )
+
+from predibench.polymarket_api import Market
+from predibench.utils import OUTPUT_PATH
 
 load_dotenv()
 
@@ -172,7 +173,7 @@ def agent_invest_positions(
     prices_df: pd.DataFrame,
     date: date,
     test_mode: bool = False,
-) -> None:
+) -> dict:
     """Let the agent decide on investment positions: 1 to buy, -1 to sell, 0 to do nothing"""
     print("\nCreating investment positions with agent...")
     print(date, markets[0].prices.index)
@@ -184,6 +185,7 @@ def agent_invest_positions(
         / date.strftime("%Y-%m-%d")
     )
     os.makedirs(output_dir, exist_ok=True)
+    choices = {}
     for i, question in enumerate(prices_df.columns):
         if (output_dir / f"{question[:50]}.json").exists():
             print(
@@ -241,6 +243,7 @@ def agent_invest_positions(
                 for message in response.messages:
                     message["model_input_messages"] = "removed"  # Clean logs
             choice = response.output
+            choices[question] = choice
 
             with open(output_dir / f"{question[:50]}.json", "w") as f:
                 json.dump(
@@ -252,7 +255,7 @@ def agent_invest_positions(
                     f,
                     default=str,
                 )
-    return
+    return choices
 
 
 def run_deep_research(

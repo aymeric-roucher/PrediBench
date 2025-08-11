@@ -19,7 +19,7 @@ if not OUTPUT_PATH.exists():
     OUTPUT_PATH.mkdir(parents=True)
 
 
-def choose_markets(end_date: date, n_markets: int = 10) -> list[Market]:
+def choose_markets(today_date: date, n_markets: int = 10) -> list[Market]:
     """Pick some interesting questions to invest in."""
     request = MarketRequest(
         limit=n_markets * 10,
@@ -27,14 +27,14 @@ def choose_markets(end_date: date, n_markets: int = 10) -> list[Market]:
         closed=False,
         order="volumeNum",
         ascending=False,
-        end_date_min=end_date + timedelta(days=1),
-        end_date_max=end_date + timedelta(days=21),
+        end_date_min=today_date + timedelta(days=1),
+        end_date_max=today_date + timedelta(days=21),
     )
     markets = get_open_markets(
         request,
         add_timeseries=[
-            end_date - MAX_INTERVAL_TIMESERIES,
-            end_date,
+            today_date - MAX_INTERVAL_TIMESERIES,
+            today_date,
         ],
     )
     markets = filter_out_resolved_markets(markets)
