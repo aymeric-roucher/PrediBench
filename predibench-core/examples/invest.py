@@ -1,7 +1,7 @@
 from datetime import date
 
 from dotenv import load_dotenv
-from predibench.agent.agent import launch_agent_investments
+from predibench.agent import launch_agent_investments
 from predibench.pnl import compute_pnls
 from predibench.polymarket_api import (
     get_historical_returns,
@@ -21,9 +21,8 @@ if __name__ == "__main__":
     # today = datetime.now().replace(tzinfo=None).date()
     end_date = date(2025, 8, 1)
 
-    if False:
-        markets = choose_markets(end_date, n_markets=N_MARKETS)
-        returns_df, prices_df = get_historical_returns(markets)
+    markets = choose_markets(end_date, n_markets=N_MARKETS)
+    returns_df, prices_df = get_historical_returns(markets)
 
     investment_dates = [date(2025, 7, 25), date(2025, 8, 1)]
 

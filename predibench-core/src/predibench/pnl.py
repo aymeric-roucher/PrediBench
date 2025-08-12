@@ -3,6 +3,9 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from datetime import date, timedelta
+
+from predibench.polymarket_api import MarketRequest, get_open_markets, get_historical_returns
 
 
 class PnlCalculator:
@@ -327,7 +330,7 @@ def compute_pnls(investment_dates, positions_df: pd.DataFrame):
         ]  # TODO: This should be removed when we can save
 
         cumulative_pnl, fig = compute_cumulative_pnl(
-            positions_agent_df, returns_df, prices_df
+            positions_agent_df, returns_df, prices_df, investment_dates
         )
 
         portfolio_output_path = f"./portfolio_performance/{agent_name}"
@@ -349,7 +352,7 @@ def compute_pnls(investment_dates, positions_df: pd.DataFrame):
 
 
 def compute_cumulative_pnl(
-    positions_agent_df: pd.DataFrame, returns_df: pd.DataFrame, prices_df: pd.DataFrame
+    positions_agent_df: pd.DataFrame, returns_df: pd.DataFrame, prices_df: pd.DataFrame, investment_dates: list
 ) -> pd.DataFrame:
     # Convert positions_agent_df to have date as index, question as columns, and choice as values
     positions_agent_df = positions_agent_df.pivot(

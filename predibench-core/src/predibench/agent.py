@@ -172,7 +172,6 @@ def agent_invest_positions(
     markets: list[Market],
     prices_df: pd.DataFrame,
     date: date,
-    test_mode: bool = False,
 ) -> dict:
     """Let the agent decide on investment positions: 1 to buy, -1 to sell, 0 to do nothing"""
     print("\nCreating investment positions with agent...")
