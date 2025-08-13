@@ -58,8 +58,6 @@ def upload_weekly_markets(markets: list):
                 "slug": market.slug,
                 "description": market.description,
                 "end_date": market.end_date,
-                "active": market.active,
-                "closed": market.closed,
                 "volume": market.volume,
                 "liquidity": market.liquidity,
                 "week_selected": date.today().strftime("%Y-%m-%d"),
