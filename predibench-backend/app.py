@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from huggingface_hub import HfApi
 from predibench.agent import agent_invest_positions
 from predibench.polymarket_api import get_historical_returns
-from predibench.utils import choose_markets
+from predibench.market_selection import choose_markets
 
 load_dotenv()
 
