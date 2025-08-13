@@ -8,7 +8,7 @@ from datasets import Dataset
 from dotenv import load_dotenv
 from huggingface_hub import HfApi
 from predibench.agent import agent_invest_positions
-from predibench.polymarket_api import get_historical_returns
+from predibench.pnl import get_historical_returns
 from predibench.market_selection import choose_markets
 
 load_dotenv()
@@ -58,8 +58,6 @@ def upload_weekly_markets(markets: list):
                 "slug": market.slug,
                 "description": market.description,
                 "end_date": market.end_date,
-                "active": market.active,
-                "closed": market.closed,
                 "volume": market.volume,
                 "liquidity": market.liquidity,
                 "week_selected": date.today().strftime("%Y-%m-%d"),

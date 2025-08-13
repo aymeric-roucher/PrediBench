@@ -40,32 +40,32 @@ class Market(BaseModel, arbitrary_types_allowed=True):
     question: str
     slug: str
     description: str
-    end_date: datetime
-    active: bool
-    closed: bool
+    end_date: datetime | None
     createdAt: datetime
-    volume: float
+    volumeNum: float | None
+    volume24hr: float | None
+    volume1wk: float | None
+    volume1mo: float | None
+    volume1yr: float | None
     liquidity: float | None
     outcomes: list[MarketOutcome]
     prices: pd.Series | None = None
-    
+
     @staticmethod
-    def from_json(market_data: dict) -> Market:
+    def from_json(market_data: dict) -> Market | None:
         """Convert a market JSON object to a PolymarketMarket dataclass."""
-        closed = (
-            bool(market_data["closed"])
-            if isinstance(market_data["closed"], bool)
-            else market_data["closed"].lower() == "true"
-        )
-        active = (
-            bool(market_data["active"])
-            if isinstance(market_data["active"], bool)
-            else market_data["active"].lower() == "true"
-        )
+
+        if not "outcomes" in market_data or not "clobTokenIds" in market_data:
+            # rarely it can happen that outcomes is present but clobTokenIds is not
+            print("Outcomes or clobTokenIds missing for market:\n", market_data["id"], market_data["question"])
+            return None
+        
         outcomes = json.loads(market_data["outcomes"])
-        if len(outcomes) != 2:
-            print("FOR MARKET:\n", market_data["id"])
-            raise ValueError(f"Expected 2 outcomes, got {len(outcomes)}")
+        if len(outcomes) < 2:
+            # There should be at least 2 
+            # Who will the world's richest person be on February 27, 2021?
+            print(f"Expected 2 outcomes, got {len(outcomes)} for market:\n", market_data["id"], market_data["question"])
+            raise ValueError(f"Expected 2 or more outcomes, got {len(outcomes)}")
         outcome_names = json.loads(market_data["outcomes"])
         outcome_prices = json.loads(market_data["outcomePrices"])
         outcome_clob_token_ids = json.loads(market_data["clobTokenIds"])
@@ -82,13 +82,15 @@ class Market(BaseModel, arbitrary_types_allowed=True):
             ],
             slug=market_data["slug"],
             description=market_data["description"],
-            end_date=convert_polymarket_time_to_datetime(market_data["endDate"]),
-            active=active,
-            closed=closed,
+            end_date=convert_polymarket_time_to_datetime(market_data["endDate"]) if "endDate" in market_data else None,
             createdAt=convert_polymarket_time_to_datetime(market_data["createdAt"]),
-            volume=float(market_data["volume"]),
+            volumeNum=float(market_data["volumeNum"]) if market_data.get("volumeNum") is not None else None,
+            volume24hr=float(market_data["volume24hr"]) if market_data.get("volume24hr") is not None else None,
+            volume1wk=float(market_data["volume1wk"]) if market_data.get("volume1wk") is not None else None,
+            volume1mo=float(market_data["volume1mo"]) if market_data.get("volume1mo") is not None else None,
+            volume1yr=float(market_data["volume1yr"]) if market_data.get("volume1yr") is not None else None,
             liquidity=float(market_data["liquidity"])
-            if "liquidity" in market_data
+            if "liquidity" in market_data and market_data["liquidity"] is not None
             else None,
             # json=market_data,
         )
@@ -141,11 +143,19 @@ class MarketsRequestParameters(BaseModel):
         response.raise_for_status()
         output = response.json()
         markets = [Market.from_json(market) for market in output]
+        markets = [market for market in markets if market is not None]
         if self.end_date_min:
-            assert all(
-                self.end_date_min <= market.end_date <= self.end_date_max
-                for market in markets
-            ), "Some markets were created after the end date"
+            filtered_markets = []
+            excluded_count = 0
+            for market in markets:
+                if market.end_date is None or not (self.end_date_min <= market.end_date <= self.end_date_max):
+                    excluded_count += 1
+                    print(f"Excluded market {market.question} because it doesn't fit the date criteria")
+                else:
+                    filtered_markets.append(market)
+            if excluded_count > 0:
+                print(f"Warning: Excluded {excluded_count} markets that don't fit the date criteria")
+            markets = filtered_markets
 
         if add_timeseries:
             start_date, end_date = add_timeseries
