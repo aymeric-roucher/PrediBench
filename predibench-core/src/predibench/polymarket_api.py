@@ -244,6 +244,10 @@ def _get_events(
     return output
 
 
+################################################################################
+# Useful for the future but unused functions
+################################################################################
+
 class Event(BaseModel):
     id: str
     slug: str
@@ -313,67 +317,6 @@ def get_order_book(token_id: str) -> OrderBook:
     
 
 
-if __name__ == "__main__":
-    # Get a market that's actually open (active and not closed)
-    market_request = MarketsRequestParameters(
-        limit=20,
-        active=True,
-        closed=False,
-        order="volumeNum",
-        ascending=False,
-        liquidity_num_min=1000,
-    )
-    all_markets = market_request.get_open_markets()
-
-    # Find the first market that's truly open
-    open_market = None
-    for market in all_markets:
-        print(
-            f"Checking market: {market.question[:50]}... (created: {market.createdAt.year}, closed: {market.closed})"
-        )
-        if not market.closed:
-            open_market = market
-            break
-    assert open_market is not None, "No open market found"
-
-    print(f"\nUsing market: {open_market.question}")
-    print(f"Created: {open_market.createdAt}")
-    print(f"Closed: {open_market.closed}")
-
-    # Get order book for the first token
-    token_id = open_market.outcomes[0].clob_token_id
-    print(f"\nGetting order book for token: {token_id}")
-
-    order_book = get_order_book(token_id)
-    print(f"Order book timestamp: {order_book.timestamp}")
-    print(f"Best bid: {order_book.bids[0].price if order_book.bids else 'None'}")
-    print(f"Best ask: {order_book.asks[0].price if order_book.asks else 'None'}")
-    print(f"Tick size: {order_book.tick_size}")
-
-    timeseries_request_parameters = _HistoricalTimeSeriesRequestParameters(
-        market=token_id,
-        start_time=datetime.now() - timedelta(days=10),
-        end_time=datetime.now(),
-        interval="1d",
-    )
-    timeseries = timeseries_request_parameters.get_token_daily_timeseries()
-
-    print(f"Found {len(timeseries)} data points")
-    for point in timeseries.iloc[-5:]:  # Print last 5 points
-        print(f"  {point.name}: ${point.values:.4f}")
-
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=timeseries.index, y=timeseries.values, mode="lines+markers", name="Price"
-        )
-    )
-    fig.update_layout(
-        title=f"Price History - {open_market.question}",
-        xaxis_title="Time",
-        yaxis_title="Price",
-    )
-    fig.write_image("timeseries.png")
 
 
 def get_historical_returns(markets: list[Market]) -> tuple[pd.DataFrame, pd.DataFrame]:
