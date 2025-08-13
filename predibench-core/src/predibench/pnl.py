@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import date, timedelta
 
-from predibench.polymarket_api import MarketsRequestParameters, get_open_markets, get_historical_returns
+from predibench.polymarket_api import MarketsRequestParameters, Market
 
 
 class PnlCalculator:
@@ -399,3 +399,28 @@ def compute_cumulative_pnl(
 
     cumulative_pnl = engine.pnl.sum(axis=1).cumsum()
     return cumulative_pnl, fig
+
+def get_historical_returns(markets: list[Market]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Get historical returns directly from timeseries data"""
+
+    returns_df = pd.DataFrame(
+        np.nan,
+        index=markets[0].prices.index,
+        columns=[market.question for market in markets],
+    )
+    prices_df = pd.DataFrame(
+        np.nan,
+        index=markets[0].prices.index,
+        columns=[market.question for market in markets],
+    )
+
+    for i, market in enumerate(markets):
+        prices_df[market.question] = market.prices
+
+        token_returns = market.prices.pct_change(periods=1)
+        returns_df[market.question] = token_returns
+
+    return returns_df, prices_df
+
+
+

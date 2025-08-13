@@ -321,27 +321,3 @@ class OrderBook(BaseModel):
     
     
 
-def get_historical_returns(markets: list[Market]) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Get historical returns directly from timeseries data"""
-
-    returns_df = pd.DataFrame(
-        np.nan,
-        index=markets[0].prices.index,
-        columns=[market.question for market in markets],
-    )
-    prices_df = pd.DataFrame(
-        np.nan,
-        index=markets[0].prices.index,
-        columns=[market.question for market in markets],
-    )
-
-    for i, market in enumerate(markets):
-        prices_df[market.question] = market.prices
-
-        token_returns = market.prices.pct_change(periods=1)
-        returns_df[market.question] = token_returns
-
-    return returns_df, prices_df
-
-
-
