@@ -51,6 +51,25 @@ class Market(BaseModel, arbitrary_types_allowed=True):
     outcomes: list[MarketOutcome]
     prices: pd.Series | None = None
 
+    def fill_prices(self, start_time: datetime, end_time: datetime, interval: str = "1d") -> None:
+        """Fill the prices field with timeseries data.
+        
+        Args:
+            start_time: Start time for timeseries data
+            end_time: End time for timeseries data
+            interval: Time interval for data points (default: "1d")
+        """
+        if self.outcomes and len(self.outcomes) > 0 and self.outcomes[0].clob_token_id:
+            ts_request = _HistoricalTimeSeriesRequestParameters(
+                market=self.outcomes[0].clob_token_id,
+                start_time=start_time,
+                end_time=end_time,
+                interval=interval,
+            )
+            self.prices = ts_request.get_token_daily_timeseries()
+        else:
+            self.prices = None
+
     @staticmethod
     def from_json(market_data: dict) -> Market | None:
         """Convert a market JSON object to a PolymarketMarket dataclass."""
@@ -133,7 +152,7 @@ class _RequestParameters(BaseModel):
 class MarketsRequestParameters(_RequestParameters):
     
     def get_markets(
-        self, add_timeseries: tuple[datetime, datetime] | None = None
+        self, start_time: datetime | None = None, end_time: datetime | None = None
     ) -> list[Market]:
         """Get open markets from Polymarket API using this request configuration."""
         url = f"{BASE_URL_POLYMARKET}/markets"
@@ -169,16 +188,9 @@ class MarketsRequestParameters(_RequestParameters):
                 print(f"Warning: Excluded {excluded_count} markets that don't fit the date criteria")
             markets = filtered_markets
 
-        if add_timeseries:
-            start_date, end_date = add_timeseries
+        if start_time and end_time:
             for market in markets:
-                ts_request = _HistoricalTimeSeriesRequestParameters(
-                    market=market.outcomes[0].clob_token_id,
-                    start_time=start_date,
-                    end_time=end_date,
-                    interval="1d",
-                )
-                market.prices = ts_request.get_token_daily_timeseries()
+                market.fill_prices(start_time, end_time)
         return markets
 
 class _HistoricalTimeSeriesRequestParameters(BaseModel):

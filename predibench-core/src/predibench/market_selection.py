@@ -8,7 +8,9 @@ from predibench.common import OUTPUT_PATH
 from predibench.polymarket_api import (
     MAX_INTERVAL_TIMESERIES,
     Market,
+    Event,
     MarketsRequestParameters,
+    EventsRequestParameters,
 )
 
 
@@ -60,7 +62,81 @@ def _filter_out_resolved_markets(
     ]
 
 
-def choose_markets(today_date: date, n_markets: int = 10) -> dict[Market]:
+def _filter_events_by_volume_and_markets(events: list[Event], n_events: int, min_volume: float = 1000) -> list[Event]:
+    """Filter events based on volume threshold and presence of markets."""
+    filtered_events = []
+    for event in events:
+        if event.markets and len(event.markets) > 0:
+            # Check if event has volume and is interesting
+            if event.volume24hr and event.volume24hr > min_volume:  # Minimum volume threshold
+                filtered_events.append(event)
+        
+        if len(filtered_events) >= n_events:
+            break
+    
+    return filtered_events
+
+
+def choose_events(today_date: date, n_events: int) -> list[Event]:
+    """Pick top events by volume for investment."""
+    request_parameters = EventsRequestParameters(
+        limit=500,
+        order="volume1wk",
+        ascending=False,
+        end_date_min=today_date + timedelta(days=1),
+        end_date_max=today_date + timedelta(days=21),
+    )
+    events = request_parameters.get_events()
+    
+    # Filter events by volume and market availability
+    filtered_events = _filter_events_by_volume_and_markets(events, n_events)
+    
+    # Add timeseries data to first market in each event (for testing purposes)
+    for event in filtered_events:
+        for i, market in enumerate(event.markets):
+            if i == 0:  # Only fill prices for first market in each event for faster testing
+                market.fill_prices(
+                    start_time=today_date - timedelta(days=7),  # Only last 7 days for faster testing
+                    end_time=today_date
+                )
+            else:
+                market.prices = None  # Skip timeseries for other markets to speed up testing
+    
+    output_dir = OUTPUT_PATH
+    output_dir.mkdir(exist_ok=True)
+    events_file = output_dir / "selected_events.json"
+    
+    # Save selected events
+    with open(events_file, "w") as f:
+        events_data = []
+        for event in filtered_events:
+            event_dict = {
+                "id": event.id,
+                "title": event.title,
+                "slug": event.slug,
+                "description": event.description,
+                "volume": event.volume,
+                "liquidity": event.liquidity,
+                "start_date": event.start_date.isoformat() if event.start_date else None,
+                "end_date": event.end_date.isoformat() if event.end_date else None,
+                "markets": [
+                    {
+                        "id": market.id,
+                        "question": market.question,
+                        "outcomes": [{"name": outcome.name, "price": outcome.price} for outcome in market.outcomes],
+                        "volume": market.volumeNum,
+                        "liquidity": market.liquidity,
+                    }
+                    for market in event.markets
+                ]
+            }
+            events_data.append(event_dict)
+        json.dump(events_data, f, indent=2)
+    
+    return filtered_events[:n_events]
+
+
+def choose_markets(today_date: date, n_markets: int = 10) -> list[Market]:
     """Pick some interesting questions to invest in."""
     request_parameters = MarketsRequestParameters(
         limit=n_markets * 10,
@@ -72,10 +148,8 @@ def choose_markets(today_date: date, n_markets: int = 10) -> dict[Market]:
         end_date_max=today_date + timedelta(days=21),
     )
     markets = request_parameters.get_markets(
-        add_timeseries=(
-            today_date - MAX_INTERVAL_TIMESERIES,
-            today_date,
-        )
+        start_time=today_date - MAX_INTERVAL_TIMESERIES,
+        end_time=today_date,
     )
     markets = _filter_out_resolved_markets(markets)
 
