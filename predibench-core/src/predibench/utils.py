@@ -1,5 +1,6 @@
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -39,3 +40,7 @@ def collect_investment_choices(output_path: Path = OUTPUT_PATH) -> pd.DataFrame:
                             raise e
                             continue
     return pd.DataFrame.from_records(positions)
+
+def convert_polymarket_time_to_datetime(time_str: str) -> datetime:
+    """Convert a Polymarket time string to a datetime object."""
+    return datetime.fromisoformat(time_str.replace("Z", "")).replace(tzinfo=None)

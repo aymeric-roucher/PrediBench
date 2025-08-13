@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from datetime import datetime, timedelta
 from typing import Literal
@@ -6,6 +8,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import requests
+from predibench.utils import convert_polymarket_time_to_datetime
 
 # TODO: respect rate limits:
 # **API Rate Limits**
@@ -45,17 +48,51 @@ class Market(BaseModel, arbitrary_types_allowed=True):
     liquidity: float | None
     outcomes: list[MarketOutcome]
     prices: pd.Series | None = None
+    
+    @staticmethod
+    def from_json(market_data: dict) -> Market:
+        """Convert a market JSON object to a PolymarketMarket dataclass."""
+        closed = (
+            bool(market_data["closed"])
+            if isinstance(market_data["closed"], bool)
+            else market_data["closed"].lower() == "true"
+        )
+        active = (
+            bool(market_data["active"])
+            if isinstance(market_data["active"], bool)
+            else market_data["active"].lower() == "true"
+        )
+        outcomes = json.loads(market_data["outcomes"])
+        if len(outcomes) != 2:
+            print("FOR MARKET:\n", market_data["id"])
+            raise ValueError(f"Expected 2 outcomes, got {len(outcomes)}")
+        outcome_names = json.loads(market_data["outcomes"])
+        outcome_prices = json.loads(market_data["outcomePrices"])
+        outcome_clob_token_ids = json.loads(market_data["clobTokenIds"])
+        return Market(
+            id=market_data["id"],
+            question=market_data["question"],
+            outcomes=[
+                MarketOutcome(
+                    clob_token_id=outcome_clob_token_ids[i],
+                    name=outcome_names[i],
+                    price=outcome_prices[i],
+                )
+                for i in range(len(outcomes))
+            ],
+            slug=market_data["slug"],
+            description=market_data["description"],
+            end_date=convert_polymarket_time_to_datetime(market_data["endDate"]),
+            active=active,
+            closed=closed,
+            createdAt=convert_polymarket_time_to_datetime(market_data["createdAt"]),
+            volume=float(market_data["volume"]),
+            liquidity=float(market_data["liquidity"])
+            if "liquidity" in market_data
+            else None,
+            # json=market_data,
+        )
 
-
-class Event(BaseModel):
-    id: str
-    slug: str
-    title: str
-    liquidity: float
-    volume: float
-    start_date: datetime
-    end_date: datetime
-    tags: list[str]
 
 
 class MarketsRequestParameters(BaseModel):
@@ -103,7 +140,7 @@ class MarketsRequestParameters(BaseModel):
         response = requests.get(url, params=params)
         response.raise_for_status()
         output = response.json()
-        markets = [_json_to_polymarket_market(market) for market in output]
+        markets = [Market.from_json(market) for market in output]
         if self.end_date_min:
             assert all(
                 self.end_date_min <= market.end_date <= self.end_date_max
@@ -163,15 +200,6 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
         return timeseries
 
 
-class HistoricalTimeSeriesDataPoint(BaseModel):
-    timestamp: datetime
-    price: float
-
-
-class HistoricalTimeSeriesData(BaseModel):
-    series: list[HistoricalTimeSeriesDataPoint]
-
-
 class OrderLevel(BaseModel):
     price: str
     size: str
@@ -187,56 +215,6 @@ class OrderBook(BaseModel):
     tick_size: str
     bids: list[OrderLevel]
     asks: list[OrderLevel]
-
-
-def convert_polymarket_time_to_datetime(time_str: str) -> datetime:
-    """Convert a Polymarket time string to a datetime object."""
-    return datetime.fromisoformat(time_str.replace("Z", "")).replace(tzinfo=None)
-
-
-def _json_to_polymarket_market(market_data: dict) -> Market:
-    """Convert a market JSON object to a PolymarketMarket dataclass."""
-    closed = (
-        bool(market_data["closed"])
-        if isinstance(market_data["closed"], bool)
-        else market_data["closed"].lower() == "true"
-    )
-    active = (
-        bool(market_data["active"])
-        if isinstance(market_data["active"], bool)
-        else market_data["active"].lower() == "true"
-    )
-    outcomes = json.loads(market_data["outcomes"])
-    if len(outcomes) != 2:
-        print("FOR MARKET:\n", market_data["id"])
-        raise ValueError(f"Expected 2 outcomes, got {len(outcomes)}")
-    outcome_names = json.loads(market_data["outcomes"])
-    outcome_prices = json.loads(market_data["outcomePrices"])
-    outcome_clob_token_ids = json.loads(market_data["clobTokenIds"])
-    return Market(
-        id=market_data["id"],
-        question=market_data["question"],
-        outcomes=[
-            MarketOutcome(
-                clob_token_id=outcome_clob_token_ids[i],
-                name=outcome_names[i],
-                price=outcome_prices[i],
-            )
-            for i in range(len(outcomes))
-        ],
-        slug=market_data["slug"],
-        description=market_data["description"],
-        end_date=convert_polymarket_time_to_datetime(market_data["endDate"]),
-        active=active,
-        closed=closed,
-        createdAt=convert_polymarket_time_to_datetime(market_data["createdAt"]),
-        volume=float(market_data["volume"]),
-        liquidity=float(market_data["liquidity"])
-        if "liquidity" in market_data
-        else None,
-        # json=market_data,
-    )
-
 
 def _get_events(
     limit: int = 500,
@@ -266,27 +244,38 @@ def _get_events(
     return output
 
 
-def get_market_events(limit: int = 500, offset: int = 0) -> list[Event]:
-    """Get market events from Polymarket, sorted by volume.
+class Event(BaseModel):
+    id: str
+    slug: str
+    title: str
+    liquidity: float
+    volume: float
+    start_date: datetime
+    end_date: datetime
+    tags: list[str]
+    
+    @staticmethod
+    def get_market_events(limit: int = 500, offset: int = 0) -> list[Event]:
+        """Get market events from Polymarket, sorted by volume.
 
-    There is a limit of 500 markets per request, one must use pagination to get all markets.
-    """
-    output = _get_events(limit, offset)
-    events = []
-    for event in output:
-        polymarket_event = Event(
-            id=event["id"],
-            slug=event["slug"],
-            title=event["title"],
-            liquidity=float(event["liquidity"]),
-            volume=float(event["volume"]),
-            start_date=convert_polymarket_time_to_datetime(event["startDate"]),
-            end_date=convert_polymarket_time_to_datetime(event["endDate"]),
-            tags=event["tags"],
-        )
-        events.append(polymarket_event)
+        There is a limit of 500 markets per request, one must use pagination to get all markets.
+        """
+        output = _get_events(limit, offset)
+        events = []
+        for event in output:
+            polymarket_event = Event(
+                id=event["id"],
+                slug=event["slug"],
+                title=event["title"],
+                liquidity=float(event["liquidity"]),
+                volume=float(event["volume"]),
+                start_date=convert_polymarket_time_to_datetime(event["startDate"]),
+                end_date=convert_polymarket_time_to_datetime(event["endDate"]),
+                tags=event["tags"],
+            )
+            events.append(polymarket_event)
 
-    return events
+        return events
 
 
 
@@ -320,6 +309,8 @@ def get_order_book(token_id: str) -> OrderBook:
         bids=bids,
         asks=asks,
     )
+    
+    
 
 
 if __name__ == "__main__":
