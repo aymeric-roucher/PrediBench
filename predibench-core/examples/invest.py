@@ -4,8 +4,7 @@ from datetime import date
 from dotenv import load_dotenv
 
 from predibench.agent import launch_agent_investments
-from predibench.pnl import compute_pnls
-from predibench.polymarket_api import get_historical_returns
+from predibench.pnl import compute_pnls, get_historical_returns
 from predibench.common import OUTPUT_PATH
 from predibench.utils import collect_investment_choices
 from predibench.market_selection import choose_markets
