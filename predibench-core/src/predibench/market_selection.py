@@ -6,7 +6,6 @@ from predibench.polymarket_api import (
     MAX_INTERVAL_TIMESERIES,
     Market,
     MarketsRequestParameters,
-    get_open_markets,
 )
 from predibench.common import OUTPUT_PATH
 from smolagents import ChatMessage, LiteLLMModel

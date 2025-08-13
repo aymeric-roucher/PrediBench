@@ -42,11 +42,15 @@ class Market(BaseModel, arbitrary_types_allowed=True):
     description: str
     end_date: datetime | None
     createdAt: datetime
-    volume: float
+    volumeNum: float | None
+    volume24hr: float | None
+    volume1wk: float | None
+    volume1mo: float | None
+    volume1yr: float | None
     liquidity: float | None
     outcomes: list[MarketOutcome]
     prices: pd.Series | None = None
-    
+
     @staticmethod
     def from_json(market_data: dict) -> Market | None:
         """Convert a market JSON object to a PolymarketMarket dataclass."""
@@ -80,9 +84,13 @@ class Market(BaseModel, arbitrary_types_allowed=True):
             description=market_data["description"],
             end_date=convert_polymarket_time_to_datetime(market_data["endDate"]) if "endDate" in market_data else None,
             createdAt=convert_polymarket_time_to_datetime(market_data["createdAt"]),
-            volume=float(market_data["volume"]),
+            volumeNum=float(market_data["volumeNum"]) if market_data.get("volumeNum") is not None else None,
+            volume24hr=float(market_data["volume24hr"]) if market_data.get("volume24hr") is not None else None,
+            volume1wk=float(market_data["volume1wk"]) if market_data.get("volume1wk") is not None else None,
+            volume1mo=float(market_data["volume1mo"]) if market_data.get("volume1mo") is not None else None,
+            volume1yr=float(market_data["volume1yr"]) if market_data.get("volume1yr") is not None else None,
             liquidity=float(market_data["liquidity"])
-            if "liquidity" in market_data
+            if "liquidity" in market_data and market_data["liquidity"] is not None
             else None,
             # json=market_data,
         )
@@ -137,10 +145,17 @@ class MarketsRequestParameters(BaseModel):
         markets = [Market.from_json(market) for market in output]
         markets = [market for market in markets if market is not None]
         if self.end_date_min:
-            assert all(
-                self.end_date_min <= market.end_date <= self.end_date_max
-                for market in markets
-            ), "Some markets were created after the end date"
+            filtered_markets = []
+            excluded_count = 0
+            for market in markets:
+                if market.end_date is None or not (self.end_date_min <= market.end_date <= self.end_date_max):
+                    excluded_count += 1
+                    print(f"Excluded market {market.question} because it doesn't fit the date criteria")
+                else:
+                    filtered_markets.append(market)
+            if excluded_count > 0:
+                print(f"Warning: Excluded {excluded_count} markets that don't fit the date criteria")
+            markets = filtered_markets
 
         if add_timeseries:
             start_date, end_date = add_timeseries
