@@ -58,7 +58,7 @@ class Event(BaseModel):
     tags: list[str]
 
 
-class MarketRequest(BaseModel):
+class MarketsRequestParameters(BaseModel):
     limit: int | None = None
     offset: int | None = None
     order: str | None = None
@@ -81,13 +81,86 @@ class MarketRequest(BaseModel):
     tag_id: int | None = None
     related_tags: bool | None = None
 
+    def get_open_markets(
+        self, add_timeseries: tuple[datetime, datetime] | None = None
+    ) -> list[Market]:
+        """Get open markets from Polymarket API using this request configuration."""
+        url = f"{BASE_URL_POLYMARKET}/markets"
 
-class HistoricalTimeSeriesRequest(BaseModel):
+        if self.limit and self.limit > 500:
+            assert False, "Limit must be less than or equal to 500"
+
+        params = {}
+        for field_name, value in self.__dict__.items():
+            if value is not None:
+                if isinstance(value, bool):
+                    params[field_name] = "true" if value else "false"
+                elif isinstance(value, datetime):
+                    params[field_name] = value.date().isoformat()
+                else:
+                    params[field_name] = value
+
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        output = response.json()
+        markets = [_json_to_polymarket_market(market) for market in output]
+        if self.end_date_min:
+            assert all(
+                self.end_date_min <= market.end_date <= self.end_date_max
+                for market in markets
+            ), "Some markets were created after the end date"
+
+        if add_timeseries:
+            start_date, end_date = add_timeseries
+            for market in markets:
+                ts_request = HistoricalTimeSeriesRequestParameters(
+                    market=market.outcomes[0].clob_token_id,
+                    start_time=start_date,
+                    end_time=end_date,
+                    interval="1d",
+                )
+                market.prices = ts_request.get_token_daily_timeseries()
+        return markets
+
+class HistoricalTimeSeriesRequestParameters(BaseModel):
     market: str
     interval: Literal["1m", "1w", "1d", "6h", "1h", "max"] = "1d"
     start_time: datetime | None = None
     end_time: datetime | None = None
     fidelity_minutes: int = 60 * 24  # default to daily
+
+    def get_token_daily_timeseries(self) -> pd.Series:
+        """Get token timeseries data using this request configuration."""
+        url = "https://clob.polymarket.com/prices-history"
+
+        params = {"market": self.market}
+
+        if self.start_time is not None:
+            params["startTs"] = int(self.start_time.timestamp())
+        if self.end_time is not None:
+            params["endTs"] = int(self.end_time.timestamp())
+        params["interval"] = self.interval
+        if self.fidelity_minutes is not None:
+            params["fidelity"] = str(self.fidelity_minutes)
+
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
+
+        timeseries = (
+            pd.Series(
+                [point["p"] for point in data["history"]],
+                index=pd.to_datetime(
+                    [datetime.fromtimestamp(point["t"]) for point in data["history"]]
+                ),
+            )
+            .sort_index()
+            .resample("1D")
+            .last()
+            .ffill()
+        )
+        timeseries.index = timeseries.index.tz_localize(None).date
+        return timeseries
 
 
 class HistoricalTimeSeriesDataPoint(BaseModel):
@@ -216,99 +289,6 @@ def get_market_events(limit: int = 500, offset: int = 0) -> list[Event]:
     return events
 
 
-def get_open_markets(
-    request: MarketRequest,
-    add_timeseries: tuple[datetime, datetime] | None = None,
-) -> list[Market]:
-    """Get open markets from Polymarket, sorted by volume.
-
-    There is a limit of 500 markets per request, one must use pagination to get all markets.
-
-    Args:
-        request: MarketRequest object with full filtering and sorting options
-        add_timeseries: tuple of datetime objects representing the start and end dates of the timeseries to add
-    """
-
-    url = f"{BASE_URL_POLYMARKET}/markets"
-
-    if request.limit and request.limit > 500:
-        assert False, "Limit must be less than or equal to 500"
-
-    params = {}
-    for field_name, value in request.__dict__.items():
-        if value is not None:
-            if isinstance(value, bool):
-                params[field_name] = "true" if value else "false"
-            elif isinstance(value, datetime):
-                params[field_name] = value.date().isoformat()
-            else:
-                params[field_name] = value
-
-    response = requests.get(url, params=params)
-    response.raise_for_status()
-    output = response.json()
-    markets = [_json_to_polymarket_market(market) for market in output]
-    if request.end_date_min:
-        assert all(
-            request.end_date_min <= market.end_date <= request.end_date_max
-            for market in markets
-        ), "Some markets were created after the end date"
-
-    if add_timeseries:
-        start_date, end_date = add_timeseries
-        for market in markets:
-            ts_request = HistoricalTimeSeriesRequest(
-                market=market.outcomes[0].clob_token_id,
-                start_time=start_date,
-                end_time=end_date,
-                interval="1d",
-            )
-            market.prices = get_token_daily_timeseries(ts_request)
-    return markets
-
-
-def get_token_daily_timeseries(
-    request: HistoricalTimeSeriesRequest,
-) -> pd.Series:
-    """Get token timeseries data from Polymarket CLOB API.
-
-    Args:
-        request: TokenTimeseriesRequest with market token ID and optional parameters
-
-    Returns:
-        HistoricalTimeSeriesData containing historical price data points
-    """
-    url = "https://clob.polymarket.com/prices-history"
-
-    params = {"market": request.market}
-
-    if request.start_time is not None:
-        params["startTs"] = int(request.start_time.timestamp())
-    if request.end_time is not None:
-        params["endTs"] = int(request.end_time.timestamp())
-    params["interval"] = request.interval
-    if request.fidelity_minutes is not None:
-        params["fidelity"] = str(request.fidelity_minutes)
-
-    response = requests.get(url, params=params)
-    response.raise_for_status()
-    data = response.json()
-
-    timeseries = (
-        pd.Series(
-            [point["p"] for point in data["history"]],
-            index=pd.to_datetime(
-                [datetime.fromtimestamp(point["t"]) for point in data["history"]]
-            ),
-        )
-        .sort_index()
-        .resample("1D")
-        .last()
-        .ffill()
-    )
-    timeseries.index = timeseries.index.tz_localize(None).date
-    return timeseries
-
 
 def get_order_book(token_id: str) -> OrderBook:
     """Get order book for a specific token ID from Polymarket CLOB API.
@@ -344,7 +324,7 @@ def get_order_book(token_id: str) -> OrderBook:
 
 if __name__ == "__main__":
     # Get a market that's actually open (active and not closed)
-    market_request = MarketRequest(
+    market_request = MarketsRequestParameters(
         limit=20,
         active=True,
         closed=False,
@@ -352,7 +332,7 @@ if __name__ == "__main__":
         ascending=False,
         liquidity_num_min=1000,
     )
-    all_markets = get_open_markets(market_request)
+    all_markets = market_request.get_open_markets()
 
     # Find the first market that's truly open
     open_market = None
@@ -379,13 +359,13 @@ if __name__ == "__main__":
     print(f"Best ask: {order_book.asks[0].price if order_book.asks else 'None'}")
     print(f"Tick size: {order_book.tick_size}")
 
-    request = HistoricalTimeSeriesRequest(
+    timeseries_request_parameters = HistoricalTimeSeriesRequestParameters(
         market=token_id,
         start_time=datetime.now() - timedelta(days=10),
         end_time=datetime.now(),
         interval="1d",
     )
-    timeseries = get_token_daily_timeseries(request)
+    timeseries = timeseries_request_parameters.get_token_daily_timeseries()
 
     print(f"Found {len(timeseries)} data points")
     for point in timeseries.iloc[-5:]:  # Print last 5 points

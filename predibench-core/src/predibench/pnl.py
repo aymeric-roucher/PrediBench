@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import date, timedelta
 
-from predibench.polymarket_api import MarketRequest, get_open_markets, get_historical_returns
+from predibench.polymarket_api import MarketsRequestParameters, get_open_markets, get_historical_returns
 
 
 class PnlCalculator:
@@ -300,15 +300,14 @@ def compute_pnls(investment_dates, positions_df: pd.DataFrame):
     expected_end = investment_dates[-1] + timedelta(days=7)
     markets = []
     for question_id in positions_df["question_id"].unique():
-        request = MarketRequest(
+        request_parameters = MarketsRequestParameters(
             id=question_id,
         )
-        market = get_open_markets(
-            request,
-            add_timeseries=[
+        market = request_parameters.get_open_markets(
+            add_timeseries=(
                 expected_start,
                 expected_end,
-            ],  # 15 days back is the maximum allowed by the API
+            )  # 15 days back is the maximum allowed by the API
         )[0]
         markets.append(market)
     returns_df, prices_df = get_historical_returns(markets)

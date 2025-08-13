@@ -12,10 +12,8 @@ from datetime import datetime
 import pandas as pd
 from predibench.polymarket_api import (
     MAX_INTERVAL_TIMESERIES,
-    HistoricalTimeSeriesRequest,
-    MarketRequest,
-    get_open_markets,
-    get_token_daily_timeseries,
+    HistoricalTimeSeriesRequestParameters,
+    MarketsRequestParameters,
 )
 
 # Test markets from late 2024 (about 6 months ago)
@@ -47,7 +45,7 @@ def test_market_request_for_old_closed_markets():
     end_date_min = datetime(2024, 10, 1)
     end_date_max = datetime(2025, 1, 1)
 
-    request = MarketRequest(
+    request_parameters = MarketsRequestParameters(
         limit=20,
         closed=True,
         active=False,
@@ -57,7 +55,7 @@ def test_market_request_for_old_closed_markets():
         ascending=False,
     )
 
-    markets = get_open_markets(request)
+    markets = request_parameters.get_open_markets()
 
     # Verify we got some markets
     assert len(markets) > 0, "Should find some closed markets from late 2024"
@@ -84,7 +82,7 @@ def test_price_series_retrieval_over_several_months():
         start_date = end_date - MAX_INTERVAL_TIMESERIES
 
         # Use the existing function with proper parameters
-        request = HistoricalTimeSeriesRequest(
+        timeseries_request_parameters = HistoricalTimeSeriesRequestParameters(
             market=market_data["token_id"],
             start_time=start_date,
             end_time=end_date,
@@ -92,8 +90,8 @@ def test_price_series_retrieval_over_several_months():
             fidelity_minutes=60 * 24,  # Default daily fidelity
         )
 
-        # Use the existing function from polymarket_api
-        timeseries = get_token_daily_timeseries(request)
+        # Use the method from the request object
+        timeseries = timeseries_request_parameters.get_token_daily_timeseries()
 
         print(f"  Retrieved {len(timeseries)} data points")
 

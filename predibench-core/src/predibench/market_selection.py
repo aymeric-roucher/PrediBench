@@ -5,7 +5,7 @@ import textwrap
 from predibench.polymarket_api import (
     MAX_INTERVAL_TIMESERIES,
     Market,
-    MarketRequest,
+    MarketsRequestParameters,
     get_open_markets,
 )
 from predibench.common import OUTPUT_PATH
@@ -62,7 +62,7 @@ def _filter_out_resolved_markets(
 
 def choose_markets(today_date: date, n_markets: int = 10) -> list[Market]:
     """Pick some interesting questions to invest in."""
-    request = MarketRequest(
+    request_parameters = MarketsRequestParameters(
         limit=n_markets * 10,
         active=True,
         closed=False,
@@ -71,12 +71,11 @@ def choose_markets(today_date: date, n_markets: int = 10) -> list[Market]:
         end_date_min=today_date + timedelta(days=1),
         end_date_max=today_date + timedelta(days=21),
     )
-    markets = get_open_markets(
-        request,
-        add_timeseries=[
+    markets = request_parameters.get_open_markets(
+        add_timeseries=(
             today_date - MAX_INTERVAL_TIMESERIES,
             today_date,
-        ],
+        )
     )
     markets = _filter_out_resolved_markets(markets)
 

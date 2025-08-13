@@ -1,16 +1,16 @@
 from predibench.polymarket_api import (
-    MarketRequest,
+    MarketsRequestParameters,
     _get_events,
     convert_polymarket_time_to_datetime,
-    get_open_markets,
 )
 
 
 def test_get_open_markets():
     """Test basic market retrieval."""
-    markets = get_open_markets(MarketRequest(limit=500))
+    request_parameters = MarketsRequestParameters(limit=500)
+    markets = request_parameters.get_open_markets()
     for market in markets:
-        assert len(market["events"]) == 1
+        assert len(market.outcomes) >= 1
     assert len(markets) == 500
 
 
@@ -38,7 +38,8 @@ def test__get_market_events():
 
 def test_get_open_markets_field_values():
     """Test that field values are reasonable."""
-    markets = get_open_markets(MarketRequest(limit=5))
+    request_parameters = MarketsRequestParameters(limit=5)
+    markets = request_parameters.get_open_markets()
 
     for market in markets:
         assert len(market.id) > 0
@@ -53,8 +54,10 @@ def test_get_open_markets_field_values():
 
 def test_get_open_markets_limit():
     """Test that limit parameter works correctly."""
-    markets_small = get_open_markets(MarketRequest(limit=5))
-    markets_large = get_open_markets(MarketRequest(limit=20))
+    request_small = MarketsRequestParameters(limit=5)
+    request_large = MarketsRequestParameters(limit=20)
+    markets_small = request_small.get_open_markets()
+    markets_large = request_large.get_open_markets()
 
     assert len(markets_small) == 5
     assert len(markets_large) == 20
