@@ -292,10 +292,11 @@ def validate_continuous_returns(
     if missing_dates:
         raise ValueError(f"Missing returns data for dates: {sorted(missing_dates)}")
 
-
+# investment_dates seems to be a tuple of two dates ?
 def compute_pnls(investment_dates, positions_df: pd.DataFrame):
     # Validate that we have continuous returns data
     expected_start = investment_dates[0]
+    # should be a hyper parameters
     expected_end = investment_dates[-1] + timedelta(days=7)
     markets = []
     for question_id in positions_df["question_id"].unique():

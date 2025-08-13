@@ -43,8 +43,7 @@ if __name__ == "__main__":
         # "anthropic/claude-sonnet-4-20250514",
     ]
 
-    if False:
-        launch_agent_investments(list_models, investment_dates, prices_df, markets)
+    launch_agent_investments(list_models, investment_dates, prices_df, markets)
 
     positions_df = collect_investment_choices(output_path=OUTPUT_PATH)
     final_pnls, cumulative_pnls, figures = compute_pnls(investment_dates, positions_df)

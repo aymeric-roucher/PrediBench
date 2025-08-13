@@ -47,8 +47,10 @@ def choose_markets(today_date: date, n_markets: int = 10) -> list[Market]:
     if old_questions_file.exists():
         print("LOADING INTERESTING QUESTIONS FROM FILE")
         with open(old_questions_file, "r") as f:
+            # where is the logic when from one week to another, we remove some interesting questions for newer ones ?
             interesting_questions = json.load(f)
     else:
+        # I strongly dislike this function, interesting questions should be based on a specific criteria
         interesting_questions = filter_interesting_questions(
             [market.question for market in markets]
         )
@@ -70,6 +72,7 @@ def choose_markets(today_date: date, n_markets: int = 10) -> list[Market]:
 
 def collect_investment_choices(output_path: Path = OUTPUT_PATH) -> pd.DataFrame:
     """Collect investment choices previously decided by agents and written to local files."""
+    # we should have a database
     positions = []
     for agent_name in os.listdir(output_path):
         if os.path.isdir(output_path / agent_name):
