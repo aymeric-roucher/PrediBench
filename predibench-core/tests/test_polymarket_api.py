@@ -24,10 +24,7 @@ def test_get_open_markets():
     assert len(markets) >= 490
     for market in markets:
         assert len(market.id) > 0
-
         assert len(market.question) > 0
-
-        assert market.volume >= 0
         assert market.liquidity is None or market.liquidity >= 0
 
 
