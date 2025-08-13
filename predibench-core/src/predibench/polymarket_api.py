@@ -55,9 +55,8 @@ class Market(BaseModel, arbitrary_types_allowed=True):
     def from_json(market_data: dict) -> Market | None:
         """Convert a market JSON object to a PolymarketMarket dataclass."""
 
-        if not "outcomes" in market_data or not "clobTokenIds" in market_data:
-            # rarely it can happen that outcomes is present but clobTokenIds is not
-            print("Outcomes or clobTokenIds missing for market:\n", market_data["id"], market_data["question"])
+        if not "outcomes" in market_data:
+            print("Outcomes missing for market:\n", market_data["id"], market_data["question"])
             return None
         
         outcomes = json.loads(market_data["outcomes"])
@@ -65,10 +64,22 @@ class Market(BaseModel, arbitrary_types_allowed=True):
             # There should be at least 2 
             # Who will the world's richest person be on February 27, 2021?
             print(f"Expected 2 outcomes, got {len(outcomes)} for market:\n", market_data["id"], market_data["question"])
-            raise ValueError(f"Expected 2 or more outcomes, got {len(outcomes)}")
+            return None
         outcome_names = json.loads(market_data["outcomes"])
-        outcome_prices = json.loads(market_data["outcomePrices"])
-        outcome_clob_token_ids = json.loads(market_data["clobTokenIds"])
+        
+        # Handle missing price data
+        if "outcomePrices" in market_data:
+            outcome_prices = json.loads(market_data["outcomePrices"])
+        else:
+            # Default to 0.5 for all outcomes if prices not available
+            outcome_prices = [0.5] * len(outcomes)
+            
+        # Handle missing token IDs
+        if "clobTokenIds" in market_data:
+            outcome_clob_token_ids = json.loads(market_data["clobTokenIds"])
+        else:
+            # Use empty strings if token IDs not available
+            outcome_clob_token_ids = [""] * len(outcomes)
         return Market(
             id=market_data["id"],
             question=market_data["question"],
@@ -96,8 +107,7 @@ class Market(BaseModel, arbitrary_types_allowed=True):
         )
 
 
-
-class MarketsRequestParameters(BaseModel):
+class _RequestParameters(BaseModel):
     limit: int | None = None
     offset: int | None = None
     order: str | None = None
@@ -120,7 +130,9 @@ class MarketsRequestParameters(BaseModel):
     tag_id: int | None = None
     related_tags: bool | None = None
 
-    def get_open_markets(
+class MarketsRequestParameters(_RequestParameters):
+    
+    def get_markets(
         self, add_timeseries: tuple[datetime, datetime] | None = None
     ) -> list[Market]:
         """Get open markets from Polymarket API using this request configuration."""
@@ -215,69 +227,78 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
 # Useful for the future but unused functions
 ################################################################################
 
-
-class Event(BaseModel):
-    id: str
-    slug: str
-    title: str
-    liquidity: float
-    volume: float
-    start_date: datetime
-    end_date: datetime
-    tags: list[str]
+class EventsRequestParameters(_RequestParameters):
     
-    @staticmethod
-    def _get_events(
-        limit: int = 500,
-        offset: int = 0,
-        end_date_min: datetime | None = None,
-        end_date_max: datetime | None = None,
-    ) -> list[dict]:
-        """Get open markets from Polymarket, sorted by volume.
-
-        There is a limit of 500 markets per request, one must use pagination to get all markets.
-        """
+    def get_events(self) -> list[Event]:
+        """Get events from Polymarket API using this request configuration."""
         url = f"{BASE_URL_POLYMARKET}/events"
-        assert limit <= 500, "Limit must be less than or equal to 500"
-        params = {
-            "limit": limit,
-            "offset": offset,
-            "active": "true",
-            "closed": "false",
-            "order": "volume",
-            "ascending": "false",
-            "end_date_min": end_date_min.isoformat() if end_date_min else None,
-            "end_date_max": end_date_max.isoformat() if end_date_max else None,
-        }
+
+        if self.limit and self.limit > 500:
+            assert False, "Limit must be less than or equal to 500"
+
+        params = {}
+        for field_name, value in self.__dict__.items():
+            if value is not None:
+                if isinstance(value, bool):
+                    params[field_name] = "true" if value else "false"
+                elif isinstance(value, datetime):
+                    params[field_name] = value.date().isoformat()
+                else:
+                    params[field_name] = value
+
         response = requests.get(url, params=params)
         response.raise_for_status()
         output = response.json()
-        return output
-
-    
-    @staticmethod
-    def get_market_events(limit: int = 500, offset: int = 0) -> list[Event]:
-        """Get market events from Polymarket, sorted by volume.
-
-        There is a limit of 500 markets per request, one must use pagination to get all markets.
-        """
-        output = Event._get_events(limit, offset)
+        
         events = []
-        for event in output:
-            polymarket_event = Event(
-                id=event["id"],
-                slug=event["slug"],
-                title=event["title"],
-                liquidity=float(event["liquidity"]),
-                volume=float(event["volume"]),
-                start_date=convert_polymarket_time_to_datetime(event["startDate"]),
-                end_date=convert_polymarket_time_to_datetime(event["endDate"]),
-                tags=event["tags"],
-            )
-            events.append(polymarket_event)
-
+        for event_data in output:
+            event = Event.from_json(event_data)
+            events.append(event)
+        
         return events
 
+
+class Event(BaseModel, arbitrary_types_allowed=True):
+    id: str
+    slug: str
+    title: str
+    description: str | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    createdAt: datetime
+    volume: float | None = None
+    volume24hr: float | None = None
+    volume1wk: float | None = None
+    volume1mo: float | None = None
+    volume1yr: float | None = None
+    liquidity: float | None = None
+    markets: list[Market]
+
+    @staticmethod
+    def from_json(event_data: dict) -> Event:
+        """Convert an event JSON object to an Event dataclass."""
+        markets = []
+        for market_data in event_data.get("markets", []):
+            market = Market.from_json(market_data)
+            if market is not None:
+                markets.append(market)
+        
+        return Event(
+            id=event_data["id"],
+            slug=event_data["slug"],
+            title=event_data["title"],
+            description=event_data.get("description"),
+            start_date=convert_polymarket_time_to_datetime(event_data["startDate"]) if "startDate" in event_data else None,
+            end_date=convert_polymarket_time_to_datetime(event_data["endDate"]) if "endDate" in event_data else None,
+            createdAt=convert_polymarket_time_to_datetime(event_data["createdAt"]),
+            volume=float(event_data["volume"]) if event_data.get("volume") is not None else None,
+            volume24hr=float(event_data["volume24hr"]) if event_data.get("volume24hr") is not None else None,
+            volume1wk=float(event_data["volume1wk"]) if event_data.get("volume1wk") is not None else None,
+            volume1mo=float(event_data["volume1mo"]) if event_data.get("volume1mo") is not None else None,
+            volume1yr=float(event_data["volume1yr"]) if event_data.get("volume1yr") is not None else None,
+            liquidity=float(event_data["liquidity"]) if event_data.get("liquidity") is not None else None,
+            markets=markets,
+        )
 
 
 

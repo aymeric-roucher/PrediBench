@@ -303,7 +303,7 @@ def compute_pnls(investment_dates, positions_df: pd.DataFrame):
         request_parameters = MarketsRequestParameters(
             id=question_id,
         )
-        market = request_parameters.get_open_markets(
+        market = request_parameters.get_markets(
             add_timeseries=(
                 expected_start,
                 expected_end,

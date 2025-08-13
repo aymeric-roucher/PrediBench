@@ -70,7 +70,7 @@ def choose_markets(today_date: date, n_markets: int = 10) -> list[Market]:
         end_date_min=today_date + timedelta(days=1),
         end_date_max=today_date + timedelta(days=21),
     )
-    markets = request_parameters.get_open_markets(
+    markets = request_parameters.get_markets(
         add_timeseries=(
             today_date - MAX_INTERVAL_TIMESERIES,
             today_date,
