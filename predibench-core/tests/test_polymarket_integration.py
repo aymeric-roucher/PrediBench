@@ -14,7 +14,7 @@ import pytest
 from predibench.polymarket_api import (
     MarketsRequestParameters,
     _HistoricalTimeSeriesRequestParameters,
-    get_order_book,
+    OrderBook,
 )
 
 def test_polymarket_api_integration():
@@ -59,7 +59,7 @@ def test_polymarket_api_integration():
     token_id = open_market.outcomes[0].clob_token_id
     print(f"\nGetting order book for token: {token_id}")
 
-    order_book = get_order_book(token_id)
+    order_book = OrderBook.get_order_book(token_id)
     
     # Verify order book structure
     assert len(order_book.market) > 0

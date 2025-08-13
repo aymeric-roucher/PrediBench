@@ -200,53 +200,11 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
         return timeseries
 
 
-class OrderLevel(BaseModel):
-    price: str
-    size: str
-
-
-class OrderBook(BaseModel):
-    market: str
-    asset_id: str
-    hash: str
-    timestamp: str
-    min_order_size: str
-    neg_risk: bool
-    tick_size: str
-    bids: list[OrderLevel]
-    asks: list[OrderLevel]
-
-def _get_events(
-    limit: int = 500,
-    offset: int = 0,
-    end_date_min: datetime | None = None,
-    end_date_max: datetime | None = None,
-) -> list[dict]:
-    """Get open markets from Polymarket, sorted by volume.
-
-    There is a limit of 500 markets per request, one must use pagination to get all markets.
-    """
-    url = f"{BASE_URL_POLYMARKET}/events"
-    assert limit <= 500, "Limit must be less than or equal to 500"
-    params = {
-        "limit": limit,
-        "offset": offset,
-        "active": "true",
-        "closed": "false",
-        "order": "volume",
-        "ascending": "false",
-        "end_date_min": end_date_min.isoformat() if end_date_min else None,
-        "end_date_max": end_date_max.isoformat() if end_date_max else None,
-    }
-    response = requests.get(url, params=params)
-    response.raise_for_status()
-    output = response.json()
-    return output
-
 
 ################################################################################
 # Useful for the future but unused functions
 ################################################################################
+
 
 class Event(BaseModel):
     id: str
@@ -259,12 +217,41 @@ class Event(BaseModel):
     tags: list[str]
     
     @staticmethod
+    def _get_events(
+        limit: int = 500,
+        offset: int = 0,
+        end_date_min: datetime | None = None,
+        end_date_max: datetime | None = None,
+    ) -> list[dict]:
+        """Get open markets from Polymarket, sorted by volume.
+
+        There is a limit of 500 markets per request, one must use pagination to get all markets.
+        """
+        url = f"{BASE_URL_POLYMARKET}/events"
+        assert limit <= 500, "Limit must be less than or equal to 500"
+        params = {
+            "limit": limit,
+            "offset": offset,
+            "active": "true",
+            "closed": "false",
+            "order": "volume",
+            "ascending": "false",
+            "end_date_min": end_date_min.isoformat() if end_date_min else None,
+            "end_date_max": end_date_max.isoformat() if end_date_max else None,
+        }
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        output = response.json()
+        return output
+
+    
+    @staticmethod
     def get_market_events(limit: int = 500, offset: int = 0) -> list[Event]:
         """Get market events from Polymarket, sorted by volume.
 
         There is a limit of 500 markets per request, one must use pagination to get all markets.
         """
-        output = _get_events(limit, offset)
+        output = Event._get_events(limit, offset)
         events = []
         for event in output:
             polymarket_event = Event(
@@ -283,41 +270,56 @@ class Event(BaseModel):
 
 
 
-def get_order_book(token_id: str) -> OrderBook:
-    """Get order book for a specific token ID from Polymarket CLOB API.
 
-    Args:
-        token_id: Token ID of the market to get the book for
+class OrderLevel(BaseModel):
+    price: str
+    size: str
 
-    Returns:
-        OrderBook containing bids, asks, and market information
-    """
-    url = "https://clob.polymarket.com/book"
-    params = {"token_id": token_id}
 
-    response = requests.get(url, params=params)
-    response.raise_for_status()
-    data = response.json()
+class OrderBook(BaseModel):
+    market: str
+    asset_id: str
+    hash: str
+    timestamp: str
+    min_order_size: str
+    neg_risk: bool
+    tick_size: str
+    bids: list[OrderLevel]
+    asks: list[OrderLevel]
 
-    bids = [OrderLevel(price=bid["price"], size=bid["size"]) for bid in data["bids"]]
-    asks = [OrderLevel(price=ask["price"], size=ask["size"]) for ask in data["asks"]]
+    @staticmethod
+    def get_order_book(token_id: str) -> OrderBook:
+        """Get order book for a specific token ID from Polymarket CLOB API.
 
-    return OrderBook(
-        market=data["market"],
-        asset_id=data["asset_id"],
-        hash=data["hash"],
-        timestamp=data["timestamp"],
-        min_order_size=data["min_order_size"],
-        neg_risk=data["neg_risk"],
-        tick_size=data["tick_size"],
-        bids=bids,
-        asks=asks,
-    )
+        Args:
+            token_id: Token ID of the market to get the book for
+
+        Returns:
+            OrderBook containing bids, asks, and market information
+        """
+        url = "https://clob.polymarket.com/book"
+        params = {"token_id": token_id}
+
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
+
+        bids = [OrderLevel(price=bid["price"], size=bid["size"]) for bid in data["bids"]]
+        asks = [OrderLevel(price=ask["price"], size=ask["size"]) for ask in data["asks"]]
+
+        return OrderBook(
+            market=data["market"],
+            asset_id=data["asset_id"],
+            hash=data["hash"],
+            timestamp=data["timestamp"],
+            min_order_size=data["min_order_size"],
+            neg_risk=data["neg_risk"],
+            tick_size=data["tick_size"],
+            bids=bids,
+            asks=asks,
+        )
     
     
-
-
-
 
 def get_historical_returns(markets: list[Market]) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Get historical returns directly from timeseries data"""

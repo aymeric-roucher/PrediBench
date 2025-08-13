@@ -1,6 +1,6 @@
 from predibench.polymarket_api import (
     MarketsRequestParameters,
-    _get_events,
+    Event,
     convert_polymarket_time_to_datetime,
 )
 
@@ -16,7 +16,7 @@ def test_get_open_markets():
 
 def test__get_market_events():
     """Test basic market event retrieval."""
-    events = _get_events()
+    events = Event._get_events()
     for event in events:
         # ticker is sometimes different from slug
         assert event["ticker"] in event["slug"]
@@ -66,14 +66,14 @@ def test_get_open_markets_limit():
 
 def test__get_events():
     """Test basic market event retrieval."""
-    events = _get_events()
+    events = Event._get_events()
     assert len(events) == 500
 
 
 def test_get_market_events_offset():
     """Test that offset parameter works correctly."""
-    events_first = _get_events(limit=5, offset=0)
-    events_second = _get_events(limit=5, offset=5)
+    events_first = Event._get_events(limit=5, offset=0)
+    events_second = Event._get_events(limit=5, offset=5)
 
     assert len(events_first) == 5
     assert len(events_second) == 5
