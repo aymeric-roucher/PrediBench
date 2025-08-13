@@ -12,7 +12,7 @@ from datetime import datetime
 import pandas as pd
 from predibench.polymarket_api import (
     MAX_INTERVAL_TIMESERIES,
-    HistoricalTimeSeriesRequestParameters,
+    _HistoricalTimeSeriesRequestParameters,
     MarketsRequestParameters,
 )
 
@@ -82,7 +82,7 @@ def test_price_series_retrieval_over_several_months():
         start_date = end_date - MAX_INTERVAL_TIMESERIES
 
         # Use the existing function with proper parameters
-        timeseries_request_parameters = HistoricalTimeSeriesRequestParameters(
+        timeseries_request_parameters = _HistoricalTimeSeriesRequestParameters(
             market=market_data["token_id"],
             start_time=start_date,
             end_time=end_date,

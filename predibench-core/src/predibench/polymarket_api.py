@@ -113,7 +113,7 @@ class MarketsRequestParameters(BaseModel):
         if add_timeseries:
             start_date, end_date = add_timeseries
             for market in markets:
-                ts_request = HistoricalTimeSeriesRequestParameters(
+                ts_request = _HistoricalTimeSeriesRequestParameters(
                     market=market.outcomes[0].clob_token_id,
                     start_time=start_date,
                     end_time=end_date,
@@ -122,7 +122,7 @@ class MarketsRequestParameters(BaseModel):
                 market.prices = ts_request.get_token_daily_timeseries()
         return markets
 
-class HistoricalTimeSeriesRequestParameters(BaseModel):
+class _HistoricalTimeSeriesRequestParameters(BaseModel):
     market: str
     interval: Literal["1m", "1w", "1d", "6h", "1h", "max"] = "1d"
     start_time: datetime | None = None
@@ -359,7 +359,7 @@ if __name__ == "__main__":
     print(f"Best ask: {order_book.asks[0].price if order_book.asks else 'None'}")
     print(f"Tick size: {order_book.tick_size}")
 
-    timeseries_request_parameters = HistoricalTimeSeriesRequestParameters(
+    timeseries_request_parameters = _HistoricalTimeSeriesRequestParameters(
         market=token_id,
         start_time=datetime.now() - timedelta(days=10),
         end_time=datetime.now(),
