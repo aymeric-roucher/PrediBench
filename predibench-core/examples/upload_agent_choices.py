@@ -1,5 +1,4 @@
 import json
-import os
 from datetime import date
 from pathlib import Path
 
@@ -14,15 +13,13 @@ def collect_agent_choices_for_dataset(output_path: Path) -> pd.DataFrame:
     """Collect all investment choices and format them for the dataset"""
     positions = []
 
-    for agent_name in os.listdir(output_path):
-        agent_dir = output_path / agent_name
-        if os.path.isdir(agent_dir):
-            for date_folder in os.listdir(agent_dir):
-                date_dir = agent_dir / date_folder
-                if os.path.isdir(date_dir):
-                    for file in os.listdir(date_dir):
-                        if file.endswith(".json"):
-                            with open(date_dir / file, "r") as f:
+    for agent_dir in output_path.iterdir():
+        if agent_dir.is_dir():
+            for date_dir in agent_dir.iterdir():
+                if date_dir.is_dir():
+                    for file_path in date_dir.iterdir():
+                        if file_path.suffix == ".json":
+                            with file_path.open("r") as f:
                                 data = json.load(f)
 
                             # Convert choice to standardized format
@@ -33,13 +30,13 @@ def collect_agent_choices_for_dataset(output_path: Path) -> pd.DataFrame:
 
                             positions.append(
                                 {
-                                    "agent_name": agent_name,
-                                    "date": date.fromisoformat(date_folder),
+                                    "agent_name": agent_dir.name,
+                                    "date": date.fromisoformat(date_dir.name),
                                     "question": data["question"],
                                     "choice": choice_numeric,
                                     "choice_raw": data.get("choice", "nothing"),
                                     "question_id": data.get(
-                                        "id", file.replace(".json", "")
+                                        "id", file_path.stem
                                     ),
                                     "messages_count": len(data.get("messages", [])),
                                     "has_reasoning": len(data.get("messages", [])) > 0,

@@ -5,6 +5,10 @@ description = "Core package for PrediBench agent predictions on Polymarket"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "apscheduler>=3.11.0",
+    "datasets>=4.0.0",
+    "gradio>=5.42.0",
+    "huggingface-hub>=0.34.3",
     "ipykernel>=6.30.0",
     "kaleido>=1.0.0",
     "litellm>=1.74.15.post1",
