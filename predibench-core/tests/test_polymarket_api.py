@@ -17,7 +17,7 @@ from predibench.polymarket_api import (
 def test_get_open_markets():
     """Test basic market retrieval."""
     request_parameters = MarketsRequestParameters(limit=500)
-    markets = request_parameters.get_open_markets()
+    markets = request_parameters.get_markets()
     for market in markets:
         assert len(market.outcomes) >= 2
     # why not 500 ? Some markets are missing keys clobTokenIds or outcomes
@@ -33,8 +33,8 @@ def test_get_open_markets_limit():
     """Test that limit parameter works correctly."""
     request_small = MarketsRequestParameters(limit=5)
     request_large = MarketsRequestParameters(limit=20)
-    markets_small = request_small.get_open_markets()
-    markets_large = request_large.get_open_markets()
+    markets_small = request_small.get_markets()
+    markets_large = request_large.get_markets()
 
     assert len(markets_small) == 5
     assert len(markets_large) == 20
@@ -52,7 +52,7 @@ def test_polymarket_api_integration():
         ascending=False,
         liquidity_num_min=1000,
     )
-    all_markets = market_request.get_open_markets()
+    all_markets = market_request.get_markets()
     
     # Verify we got markets and find an open one
     assert len(all_markets) > 0, "Should find some active markets"

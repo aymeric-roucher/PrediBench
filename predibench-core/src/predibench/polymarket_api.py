@@ -120,7 +120,7 @@ class MarketsRequestParameters(BaseModel):
     tag_id: int | None = None
     related_tags: bool | None = None
 
-    def get_open_markets(
+    def get_markets(
         self, add_timeseries: tuple[datetime, datetime] | None = None
     ) -> list[Market]:
         """Get open markets from Polymarket API using this request configuration."""

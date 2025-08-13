@@ -55,7 +55,7 @@ def test_market_request_for_old_closed_markets():
         ascending=False,
     )
 
-    markets = request_parameters.get_open_markets()
+    markets = request_parameters.get_markets()
 
     # Verify we got some markets
     assert len(markets) > 0, "Should find some closed markets from late 2024"
