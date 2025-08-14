@@ -33,11 +33,9 @@ def collect_agent_choices_for_dataset(output_path: Path) -> pd.DataFrame:
                                     "agent_name": agent_dir.name,
                                     "date": date.fromisoformat(date_dir.name),
                                     "question": data["question"],
+                                    "market_id": data["market_id"],
                                     "choice": choice_numeric,
                                     "choice_raw": data.get("choice", "nothing"),
-                                    "question_id": data.get(
-                                        "id", file_path.stem
-                                    ),
                                     "messages_count": len(data.get("messages", [])),
                                     "has_reasoning": len(data.get("messages", [])) > 0,
                                 }
@@ -72,7 +70,7 @@ def main():
         f"Collected {len(df)} agent decisions from {df['agent_name'].nunique()} agents"
     )
     print(f"Date range: {df['date'].min()} to {df['date'].max()}")
-    print(f"Unique questions: {df['question_id'].nunique()}")
+    print(f"Unique market_ids: {df['market_id'].nunique()}")
 
     # Display summary
     print("\nAgent summary:")

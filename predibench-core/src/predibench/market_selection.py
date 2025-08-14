@@ -1,14 +1,15 @@
 import json
-from datetime import date, timedelta
 import textwrap
+from datetime import date, timedelta
 
+from smolagents import ChatMessage, LiteLLMModel
+
+from predibench.common import OUTPUT_PATH
 from predibench.polymarket_api import (
     MAX_INTERVAL_TIMESERIES,
     Market,
     MarketsRequestParameters,
 )
-from predibench.common import OUTPUT_PATH
-from smolagents import ChatMessage, LiteLLMModel
 
 
 def _filter_interesting_questions(questions: list[str]) -> list[str]:
@@ -59,7 +60,7 @@ def _filter_out_resolved_markets(
     ]
 
 
-def choose_markets(today_date: date, n_markets: int = 10) -> list[Market]:
+def choose_markets(today_date: date, n_markets: int = 10) -> dict[Market]:
     """Pick some interesting questions to invest in."""
     request_parameters = MarketsRequestParameters(
         limit=n_markets * 10,
@@ -104,7 +105,5 @@ def choose_markets(today_date: date, n_markets: int = 10) -> list[Market]:
             f,
             indent=2,
         )
-    markets = markets[:n_markets]
-    assert len(markets) == n_markets
-    return markets
-
+    markets_dict = {market.id: market for market in markets}
+    return markets_dict

@@ -169,46 +169,48 @@ def run_smolagent(
 
 def agent_invest_positions(
     model_id: str,
-    markets: list[Market],
+    markets: dict[str, Market],
     prices_df: pd.DataFrame,
-    date: date,
+    target_date: date,
 ) -> dict:
     """Let the agent decide on investment positions: 1 to buy, -1 to sell, 0 to do nothing"""
     print("\nCreating investment positions with agent...")
-    print(date, markets[0].prices.index)
-    assert date in markets[0].prices.index
+    print(target_date, markets[list(markets.keys())[0]].prices.index)
+    assert target_date in markets[list(markets.keys())[0]].prices.index
 
     output_dir = (
         OUTPUT_PATH
         / f"smolagent_{model_id}".replace("/", "--")
-        / date.strftime("%Y-%m-%d")
+        / target_date.strftime("%Y-%m-%d")
     )
     os.makedirs(output_dir, exist_ok=True)
     choices = {}
-    for i, question in enumerate(prices_df.columns):
-        if (output_dir / f"{question[:50]}.json").exists():
+    for question_id in prices_df.columns:
+        if (output_dir / f"{question_id}.json").exists():
             print(
-                f"Getting the result for '{question}' for {model_id} on {date} from file."
+                f"Getting the result for market n°'{question_id}' for {model_id} on {target_date} from file."
             )
-            response = json.load(open(output_dir / f"{question[:50]}.json"))
+            response = json.load(open(output_dir / f"{question_id}.json"))
             choice = response["choice"]
         else:
-            print(f"NOT FOUND: {output_dir / f'{question[:50]}.json'}")
-            market = markets[i]
-            assert market.question == question
-            if np.isnan(prices_df.loc[date, question]):
+            print(
+                f"No results found in {output_dir / f'{question_id}.json'}, building them new."
+            )
+            market = markets[question_id]
+            assert market.id == question_id
+            if np.isnan(prices_df.loc[target_date, question_id]):
                 continue
             prices_str = (
-                prices_df.loc[:date, question]
+                prices_df.loc[:target_date, question_id]
                 .dropna()
                 .to_string(index=True, header=False)
             )
             full_question = textwrap.dedent(
-                f"""Let's say we are the {date.strftime("%B %d, %Y")}.
+                f"""Let's say we are the {target_date.strftime("%B %d, %Y")}.
                 Please answer the below question by yes or no. But first, run a detailed analysis. You can search the web for information.
                 One good method for analyzing is to break down the question into sub-parts, like a tree, and assign probabilities to each sub-branch of the tree, to get a total probability of the question being true.
                 Here is the question:
-                {question}
+                {market.question}
                 More details:
                 {market.description}
 
@@ -223,7 +225,7 @@ def agent_invest_positions(
                 response = run_deep_research(
                     model_id,
                     full_question,
-                    cutoff_date=date,
+                    cutoff_date=target_date,
                 )
             elif model_id == "test_random":
                 response = RunResult(
@@ -237,17 +239,18 @@ def agent_invest_positions(
                 response = run_smolagent(
                     model_id,
                     full_question,
-                    cutoff_date=date,
+                    cutoff_date=target_date,
                 )
                 for message in response.messages:
                     message["model_input_messages"] = "removed"  # Clean logs
             choice = response.output
-            choices[question] = choice
+            choices[question_id] = choice
 
-            with open(output_dir / f"{question[:50]}.json", "w") as f:
+            with open(output_dir / f"{question_id}.json", "w") as f:
                 json.dump(
                     {
-                        "question": question,
+                        "question": market.question,
+                        "market_id": market.id,
                         "choice": choice,
                         "messages": response.messages,
                     },
@@ -292,7 +295,7 @@ def launch_agent_investments(list_models, investment_dates, prices_df, markets):
                 agent_invest_positions(model_id, markets, prices_df, investment_date)
         except Exception as e:
             print(f"Error for {model_id}: {e}")
-            # raise e
+            raise e
             continue
 
 

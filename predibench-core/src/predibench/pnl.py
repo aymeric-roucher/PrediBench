@@ -1,11 +1,13 @@
+import os
+from datetime import date, timedelta
+
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from datetime import date, timedelta
 
-from predibench.polymarket_api import MarketsRequestParameters, Market
+from predibench.polymarket_api import Market, MarketsRequestParameters
 
 
 class PnlCalculator:
@@ -78,6 +80,9 @@ class PnlCalculator:
             )
             return pnls_
         else:
+            print("FLAGG")
+            print(self.returns.head())
+            print(self.positions.head())
             pnls_ = pd.concat(
                 [
                     self._get_positions_begin_next_day(col).reindex(
@@ -292,16 +297,17 @@ def validate_continuous_returns(
     if missing_dates:
         raise ValueError(f"Missing returns data for dates: {sorted(missing_dates)}")
 
+
 # investment_dates seems to be a tuple of two dates ?
 def compute_pnls(investment_dates, positions_df: pd.DataFrame):
     # Validate that we have continuous returns data
     expected_start = investment_dates[0]
     # should be a hyper parameters
     expected_end = investment_dates[-1] + timedelta(days=7)
-    markets = []
-    for question_id in positions_df["question_id"].unique():
+    markets = {}
+    for market_id in positions_df["market_id"].unique():
         request_parameters = MarketsRequestParameters(
-            id=question_id,
+            id=market_id,
         )
         market = request_parameters.get_markets(
             add_timeseries=(
@@ -309,7 +315,7 @@ def compute_pnls(investment_dates, positions_df: pd.DataFrame):
                 expected_end,
             )  # 15 days back is the maximum allowed by the API
         )[0]
-        markets.append(market)
+        markets[market_id] = market
     returns_df, prices_df = get_historical_returns(markets)
 
     validate_continuous_returns(returns_df, expected_start, expected_end)
@@ -317,7 +323,7 @@ def compute_pnls(investment_dates, positions_df: pd.DataFrame):
     final_pnls = {}
     cumulative_pnls = {}
     figures = {}
-    
+
     for agent_name in positions_df["agent_name"].unique():
         positions_agent_df = positions_df[
             positions_df["agent_name"] == agent_name
@@ -326,14 +332,19 @@ def compute_pnls(investment_dates, positions_df: pd.DataFrame):
             positions_agent_df["date"].isin(investment_dates)
         ]
         positions_agent_df = positions_agent_df.loc[
-            positions_df["question"].isin(returns_df.columns)
+            positions_df["market_id"].isin(returns_df.columns)
         ]  # TODO: This should be removed when we can save
+        assert len(positions_agent_df) > 0, (
+            "A this stage, dataframe should not be empty!"
+        )
 
         cumulative_pnl, fig = compute_cumulative_pnl(
             positions_agent_df, returns_df, prices_df, investment_dates
         )
 
         portfolio_output_path = f"./portfolio_performance/{agent_name}"
+        if not os.path.exists(portfolio_output_path):
+            os.makedirs(portfolio_output_path)
         fig.write_html(portfolio_output_path + ".html")
         fig.write_image(portfolio_output_path + ".png")
         print(
@@ -347,16 +358,19 @@ def compute_pnls(investment_dates, positions_df: pd.DataFrame):
         final_pnls[agent_name] = final_pnl
         cumulative_pnls[agent_name] = cumulative_pnl
         figures[agent_name] = fig
-        
+
     return final_pnls, cumulative_pnls, figures
 
 
 def compute_cumulative_pnl(
-    positions_agent_df: pd.DataFrame, returns_df: pd.DataFrame, prices_df: pd.DataFrame, investment_dates: list
+    positions_agent_df: pd.DataFrame,
+    returns_df: pd.DataFrame,
+    prices_df: pd.DataFrame,
+    investment_dates: list,
 ) -> pd.DataFrame:
     # Convert positions_agent_df to have date as index, question as columns, and choice as values
     positions_agent_df = positions_agent_df.pivot(
-        index="date", columns="question", values="choice"
+        index="date", columns="market_id", values="choice"
     )
 
     # Forward-fill positions to all daily dates in the returns range
@@ -400,27 +414,27 @@ def compute_cumulative_pnl(
     cumulative_pnl = engine.pnl.sum(axis=1).cumsum()
     return cumulative_pnl, fig
 
-def get_historical_returns(markets: list[Market]) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Get historical returns directly from timeseries data"""
+
+def get_historical_returns(
+    markets: dict[str, Market],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Get historical returns directly from timeseries data. Columns are market ids"""
 
     returns_df = pd.DataFrame(
         np.nan,
-        index=markets[0].prices.index,
-        columns=[market.question for market in markets],
+        index=markets[list(markets.keys())[0]].prices.index,
+        columns=list(markets.keys()),
     )
     prices_df = pd.DataFrame(
         np.nan,
-        index=markets[0].prices.index,
-        columns=[market.question for market in markets],
+        index=markets[list(markets.keys())[0]].prices.index,
+        columns=list(markets.keys()),
     )
 
-    for i, market in enumerate(markets):
-        prices_df[market.question] = market.prices
+    for market in markets.values():
+        prices_df[market.id] = market.prices
 
         token_returns = market.prices.pct_change(periods=1)
-        returns_df[market.question] = token_returns
+        returns_df[market.id] = token_returns
 
     return returns_df, prices_df
-
-
-

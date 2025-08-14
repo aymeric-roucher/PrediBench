@@ -2,22 +2,24 @@ from dataclasses import dataclass
 from datetime import date
 
 from dotenv import load_dotenv
-
 from predibench.agent import launch_agent_investments
-from predibench.pnl import compute_pnls, get_historical_returns
 from predibench.common import OUTPUT_PATH
-from predibench.utils import collect_investment_choices
 from predibench.market_selection import choose_markets
+from predibench.pnl import compute_pnls, get_historical_returns
+from predibench.utils import collect_investment_choices
 
 load_dotenv()
+
 
 @dataclass(frozen=True)
 class InvestmentHyperparameters:
     """Configuration parameters for investment simulation."""
+
     n_markets: int
     end_date: date
     investment_dates: list[date]
     model_names: list[str]
+
 
 HYPERPARAMETERS = InvestmentHyperparameters(
     n_markets=10,
@@ -44,17 +46,17 @@ HYPERPARAMETERS = InvestmentHyperparameters(
 
 def main(hyperparams: InvestmentHyperparameters) -> None:
     """Run the investment simulation with multiple AI models."""
-    
+
     selected_markets = choose_markets(
         today_date=hyperparams.end_date, n_markets=hyperparams.n_markets
     )
     returns_df, prices_data = get_historical_returns(markets=selected_markets)
 
     launch_agent_investments(
-        list_models=hyperparams.model_names, 
-        investment_dates=hyperparams.investment_dates, 
-        prices_df=prices_data, 
-        markets=selected_markets
+        list_models=hyperparams.model_names,
+        investment_dates=hyperparams.investment_dates,
+        prices_df=prices_data,
+        markets=selected_markets,
     )
 
     positions_data = collect_investment_choices(output_path=OUTPUT_PATH)

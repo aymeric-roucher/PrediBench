@@ -8,8 +8,8 @@ from datasets import Dataset
 from dotenv import load_dotenv
 from huggingface_hub import HfApi
 from predibench.agent import agent_invest_positions
-from predibench.pnl import get_historical_returns
 from predibench.market_selection import choose_markets
+from predibench.pnl import get_historical_returns
 
 load_dotenv()
 
@@ -121,7 +121,7 @@ def weekly_pipeline():
                 all_agent_choices[model_id] = choices
             except Exception as e:
                 print(f"Error for {model_id}: {e}")
-                # raise e
+                raise e
                 continue
 
             # 3. Run agent decision-making
