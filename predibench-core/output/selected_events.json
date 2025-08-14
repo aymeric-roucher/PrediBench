@@ -1,0 +1,758 @@
+[
+  {
+    "id": "24212",
+    "title": "Bolivia Presidential Election",
+    "slug": "bolivia-presidential-election",
+    "description": "General elections are scheduled to take place in Bolivia on 17 August 2025.\n\nThis market will resolve according to the listed candidate that wins this election. \n\nThis market includes any potential second round. If the result of this election isn't known by December 31, 2025, 11:59 PM ET, the market will resolve to \"Other\".\n\nThis market will resolve based on the result of the election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by the Bolivian government, specifically the Plurinational Electoral Body (\u00d3rgano Electoral Plurinacional, OEP) (https://www.oep.org.bo/).\n",
+    "volume": 7552600.641691,
+    "liquidity": 1236972.07188,
+    "start_date": "2025-05-10T17:38:31.041199",
+    "end_date": "2025-08-17T12:00:00",
+    "markets": [
+      {
+        "id": "543258",
+        "question": "Will Luis Arce win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0005
+          },
+          {
+            "name": "No",
+            "price": 0.9995
+          }
+        ],
+        "volume": 134994.583149,
+        "liquidity": 54173.54248
+      },
+      {
+        "id": "543259",
+        "question": "Will Andr\u00f3nico Rodr\u00edguez win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.065
+          },
+          {
+            "name": "No",
+            "price": 0.935
+          }
+        ],
+        "volume": 1415169.495039,
+        "liquidity": 62462.0541
+      },
+      {
+        "id": "543260",
+        "question": "Will Samuel Doria Medina win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.515
+          },
+          {
+            "name": "No",
+            "price": 0.485
+          }
+        ],
+        "volume": 642873.125638,
+        "liquidity": 68100.3987
+      },
+      {
+        "id": "543261",
+        "question": "Will Manfred Reyes Villa win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0175
+          },
+          {
+            "name": "No",
+            "price": 0.9825
+          }
+        ],
+        "volume": 661217.382487,
+        "liquidity": 26412.99174
+      },
+      {
+        "id": "543262",
+        "question": "Will Jorge \u201cTuto\u201d Quiroga win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.395
+          },
+          {
+            "name": "No",
+            "price": 0.605
+          }
+        ],
+        "volume": 449143.487233,
+        "liquidity": 43686.1247
+      },
+      {
+        "id": "543263",
+        "question": "Will Chi Hyun Chung win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0005
+          },
+          {
+            "name": "No",
+            "price": 0.9995
+          }
+        ],
+        "volume": 104411.396818,
+        "liquidity": 58894.42944
+      },
+      {
+        "id": "543264",
+        "question": "Will Jaime Dunn win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0005
+          },
+          {
+            "name": "No",
+            "price": 0.9995
+          }
+        ],
+        "volume": 364532.887385,
+        "liquidity": 74210.15184
+      },
+      {
+        "id": "543265",
+        "question": "Will Rodrigo Paz win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0085
+          },
+          {
+            "name": "No",
+            "price": 0.9915
+          }
+        ],
+        "volume": 453940.728225,
+        "liquidity": 43123.12082
+      },
+      {
+        "id": "543266",
+        "question": "Will Jos\u00e9 Carlos S\u00e1nchez Veraza\u00edn win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0005
+          },
+          {
+            "name": "No",
+            "price": 0.9995
+          }
+        ],
+        "volume": 311709.090965,
+        "liquidity": 88378.56283
+      },
+      {
+        "id": "543267",
+        "question": "Will Jhonny Fern\u00e1ndez win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0045
+          },
+          {
+            "name": "No",
+            "price": 0.9955
+          }
+        ],
+        "volume": 356413.86324,
+        "liquidity": 28363.58743
+      },
+      {
+        "id": "543268",
+        "question": "Will Antonio Saravia win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0005
+          },
+          {
+            "name": "No",
+            "price": 0.9995
+          }
+        ],
+        "volume": 243400.439115,
+        "liquidity": 96571.28961
+      },
+      {
+        "id": "543269",
+        "question": "Will Gualberto Cusi Mamani win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0005
+          },
+          {
+            "name": "No",
+            "price": 0.9995
+          }
+        ],
+        "volume": 219097.571918,
+        "liquidity": 51464.27361
+      },
+      {
+        "id": "543270",
+        "question": "Will Ruth Nina win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0005
+          },
+          {
+            "name": "No",
+            "price": 0.9995
+          }
+        ],
+        "volume": 124017.35339,
+        "liquidity": 64563.20033
+      },
+      {
+        "id": "543271",
+        "question": "Will Evo Morales win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0005
+          },
+          {
+            "name": "No",
+            "price": 0.9995
+          }
+        ],
+        "volume": 208587.691259,
+        "liquidity": 25409.73876
+      },
+      {
+        "id": "543272",
+        "question": "Will Carlos Mesa win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0005
+          },
+          {
+            "name": "No",
+            "price": 0.9995
+          }
+        ],
+        "volume": 167006.171001,
+        "liquidity": 92340.93953
+      },
+      {
+        "id": "543273",
+        "question": "Will Luis Fernando Camacho win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0005
+          },
+          {
+            "name": "No",
+            "price": 0.9995
+          }
+        ],
+        "volume": 209497.896604,
+        "liquidity": 99075.76121
+      },
+      {
+        "id": "543274",
+        "question": "Will Branko Marinkovi\u0107 win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0005
+          },
+          {
+            "name": "No",
+            "price": 0.9995
+          }
+        ],
+        "volume": 191308.588581,
+        "liquidity": 102295.98156
+      },
+      {
+        "id": "543275",
+        "question": "Will Mar\u00eda Galindo win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0005
+          },
+          {
+            "name": "No",
+            "price": 0.9995
+          }
+        ],
+        "volume": 122445.144295,
+        "liquidity": 49985.1502
+      },
+      {
+        "id": "543276",
+        "question": "Will Rub\u00e9n Costas win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0005
+          },
+          {
+            "name": "No",
+            "price": 0.9995
+          }
+        ],
+        "volume": 346578.522656,
+        "liquidity": 48070.73939
+      },
+      {
+        "id": "543277",
+        "question": "Will another person win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.5
+          },
+          {
+            "name": "No",
+            "price": 0.5
+          }
+        ],
+        "volume": 0.0,
+        "liquidity": 0.0
+      },
+      {
+        "id": "543278",
+        "question": "Will Eduardo del Castillo win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.006
+          },
+          {
+            "name": "No",
+            "price": 0.994
+          }
+        ],
+        "volume": 346515.929365,
+        "liquidity": 13214.52105
+      },
+      {
+        "id": "543279",
+        "question": "Will Eva Copa win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0005
+          },
+          {
+            "name": "No",
+            "price": 0.9995
+          }
+        ],
+        "volume": 480290.293328,
+        "liquidity": 47573.98551
+      },
+      {
+        "id": "543280",
+        "question": "Will Person C win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.5
+          },
+          {
+            "name": "No",
+            "price": 0.5
+          }
+        ],
+        "volume": 0.0,
+        "liquidity": 0.0
+      },
+      {
+        "id": "543281",
+        "question": "Will Person D win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.5
+          },
+          {
+            "name": "No",
+            "price": 0.5
+          }
+        ],
+        "volume": 0.0,
+        "liquidity": 0.0
+      },
+      {
+        "id": "543282",
+        "question": "Will Person E win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.5
+          },
+          {
+            "name": "No",
+            "price": 0.5
+          }
+        ],
+        "volume": 0.0,
+        "liquidity": 0.0
+      },
+      {
+        "id": "543283",
+        "question": "Will Person F win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.5
+          },
+          {
+            "name": "No",
+            "price": 0.5
+          }
+        ],
+        "volume": 0.0,
+        "liquidity": 0.0
+      },
+      {
+        "id": "543284",
+        "question": "Will Person G win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.5
+          },
+          {
+            "name": "No",
+            "price": 0.5
+          }
+        ],
+        "volume": 0.0,
+        "liquidity": 0.0
+      },
+      {
+        "id": "543285",
+        "question": "Will Person H win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.5
+          },
+          {
+            "name": "No",
+            "price": 0.5
+          }
+        ],
+        "volume": 0.0,
+        "liquidity": 0.0
+      },
+      {
+        "id": "543286",
+        "question": "Will Person I win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.5
+          },
+          {
+            "name": "No",
+            "price": 0.5
+          }
+        ],
+        "volume": 0.0,
+        "liquidity": 0.0
+      },
+      {
+        "id": "543287",
+        "question": "Will Person J win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.5
+          },
+          {
+            "name": "No",
+            "price": 0.5
+          }
+        ],
+        "volume": 0.0,
+        "liquidity": 0.0
+      },
+      {
+        "id": "543410",
+        "question": "Will Person K win the 2025 Bolivia presidential election?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.5
+          },
+          {
+            "name": "No",
+            "price": 0.5
+          }
+        ],
+        "volume": 0.0,
+        "liquidity": 0.0
+      }
+    ]
+  },
+  {
+    "id": "35439",
+    "title": "Elon Musk # of tweets August 1-8?",
+    "slug": "elon-musk-of-tweets-august-1-8",
+    "description": "This market will resolve according to the number of times Elon Musk (@elonmusk), posts on X between August 1, 2025, 12:00 PM ET and August 8, 2025, 12:00 PM ET.\n\nFor the purposes of this market, only main feed posts, quote posts and reposts posts will count.\n\nReplies will NOT count towards the total - however, replies on the main feed such as https://x.com/elonmusk/status/1786073478711353576 will be counted by the tracker.\n\nDeleted posts will count as long as they remain available long enough to be captured by the tracker (~5 minutes).\n\nCommunity reposts which are not counted by the tracker not count toward the total. \n\nThe resolution source for this market is the \u2018Post Counter\u2019 figure for posts found at https://www.xtracker.io/. Individual posts can be viewed by clicking \"Export Data\". If the tracker does not update correctly in accordance with the rules, X itself may be used as a secondary resolution source.",
+    "volume": 6394436.671006,
+    "liquidity": null,
+    "start_date": "2025-08-01T12:35:06.327575",
+    "end_date": "2025-08-08T16:00:00",
+    "markets": [
+      {
+        "id": "570818",
+        "question": "Will Elon tweet less than 90 times August 1\u2013August 8?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0
+          },
+          {
+            "name": "No",
+            "price": 1.0
+          }
+        ],
+        "volume": 383119.191259,
+        "liquidity": null
+      },
+      {
+        "id": "570819",
+        "question": "Will Elon tweet 90\u2013104 times August 1\u2013August 8?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0
+          },
+          {
+            "name": "No",
+            "price": 1.0
+          }
+        ],
+        "volume": 291866.23733,
+        "liquidity": null
+      },
+      {
+        "id": "570820",
+        "question": "Will Elon tweet 105\u2013119 times August 1\u2013August 8?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0
+          },
+          {
+            "name": "No",
+            "price": 1.0
+          }
+        ],
+        "volume": 258027.1156,
+        "liquidity": null
+      },
+      {
+        "id": "570821",
+        "question": "Will Elon tweet 120\u2013134 times August 1\u2013August 8?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0
+          },
+          {
+            "name": "No",
+            "price": 1.0
+          }
+        ],
+        "volume": 333258.099252,
+        "liquidity": null
+      },
+      {
+        "id": "570822",
+        "question": "Will Elon tweet 135\u2013149 times August 1\u2013August 8?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0
+          },
+          {
+            "name": "No",
+            "price": 1.0
+          }
+        ],
+        "volume": 333322.379722,
+        "liquidity": null
+      },
+      {
+        "id": "570823",
+        "question": "Will Elon tweet 150\u2013164 times August 1\u2013August 8?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0
+          },
+          {
+            "name": "No",
+            "price": 1.0
+          }
+        ],
+        "volume": 479404.361561,
+        "liquidity": null
+      },
+      {
+        "id": "570824",
+        "question": "Will Elon tweet 165\u2013179 times August 1\u2013August 8?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0
+          },
+          {
+            "name": "No",
+            "price": 1.0
+          }
+        ],
+        "volume": 479923.402027,
+        "liquidity": null
+      },
+      {
+        "id": "570825",
+        "question": "Will Elon tweet 180\u2013194 times August 1\u2013August 8?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0
+          },
+          {
+            "name": "No",
+            "price": 1.0
+          }
+        ],
+        "volume": 430131.713778,
+        "liquidity": null
+      },
+      {
+        "id": "570826",
+        "question": "Will Elon tweet 195\u2013209 times August 1\u2013August 8?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0
+          },
+          {
+            "name": "No",
+            "price": 1.0
+          }
+        ],
+        "volume": 446042.069469,
+        "liquidity": null
+      },
+      {
+        "id": "570827",
+        "question": "Will Elon tweet 210\u2013224 times August 1\u2013August 8?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0
+          },
+          {
+            "name": "No",
+            "price": 1.0
+          }
+        ],
+        "volume": 466918.580992,
+        "liquidity": null
+      },
+      {
+        "id": "570828",
+        "question": "Will Elon tweet 225\u2013239 times August 1\u2013August 8?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0
+          },
+          {
+            "name": "No",
+            "price": 1.0
+          }
+        ],
+        "volume": 606975.563267,
+        "liquidity": null
+      },
+      {
+        "id": "570829",
+        "question": "Will Elon tweet 240\u2013254 times August 1\u2013August 8?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.0
+          },
+          {
+            "name": "No",
+            "price": 1.0
+          }
+        ],
+        "volume": 824471.491167,
+        "liquidity": null
+      },
+      {
+        "id": "570830",
+        "question": "Will Elon tweet 255 or more times August 1\u2013August 8?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 1.0
+          },
+          {
+            "name": "No",
+            "price": 0.0
+          }
+        ],
+        "volume": 1060976.465582,
+        "liquidity": null
+      }
+    ]
+  },
+  {
+    "id": "32416",
+    "title": "Israel x Hamas ceasefire by August 15?",
+    "slug": "israel-x-hamas-ceasefire-by-august-15",
+    "description": "On March 17, Israel announced extensive strikes on terror targets belonging to the Hamas terrorist organization in the Gaza Strip ending a previous ceasefire agreement which had been agreed on January 15 (See: https://x.com/IDF/status/1901802698237935705).\n\nThis market will resolve to \"Yes\" if there is an official ceasefire agreement, defined as a publicly announced and mutually agreed halt in military engagement, between Israel and Hamas between July 14, and August 15, 2025, 11:59 PM ET.\n\nIf the agreement is officially reached before the resolution date, this market will resolve to \"Yes\", regardless of whether the ceasefire officially starts afterwards.\n\nAn announced agreement to reinstate the previous agreed upon January 15th ceasefire deal will qualify.\n\nAny form of informal agreement will not be considered an official ceasefire. Humanitarian pauses will not count toward the resolution of this market.\n\nThis market's resolution will be based on official announcements from both Israel and Hamas, however a wide consensus of credible media reporting stating an official ceasefire agreement between Israel and Hamas has been reached will suffice.\n",
+    "volume": 5299450.124315,
+    "liquidity": 83349.39954,
+    "start_date": "2025-07-14T13:28:59.579581",
+    "end_date": "2025-08-15T00:00:00",
+    "markets": [
+      {
+        "id": "563308",
+        "question": "Israel x Hamas ceasefire by August 15?",
+        "outcomes": [
+          {
+            "name": "Yes",
+            "price": 0.004
+          },
+          {
+            "name": "No",
+            "price": 0.996
+          }
+        ],
+        "volume": 5299510.364315,
+        "liquidity": 82909.72643
+      }
+    ]
+  }
+]

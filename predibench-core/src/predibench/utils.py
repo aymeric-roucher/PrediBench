@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 from predibench.common import OUTPUT_PATH
+from datetime import date
 
 
 def collect_investment_choices(output_path: Path = OUTPUT_PATH) -> pd.DataFrame:
@@ -31,7 +32,7 @@ def collect_investment_choices(output_path: Path = OUTPUT_PATH) -> pd.DataFrame:
                                         if data["choice"] == "nothing"
                                         else (1 if data["choice"] == "yes" else -1)
                                     ),
-                                    "question_id": data["id"],
+                                    "question_id": file.replace(".json", ""),
                                 }
                             )
                         except Exception as e:

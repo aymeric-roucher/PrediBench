@@ -1,0 +1,184 @@
+{
+  "563308": {
+    "id": "563308",
+    "question": "Israel x Hamas ceasefire by August 15?",
+    "slug": "israel-x-hamas-ceasefire-by-august-15",
+    "description": "On March 17, Israel announced extensive strikes on terror targets belonging to the Hamas terrorist organization in the Gaza Strip ending a previous ceasefire agreement which had been agreed on January 15 (See: https://x.com/IDF/status/1901802698237935705).\n\nThis market will resolve to \"Yes\" if there is an official ceasefire agreement, defined as a publicly announced and mutually agreed halt in military engagement, between Israel and Hamas between July 14, and August 15, 2025, 11:59 PM ET.\n\nIf the agreement is officially reached before the resolution date, this market will resolve to \"Yes\", regardless of whether the ceasefire officially starts afterwards.\n\nAn announced agreement to reinstate the previous agreed upon January 15th ceasefire deal will qualify.\n\nAny form of informal agreement will not be considered an official ceasefire. Humanitarian pauses will not count toward the resolution of this market.\n\nThis market's resolution will be based on official announcements from both Israel and Hamas, however a wide consensus of credible media reporting stating an official ceasefire agreement between Israel and Hamas has been reached will suffice.\n",
+    "end_date": "2025-08-15T00:00:00",
+    "createdAt": "2025-07-14T12:47:44.356037",
+    "volumeNum": 5315698.508314,
+    "volume24hr": 22168.322332999996,
+    "volume1wk": 960023.2688749996,
+    "volume1mo": 5299555.814315011,
+    "volume1yr": 5299555.814315011,
+    "liquidity": 69630.22711,
+    "outcomes": [
+      {
+        "clob_token_id": "64164139741409385441658805156445960147369700631333923468874518950998274340137",
+        "name": "Yes",
+        "price": 0.0035
+      },
+      {
+        "clob_token_id": "36152309440055166767293953429052670897284732512249407875329322791027155160396",
+        "name": "No",
+        "price": 0.9965
+      }
+    ]
+  },
+  "543259": {
+    "id": "543259",
+    "question": "Will Andr\u00f3nico Rodr\u00edguez win the 2025 Bolivia presidential election?",
+    "slug": "will-andrnico-rodrguez-win-the-2025-bolivia-presidential-election",
+    "description": "General elections are scheduled to take place in Bolivia on 17 August 2025.\n\nThis market will resolve according to the listed candidate that wins this election. \n\nThis market includes any potential second round. If the result of this election isn't known by December 31, 2025, 11:59 PM ET, the market will resolve to \"Other\".\n\nThis market will resolve based on the result of the election as indicated by a consensus of credible reporting. If there is ambiguity, this market will resolve based solely on the official results as reported by the Bolivian government, specifically the Plurinational Electoral Body (\u00d3rgano Electoral Plurinacional, OEP) (https://www.oep.org.bo/).",
+    "end_date": "2025-08-17T12:00:00",
+    "createdAt": "2025-05-09T21:39:14.001066",
+    "volumeNum": 1421636.573721,
+    "volume24hr": 44747.31706399999,
+    "volume1wk": 354028.0922549999,
+    "volume1mo": 843224.5968899997,
+    "volume1yr": 1418182.760971999,
+    "liquidity": 63271.7287,
+    "outcomes": [
+      {
+        "clob_token_id": "21349083717605037525723335754807560771874175181325455859992777238860289139531",
+        "name": "Yes",
+        "price": 0.065
+      },
+      {
+        "clob_token_id": "83800005256015527477785648001008205129811919378219747447077115706438887498072",
+        "name": "No",
+        "price": 0.935
+      }
+    ]
+  },
+  "544421": {
+    "id": "544421",
+    "question": "Will the U.S. tariff rate on China be between 25% and 40% on August 15?",
+    "slug": "will-the-us-tariff-rate-on-china-be-between-25-and-40-on-august-15",
+    "description": "On May 12, 2025, the United States and China announced a 90-day mutual reduction in tariffs as part of a temporary trade de-escalation agreement.\n\nThis market will resolve according to the general tariff rate on imports into the United States from the People's Republic of China on August 15, 2025, 12:00 PM ET. \n\nThe general tariff rate refers to the base tariff rate paid on imports, including any general tariff the U.S. imposes on all imports (e.g. a 10% tariff on all U.S. imports and a 50% tariff on top of that on Chinese imports would equal a 60% tariff).\n\nIf the reported value falls exactly between two brackets, then this market will resolve to the higher range bracket.\n\nItem specific exceptions or increases will not be considered (i.e. this market does not refer to the effective tariff rate). \n\nOnly tariffs which are in effect will qualify. Tariffs which are paused, or which have been announced but not yet gone into effect will not be considered.\n\nThis market's primary resolution source will be official information from the Trump administration, however a consensus of credible information will also be used.",
+    "end_date": "2025-08-15T12:00:00",
+    "createdAt": "2025-05-13T17:22:38.438677",
+    "volumeNum": 693998.819352,
+    "volume24hr": 8862.269855999999,
+    "volume1wk": 48409.92545699999,
+    "volume1mo": 77720.43845500002,
+    "volume1yr": 693060.2110199997,
+    "liquidity": 9889.58231,
+    "outcomes": [
+      {
+        "clob_token_id": "26494547383015857678084557394288070598738111674059710005374810077339628486403",
+        "name": "Yes",
+        "price": 0.9875
+      },
+      {
+        "clob_token_id": "56384060877427795812705402136312411494636654726402697868437712049098339772959",
+        "name": "No",
+        "price": 0.0125
+      }
+    ]
+  },
+  "569996": {
+    "id": "569996",
+    "question": "Israel strikes Yemen by August 15?",
+    "slug": "israel-strikes-yemen-by-august-15",
+    "description": "This market will resolve to \"Yes\" if Israel initiates a drone, missile, or air strike on Yemeni soil or any official Yemeni embassy or consulate between July 30 and August 15, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nFor the purposes of this market, a qualifying \"strike\" is defined as the use of aerial bombs, drones or missiles (including cruise or ballistic missiles) launched by Israeli military forces that impact Yemen ground territory or any official Yemen embassy or consulate (e.g., if a weapons depot on Yemen soil is hit by an Israeli missile, this market will resolve to \"Yes\").\n\nMissiles or drones that are intercepted and surface-to-air missile strikes will not be sufficient for a \"Yes\" resolution, regardless of whether they land on Yemeni territory or cause damage.\n\nActions such as artillery fire, small arms fire, FPV or ATGM strikes directly, ground incursions, naval shelling, cyberattacks, or other operations conducted by Israeli ground operatives will not qualify.\n\nThe resolution source will be a consensus of credible reporting.\n\nIf there is ambiguity as to whether a qualifying strike occurred, this market may remain open after resolution time for confirming evidence.",
+    "end_date": "2025-08-15T00:00:00",
+    "createdAt": "2025-07-30T14:46:30.009904",
+    "volumeNum": 536039.327654,
+    "volume24hr": 76384.768541,
+    "volume1wk": 338901.32532799995,
+    "volume1mo": 530157.7105949997,
+    "volume1yr": 530157.7105949997,
+    "liquidity": 21677.78829,
+    "outcomes": [
+      {
+        "clob_token_id": "56565041809570190633058432923996420893799407522838298262867236445888352008959",
+        "name": "Yes",
+        "price": 0.0645
+      },
+      {
+        "clob_token_id": "59843634741148286360674644119463275138187710897161787048920051076746176243833",
+        "name": "No",
+        "price": 0.9355
+      }
+    ]
+  },
+  "574322": {
+    "id": "574322",
+    "question": "Will Elon tweet 470 or more times August 8\u2013August 15?",
+    "slug": "will-elon-tweet-470-or-more-times-august-8august-15",
+    "description": "This market will resolve according to the number of times Elon Musk (@elonmusk), posts on X between August 8, 2025, 12:00 PM ET and August 15, 2025, 12:00 PM ET.\n\nFor the purposes of this market, only main feed posts, quote posts and reposts posts will count.\n\nReplies will NOT count towards the total - however, replies on the main feed such as https://x.com/elonmusk/status/1786073478711353576 will be counted by the tracker.\n\nDeleted posts will count as long as they remain available long enough to be captured by the tracker (~5 minutes).\n\nCommunity reposts which are not counted by the tracker not count toward the total. \n\nThe resolution source for this market is the \u2018Post Counter\u2019 figure for posts found at https://www.xtracker.io/. Individual posts can be viewed by clicking \"Export Data\". If the tracker does not update correctly in accordance with the rules, X itself may be used as a secondary resolution source.",
+    "end_date": "2025-08-15T00:00:00",
+    "createdAt": "2025-08-08T15:24:20.737144",
+    "volumeNum": 525520.562665,
+    "volume24hr": 97232.195328,
+    "volume1wk": 488119.07322300004,
+    "volume1mo": 488119.07322300004,
+    "volume1yr": 488119.07322300004,
+    "liquidity": 8308.98744,
+    "outcomes": [
+      {
+        "clob_token_id": "43237710334300428941162185974059626894831895722969396843718390425251299781597",
+        "name": "Yes",
+        "price": 0.423
+      },
+      {
+        "clob_token_id": "50201767058584879453547897331523761576775840356151429482506776160549722381748",
+        "name": "No",
+        "price": 0.577
+      }
+    ]
+  },
+  "544420": {
+    "id": "544420",
+    "question": "Will the U.S. tariff rate on China be less than 25% on August 15?",
+    "slug": "will-the-us-tariff-rate-on-china-be-less-than-25-on-august-15",
+    "description": "On May 12, 2025, the United States and China announced a 90-day mutual reduction in tariffs as part of a temporary trade de-escalation agreement.\n\nThis market will resolve according to the general tariff rate on imports into the United States from the People's Republic of China on August 15, 2025, 12:00 PM ET. \n\nThe general tariff rate refers to the base tariff rate paid on imports, including any general tariff the U.S. imposes on all imports (e.g. a 10% tariff on all U.S. imports and a 50% tariff on top of that on Chinese imports would equal a 60% tariff).\n\nIf the reported value falls exactly between two brackets, then this market will resolve to the higher range bracket.\n\nItem specific exceptions or increases will not be considered (i.e. this market does not refer to the effective tariff rate). \n\nOnly tariffs which are in effect will qualify. Tariffs which are paused, or which have been announced but not yet gone into effect will not be considered.\n\nThis market's primary resolution source will be official information from the Trump administration, however a consensus of credible information will also be used.",
+    "end_date": "2025-08-15T12:00:00",
+    "createdAt": "2025-05-13T17:22:38.084626",
+    "volumeNum": 429760.090065,
+    "volume24hr": 4007.367413,
+    "volume1wk": 71797.05953800002,
+    "volume1mo": 161566.764596,
+    "volume1yr": 429623.9600649999,
+    "liquidity": 9316.21426,
+    "outcomes": [
+      {
+        "clob_token_id": "62894892057652747159161857835481794400439837681003668649783386868036115486192",
+        "name": "Yes",
+        "price": 0.002
+      },
+      {
+        "clob_token_id": "85527881850865051394012617835804319487097412991995656162825392034976588920776",
+        "name": "No",
+        "price": 0.998
+      }
+    ]
+  },
+  "563084": {
+    "id": "563084",
+    "question": "Han Duck-soo in jail by August 15?",
+    "slug": "han-duck-soo-in-jail-by-august-15",
+    "description": "This market will resolve to \"Yes\" if Han Duck-soo spends any time in custody in a jail or prison between July 13 and August 15, 2025, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nthis market will resolve to \"Yes\" if Han Duck-soo spends time in custody in a jail or prison. Temporary holding at a facility such as the Seoul Detention Center while awaiting a judge\u2019s decision on whether to grant a detention warrant does not qualify. However, non-temporary detention initiated by a court ordered warrant will count.\n\nThe primary resolution source for this market will be official information from involved government(s), however a consensus of credible reporting may also be used.",
+    "end_date": "2025-08-15T00:00:00",
+    "createdAt": "2025-07-13T16:53:00.909728",
+    "volumeNum": 402235.137357,
+    "volume24hr": 12687.509836,
+    "volume1wk": 176996.00410000005,
+    "volume1mo": 397824.0182999997,
+    "volume1yr": 398742.2933569997,
+    "liquidity": 27658.87595,
+    "outcomes": [
+      {
+        "clob_token_id": "19014844703346916777170285413250405753194310584215462703772174670004637779850",
+        "name": "Yes",
+        "price": 0.0015
+      },
+      {
+        "clob_token_id": "40998349429755384420957882593174430220318752817779550704201506554899132281412",
+        "name": "No",
+        "price": 0.9985
+      }
+    ]
+  }
+}

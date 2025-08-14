@@ -20,42 +20,45 @@ class InvestmentHyperparameters:
     model_names: list[str]
 
 HYPERPARAMETERS = InvestmentHyperparameters(
-    n_markets=10,
+    n_markets=2,
     end_date=date(2025, 8, 1),
     investment_dates=[date(2025, 7, 25), date(2025, 8, 1)],
     model_names=[
-        "huggingface/openai/gpt-oss-120b",
-        "huggingface/openai/gpt-oss-20b",
-        "huggingface/Qwen/Qwen3-30B-A3B-Instruct-2507",
-        "huggingface/deepseek-ai/DeepSeek-R1-0528",
-        "huggingface/Qwen/Qwen3-4B-Thinking-2507",
-        "gpt-4.1",
-        "gpt-4o",
+        # "huggingface/openai/gpt-oss-120b",
+        # "huggingface/openai/gpt-oss-20b",
+        # "huggingface/Qwen/Qwen3-30B-A3B-Instruct-2507",
+        # "huggingface/deepseek-ai/DeepSeek-R1-0528",
+        # "huggingface/Qwen/Qwen3-4B-Thinking-2507",
+        # "gpt-4.1",
+        # "gpt-4o",
         "gpt-4.1-mini",
-        "o4-mini",
-        "gpt-5",
-        "gpt-5-mini",
-        "o3-deep-research",
+        # "o4-mini",
+        # "gpt-5",
+        # "gpt-5-mini",
+        # "o3-deep-research",
         "test_random",
         # "anthropic/claude-sonnet-4-20250514",
     ],
 )
 
 
-def main(hyperparams: InvestmentHyperparameters) -> None:
+def main(hyperparams: InvestmentHyperparameters, use_cache: bool = False) -> None:
     """Run the investment simulation with multiple AI models."""
     
-    selected_markets = choose_markets(
-        today_date=hyperparams.end_date, n_markets=hyperparams.n_markets
-    )
-    returns_df, prices_data = get_historical_returns(markets=selected_markets)
+    if not use_cache:
+        selected_markets = choose_markets(
+            today_date=hyperparams.end_date, n_markets=hyperparams.n_markets
+        )
+        returns_df, prices_data = get_historical_returns(markets=selected_markets)
 
-    launch_agent_investments(
-        list_models=hyperparams.model_names, 
-        investment_dates=hyperparams.investment_dates, 
-        prices_df=prices_data, 
-        markets=selected_markets
-    )
+        launch_agent_investments(
+            list_models=hyperparams.model_names, 
+            investment_dates=hyperparams.investment_dates, 
+            prices_df=prices_data, 
+            markets=selected_markets
+        )
+        
+    
 
     positions_data = collect_investment_choices(output_path=OUTPUT_PATH)
     final_pnl_results, cumulative_pnl_results, visualization_figures = compute_pnls(
@@ -67,4 +70,4 @@ def main(hyperparams: InvestmentHyperparameters) -> None:
 
 
 if __name__ == "__main__":
-    main(hyperparams=HYPERPARAMETERS)
+    main(hyperparams=HYPERPARAMETERS, use_cache=True)
