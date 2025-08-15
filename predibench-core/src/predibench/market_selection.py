@@ -101,7 +101,6 @@ def choose_events(today_date: datetime, time_until_ending: timedelta, n_events: 
     
     for event in filtered_events:
         for market in event.markets:
-            # here it would be able to
             if backward_mode:
                 market.fill_prices(
                     start_time=today_date - timedelta(days=7),
@@ -109,39 +108,7 @@ def choose_events(today_date: datetime, time_until_ending: timedelta, n_events: 
                 )
             else:
                 market.fill_prices()
-
-    output_dir = OUTPUT_PATH
-    output_dir.mkdir(exist_ok=True)
-    events_file = output_dir / "selected_events.json"
-    
-    # Save selected events
-    with open(events_file, "w") as f:
-        events_data = []
-        for event in filtered_events:
-            event_dict = {
-                "id": event.id,
-                "title": event.title,
-                "slug": event.slug,
-                "description": event.description,
-                "volume": event.volume,
-                "liquidity": event.liquidity,
-                "start_date": event.start_date.isoformat() if event.start_date else None,
-                "end_date": event.end_date.isoformat() if event.end_date else None,
-                "markets": [
-                    {
-                        "id": market.id,
-                        "question": market.question,
-                        "outcomes": [{"name": outcome.name, "price": outcome.price} for outcome in market.outcomes],
-                        "volume": market.volumeNum,
-                        "liquidity": market.liquidity,
-                    }
-                    for market in event.markets
-                ]
-            }
-            events_data.append(event_dict)
-        json.dump(events_data, f, indent=2)
-    
-    return filtered_events[:n_events]
+    return filtered_events
 
 
 def choose_markets(today_date: date, n_markets: int = 10) -> list[Market]:

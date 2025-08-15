@@ -235,11 +235,6 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
         return timeseries
 
 
-
-################################################################################
-# Useful for the future but unused functions
-################################################################################
-
 class EventsRequestParameters(_RequestParameters):
     
     def get_events(self) -> list[Event]:
@@ -313,6 +308,9 @@ class Event(BaseModel, arbitrary_types_allowed=True):
             markets=markets,
         )
 
+################################################################################
+# Useful for the future but unused functions
+################################################################################
 
 
 class OrderLevel(BaseModel):

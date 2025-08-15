@@ -50,6 +50,8 @@ def run_event_based_investment(time_until_ending: timedelta, max_n_events: int, 
         n_events=max_n_events
     )
     
+    # TODO: add a saving mechanism
+    
     logger.info(f"Selected {len(selected_events)} events for analysis")
     for event in selected_events:
         logger.info(f"- {event.title} (Volume: ${event.volume:,.0f})")
