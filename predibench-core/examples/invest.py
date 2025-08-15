@@ -60,6 +60,9 @@ def run_event_based_investment(time_until_ending: timedelta, max_n_events: int, 
     for event in selected_events:
         logger.info(f"- {event.title} (Volume: ${event.volume:,.0f})")
     
+    # now you have to do the investment agent for each event, think about the database and compute the pnl
+    # you must also implement a mechanism to have more datapoints (backward compatiblities)
+    # then frontend backend and deployment
     launch_agent_event_investments(
         list_models=model_names,
         investment_dates=investment_dates,
