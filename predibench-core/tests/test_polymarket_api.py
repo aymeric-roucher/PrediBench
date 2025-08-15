@@ -148,20 +148,15 @@ def test_get_events():
     events = request_parameters.get_events()
     for event in events:
         for i, market in enumerate(event.markets):
-            # Just making sure that all markets have Yes or No outcomes
+            # outcomes are usually Yes and No, but can be two different sports teams for instance
             assert len(market.outcomes) == 2
-            assert market.outcomes[0].name == "Yes"
-            for outcome in market.outcomes:
-                if outcome.name not in ["Yes", "No"]:
-                    raise ValueError(f"Market {market.id} has outcome {outcome.name} which is not Yes or No")
-                    
             if i == 0:
                 market.fill_prices(
                     start_time=datetime.today() - timedelta(days=7),
                     end_time=datetime.today()
                 )
     assert len(events) >= 10  # Should get at least some events
-
+test_get_events()
 
 def test_get_events_offset():
     """Test that offset parameter works correctly."""

@@ -24,9 +24,12 @@ from predibench.utils import convert_polymarket_time_to_datetime
 from pydantic import BaseModel
 
 from predibench.common import BASE_URL_POLYMARKET
+from predibench.logging import get_logger
 
 MAX_INTERVAL_TIMESERIES = timedelta(days=14, hours=23, minutes=0)
 # NOTE: above is refined by experience: seems independant from the resolution
+
+logger = get_logger(__name__)
 
 
 class MarketOutcome(BaseModel):
@@ -59,7 +62,7 @@ class Market(BaseModel, arbitrary_types_allowed=True):
             end_time: End time for timeseries data
             interval: Time interval for data points (default: "1d")
         """
-        if self.outcomes and len(self.outcomes) > 0 and self.outcomes[0].clob_token_id and self.outcomes[0].name == "Yes":
+        if self.outcomes and len(self.outcomes) == 2 and self.outcomes[0].clob_token_id:
             ts_request = _HistoricalTimeSeriesRequestParameters(
                 market=self.outcomes[0].clob_token_id,
                 start_time=start_time,
@@ -67,7 +70,7 @@ class Market(BaseModel, arbitrary_types_allowed=True):
             )
             self.prices = ts_request.get_token_daily_timeseries()
         else:
-            print(f"Incorrect outcomes for market {self.id}")
+            logger.error(f"Incorrect outcomes for market {self.id} with name {self.question} and outcomes {self.outcomes}")
             self.prices = None
 
     @staticmethod
@@ -75,14 +78,14 @@ class Market(BaseModel, arbitrary_types_allowed=True):
         """Convert a market JSON object to a PolymarketMarket dataclass."""
 
         if not "outcomes" in market_data:
-            print("Outcomes missing for market:\n", market_data["id"], market_data["question"])
+            logger.warning(f"Outcomes missing for market:\n{market_data['id']}\n{market_data['question']}")
             return None
         
         outcomes = json.loads(market_data["outcomes"])
         if len(outcomes) < 2:
             # There should be at least 2 
             # Who will the world's richest person be on February 27, 2021?
-            print(f"Expected 2 outcomes, got {len(outcomes)} for market:\n", market_data["id"], market_data["question"])
+            logger.warning(f"Expected 2 outcomes, got {len(outcomes)} for market:\n{market_data['id']}\n{market_data['question']}")
             return None
         outcome_names = json.loads(market_data["outcomes"])
         
@@ -181,11 +184,11 @@ class MarketsRequestParameters(_RequestParameters):
             for market in markets:
                 if market.end_date is None or not (self.end_date_min <= market.end_date <= self.end_date_max):
                     excluded_count += 1
-                    print(f"Excluded market {market.question} because it doesn't fit the date criteria")
+                    logger.warning(f"Excluded market {market.question} because it doesn't fit the date criteria")
                 else:
                     filtered_markets.append(market)
             if excluded_count > 0:
-                print(f"Warning: Excluded {excluded_count} markets that don't fit the date criteria")
+                logger.warning(f"Excluded {excluded_count} markets that don't fit the date criteria")
             markets = filtered_markets
 
         if start_time and end_time:
