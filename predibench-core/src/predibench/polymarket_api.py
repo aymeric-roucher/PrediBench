@@ -214,13 +214,7 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
         url = "https://clob.polymarket.com/prices-history"
 
         params = {"market": self.market}
-
-        if self.start_time is not None:
-            params["startTs"] = int(self.start_time.timestamp())
-        if self.end_time is not None:
-            params["endTs"] = int(self.end_time.timestamp())
-        if self.start_time is None and self.end_time is None:
-            params["interval"] = self.interval
+        params["interval"] = self.interval
 
         response = requests.get(url, params=params)
         response.raise_for_status()
@@ -241,6 +235,15 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
             .ffill()
         )
         timeseries.index = timeseries.index.tz_localize(timezone.utc).date
+        
+        # Filter timeseries to only include dates between start_time and end_time
+        if self.start_time is not None:
+            start_date = self.start_time.date()
+            timeseries = timeseries[timeseries.index >= start_date]
+        
+        if self.end_time is not None:
+            end_date = self.end_time.date()
+            timeseries = timeseries[timeseries.index <= end_date]
         
         return timeseries
 

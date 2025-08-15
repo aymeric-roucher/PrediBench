@@ -64,6 +64,13 @@ def _filter_out_resolved_markets(
         )
     ]
 
+def _remove_markets_without_prices_in_events(events: list[Event]) -> list[Event]:
+    """Remove markets that have no prices"""
+    for event in events:
+        market_filtered = [market for market in event.markets if market.prices is not None and len(market.prices) >= 1]
+        event.markets = market_filtered
+    return events
+
 
 def _filter_events_by_volume_and_markets(events: list[Event], min_volume: float = 1000, backward_mode: bool = False) -> list[Event]:
     """Filter events based on volume threshold and presence of markets."""
@@ -99,15 +106,17 @@ def choose_events(today_date: datetime, time_until_ending: timedelta, n_events: 
         filtered_events = events
     filtered_events = filtered_events[:n_events]
     
+    
     for event in filtered_events:
         for market in event.markets:
             if backward_mode:
                 market.fill_prices(
-                    start_time=today_date - timedelta(days=7),
                     end_time=today_date
                 )
             else:
                 market.fill_prices()
+    
+    filtered_events = _remove_markets_without_prices_in_events(filtered_events)
     return filtered_events
 
 

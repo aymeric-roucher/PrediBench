@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 End-to-end tests for market selection functionality.
 
@@ -54,7 +53,8 @@ def test_choose_events_event_caching_e2e():
                 nb_markets_with_prices += 1
             else:
                 nb_markets_without_prices += 1
-    assert nb_markets_with_prices > nb_markets_without_prices * 3 # it will not work for some, 3 is a safe margin
+    assert nb_markets_with_prices > 0
+    assert nb_markets_without_prices == 0
 
     # Step 2: Save events to file
     logger.info("Step 2: Saving events to file...")
@@ -129,73 +129,40 @@ def test_choose_events_backward_compatibility():
     # Test parameters
     base_date = datetime(2025, 7, 15, tzinfo=timezone.utc)  # Fixed date for testing
     time_until_ending = timedelta(days=7)
-    n_events = 3
+    max_n_events = 3
     
     # Test 1: Normal mode (backward_mode=False)
     logger.info("Test 1: Testing normal mode (backward_mode=False)...")
     
-    events_normal = choose_events(
+    selected_events = choose_events(
         today_date=base_date,
         time_until_ending=time_until_ending,
-        n_events=n_events,
+        n_events=max_n_events,
         backward_mode=True
     )
     
-    logger.info(f"Normal mode returned {len(events_normal)} events")
-    assert len(events_normal) <= n_events, f"Expected at most {n_events} events, got {len(events_normal)}"
-    
-    for i, event in enumerate(events_normal):
-        logger.info(f"  Normal event {i+1}: {event.title} (Volume: ${event.volume:,.0f})")
+    # checking events
+    nb_markets_with_prices = 0
+    nb_markets_without_prices = 0
+    assert len(selected_events) == max_n_events, f"Expected {max_n_events} events, got {len(selected_events)}"
+    for event in selected_events:
+        assert len(event.markets) > 0, f"Event {event.title} has no markets"
+        assert event.end_date.astimezone(timezone.utc) <= base_date + time_until_ending, f"Event {event.title} has end_date {event.end_date} which is after {base_date + time_until_ending}"
         
-        # Verify event has markets
-        assert len(event.markets) > 0, f"Event {i+1} has no markets"
-        
-        # In normal mode, events should be filtered by volume24hr
-        if event.volume24hr is not None:
-            assert event.volume24hr >= 1000, f"Event {i+1} volume24hr ({event.volume24hr}) below minimum threshold"
-        
-        # Check that markets have price data (should be filled in normal mode)
-        for j, market in enumerate(event.markets):
-            if market.prices is not None:
-                logger.info(f"    Market {j+1}: {market.question} - Price data: {len(market.prices)} points")
+        for market in event.markets:
+            assert len(market.outcomes) == 2, f"Market {market.question} has {len(market.outcomes)} outcomes, expected 2"
+            if market.prices is not None and len(market.prices) >= 1:
+                nb_markets_with_prices += 1
             else:
-                logger.warning(f"    Market {j+1}: {market.question} - No price data")
-    
-    # Test 2: Backward compatibility mode (backward_mode=True)
-    logger.info("Test 2: Testing backward compatibility mode (backward_mode=True)...")
-    
-    events_backward = choose_events(
-        today_date=base_date,
-        time_until_ending=time_until_ending,
-        n_events=n_events,
-        backward_mode=True
-    )
-    
-    logger.info(f"Backward mode returned {len(events_backward)} events")
-    assert len(events_backward) <= n_events, f"Expected at most {n_events} events, got {len(events_backward)}"
-    
-    for i, event in enumerate(events_backward):
-        logger.info(f"  Backward event {i+1}: {event.title} (Volume: ${event.volume:,.0f})")
-        
-        # Verify event has markets
-        assert len(event.markets) > 0, f"Event {i+1} has no markets"
-        
-        # In backward mode, volume24hr filtering is not applied
-        # Events may have lower volume24hr or None
-        
-        # Check that markets have historical price data (should be filled for specific date range)
-        for j, market in enumerate(event.markets):
-            if market.prices is not None:
-                logger.info(f"    Market {j+1}: {market.question} - Historical price data: {len(market.prices)} points")
-                # Verify price data covers the expected time range (7 days before base_date)
-                assert len(market.prices) > 0, f"Market {j+1} has empty price data"
-            else:
-                logger.warning(f"    Market {j+1}: {market.question} - No historical price data")
-    
+                nb_markets_without_prices += 1
+    assert nb_markets_with_prices > 0
+    assert nb_markets_without_prices == 0
+
+    pass
 
 def main():
-    test_choose_events_event_caching_e2e()
     test_choose_events_backward_compatibility()
+    test_choose_events_event_caching_e2e()
 
 
 
