@@ -62,7 +62,7 @@ def _filter_out_resolved_markets(
     ]
 
 
-def _filter_events_by_volume_and_markets(events: list[Event], n_events: int, min_volume: float = 1000) -> list[Event]:
+def _filter_events_by_volume_and_markets(events: list[Event], min_volume: float = 1000) -> list[Event]:
     """Filter events based on volume threshold and presence of markets."""
     filtered_events = []
     for event in events:
@@ -71,12 +71,10 @@ def _filter_events_by_volume_and_markets(events: list[Event], n_events: int, min
             if event.volume24hr and event.volume24hr > min_volume:  # Minimum volume threshold
                 filtered_events.append(event)
         
-        if len(filtered_events) >= n_events:
-            break
-    
     return filtered_events
 
 
+# TODO: all of the parameters here should be threated as hyper parameters
 def choose_events(today_date: date, n_events: int) -> list[Event]:
     """Pick top events by volume for investment."""
     request_parameters = EventsRequestParameters(
@@ -88,20 +86,16 @@ def choose_events(today_date: date, n_events: int) -> list[Event]:
     )
     events = request_parameters.get_events()
     
-    # Filter events by volume and market availability
-    filtered_events = _filter_events_by_volume_and_markets(events, n_events)
+    filtered_events = _filter_events_by_volume_and_markets(events=events)
+    filtered_events = filtered_events[:n_events]
     
-    # Add timeseries data to first market in each event (for testing purposes)
     for event in filtered_events:
-        for i, market in enumerate(event.markets):
-            if i == 0:  # Only fill prices for first market in each event for faster testing
-                market.fill_prices(
-                    start_time=today_date - timedelta(days=7),  # Only last 7 days for faster testing
-                    end_time=today_date
-                )
-            else:
-                market.prices = None  # Skip timeseries for other markets to speed up testing
-    
+        for market in event.markets:
+            market.fill_prices(
+                start_time=today_date - timedelta(days=7),
+                end_time=today_date
+            )
+
     output_dir = OUTPUT_PATH
     output_dir.mkdir(exist_ok=True)
     events_file = output_dir / "selected_events.json"

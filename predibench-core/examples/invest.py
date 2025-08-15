@@ -29,20 +29,6 @@ HYPERPARAMETERS = InvestmentHyperparameters(
     use_events=True,
     model_names=[
         "test_random",
-        # "gpt-4.1-mini",  # Commented out for testing without API keys
-        # Add back other models once testing is complete
-        # "huggingface/openai/gpt-oss-120b",
-        # "huggingface/openai/gpt-oss-20b",
-        # "huggingface/Qwen/Qwen3-30B-A3B-Instruct-2507",
-        # "huggingface/deepseek-ai/DeepSeek-R1-0528",
-        # "huggingface/Qwen/Qwen3-4B-Thinking-2507",
-        # "gpt-4.1",
-        # "gpt-4o",
-        # "o4-mini",
-        # "gpt-5",
-        # "gpt-5-mini",
-        # "o3-deep-research",
-        # "anthropic/claude-sonnet-4-20250514",
     ],
 )
 
