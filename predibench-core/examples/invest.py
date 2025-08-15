@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
-
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -38,18 +38,15 @@ HYPERPARAMETERS = InvestmentHyperparameters(
 )
 
 
-def run_event_based_investment(time_until_ending: timedelta, max_n_events: int, model_names: list[str], investment_dates: list[date]) -> None:
+def run_event_based_investment(time_until_ending: timedelta, max_n_events: int, model_names: list[str], investment_dates: list[date], cache_file: Path | None = None) -> None:
     """Run event-based investment simulation with multiple AI models."""
     
     today_date=datetime.now(timezone.utc)
     logger.info("Using event-based investment approach")
     
-    # Check for cached events
-    cache_file = OUTPUT_PATH / "cache" / "selected_events.json"
-    
-    if cache_file.exists():
+    if cache_file is not None and cache_file.exists():
         logger.info("Loading events from cache")
-        selected_events = load_events_from_file()
+        selected_events = load_events_from_file(cache_file)
     else:
         logger.info("Fetching events from API")
         selected_events = choose_events(
@@ -57,7 +54,7 @@ def run_event_based_investment(time_until_ending: timedelta, max_n_events: int, 
             time_until_ending=time_until_ending,
             n_events=max_n_events
         )
-        save_events_to_file(selected_events)
+        save_events_to_file(selected_events, cache_file)
     
     logger.info(f"Selected {len(selected_events)} events for analysis")
     for event in selected_events:
