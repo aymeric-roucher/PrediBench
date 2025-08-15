@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 import numpy as np
@@ -24,9 +24,12 @@ from predibench.utils import convert_polymarket_time_to_datetime
 from pydantic import BaseModel
 
 from predibench.common import BASE_URL_POLYMARKET
+from predibench.logging import get_logger
 
 MAX_INTERVAL_TIMESERIES = timedelta(days=14, hours=23, minutes=0)
 # NOTE: above is refined by experience: seems independant from the resolution
+
+logger = get_logger(__name__)
 
 
 class MarketOutcome(BaseModel):
@@ -51,19 +54,38 @@ class Market(BaseModel, arbitrary_types_allowed=True):
     outcomes: list[MarketOutcome]
     prices: pd.Series | None = None
 
+    def fill_prices(self, start_time: datetime | None = None, end_time: datetime | None = None) -> None:
+        """Fill the prices field with timeseries data.
+        
+        Args:
+            start_time: Start time for timeseries data
+            end_time: End time for timeseries data
+            interval: Time interval for data points (default: "1d")
+        """
+        if self.outcomes and len(self.outcomes) == 2 and self.outcomes[0].clob_token_id:
+            ts_request = _HistoricalTimeSeriesRequestParameters(
+                market=self.outcomes[0].clob_token_id,
+                start_time=start_time,
+                end_time=end_time,
+            )
+            self.prices = ts_request.get_token_daily_timeseries()
+        else:
+            logger.error(f"Incorrect outcomes for market {self.id} with name {self.question} and outcomes {self.outcomes}")
+            self.prices = None
+
     @staticmethod
     def from_json(market_data: dict) -> Market | None:
         """Convert a market JSON object to a PolymarketMarket dataclass."""
 
         if not "outcomes" in market_data:
-            print("Outcomes missing for market:\n", market_data["id"], market_data["question"])
+            logger.warning(f"Outcomes missing for market:\n{market_data['id']}\n{market_data['question']}")
             return None
         
         outcomes = json.loads(market_data["outcomes"])
         if len(outcomes) < 2:
             # There should be at least 2 
             # Who will the world's richest person be on February 27, 2021?
-            print(f"Expected 2 outcomes, got {len(outcomes)} for market:\n", market_data["id"], market_data["question"])
+            logger.warning(f"Expected 2 outcomes, got {len(outcomes)} for market:\n{market_data['id']}\n{market_data['question']}")
             return None
         outcome_names = json.loads(market_data["outcomes"])
         
@@ -133,7 +155,7 @@ class _RequestParameters(BaseModel):
 class MarketsRequestParameters(_RequestParameters):
     
     def get_markets(
-        self, add_timeseries: tuple[datetime, datetime] | None = None
+        self, start_time: datetime | None = None, end_time: datetime | None = None
     ) -> list[Market]:
         """Get open markets from Polymarket API using this request configuration."""
         url = f"{BASE_URL_POLYMARKET}/markets"
@@ -162,49 +184,43 @@ class MarketsRequestParameters(_RequestParameters):
             for market in markets:
                 if market.end_date is None or not (self.end_date_min <= market.end_date <= self.end_date_max):
                     excluded_count += 1
-                    print(f"Excluded market {market.question} because it doesn't fit the date criteria")
+                    logger.warning(f"Excluded market {market.question} because it doesn't fit the date criteria")
                 else:
                     filtered_markets.append(market)
             if excluded_count > 0:
-                print(f"Warning: Excluded {excluded_count} markets that don't fit the date criteria")
+                logger.warning(f"Excluded {excluded_count} markets that don't fit the date criteria")
             markets = filtered_markets
 
-        if add_timeseries:
-            start_date, end_date = add_timeseries
+        if start_time and end_time:
             for market in markets:
-                ts_request = _HistoricalTimeSeriesRequestParameters(
-                    market=market.outcomes[0].clob_token_id,
-                    start_time=start_date,
-                    end_time=end_date,
-                    interval="1d",
-                )
-                market.prices = ts_request.get_token_daily_timeseries()
+                market.fill_prices(start_time, end_time)
         return markets
 
 class _HistoricalTimeSeriesRequestParameters(BaseModel):
     market: str
-    interval: Literal["1m", "1w", "1d", "6h", "1h", "max"] = "1d"
+    interval: Literal["1m", "1w", "1d", "6h", "1h", "max"] = "max"
     start_time: datetime | None = None
     end_time: datetime | None = None
-    fidelity_minutes: int = 60 * 24  # default to daily
 
-    def get_token_daily_timeseries(self) -> pd.Series:
-        """Get token timeseries data using this request configuration."""
+    def get_token_daily_timeseries(self) -> pd.Series | None:
+        """Get token timeseries data using this request configuration.
+        
+        Why no fidelity ? Because when the market is closed in an Event that is still open (bitcoin price for instance),
+        the argument fidelity will return an empty timeseries. Better get as much data as possible.
+        
+        Some markets are present in the API and yet without prices, it is because they are not used and not traded,
+        in that case we will return None
+        """
         url = "https://clob.polymarket.com/prices-history"
 
         params = {"market": self.market}
-
-        if self.start_time is not None:
-            params["startTs"] = int(self.start_time.timestamp())
-        if self.end_time is not None:
-            params["endTs"] = int(self.end_time.timestamp())
         params["interval"] = self.interval
-        if self.fidelity_minutes is not None:
-            params["fidelity"] = str(self.fidelity_minutes)
 
         response = requests.get(url, params=params)
         response.raise_for_status()
         data = response.json()
+        if len(data["history"]) == 0:
+            return None
 
         timeseries = (
             pd.Series(
@@ -218,14 +234,19 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
             .last()
             .ffill()
         )
-        timeseries.index = timeseries.index.tz_localize(None).date
+        timeseries.index = timeseries.index.tz_localize(timezone.utc).date
+        
+        # Filter timeseries to only include dates between start_time and end_time
+        if self.start_time is not None:
+            start_date = self.start_time.date()
+            timeseries = timeseries[timeseries.index >= start_date]
+        
+        if self.end_time is not None:
+            end_date = self.end_time.date()
+            timeseries = timeseries[timeseries.index <= end_date]
+        
         return timeseries
 
-
-
-################################################################################
-# Useful for the future but unused functions
-################################################################################
 
 class EventsRequestParameters(_RequestParameters):
     
@@ -300,6 +321,9 @@ class Event(BaseModel, arbitrary_types_allowed=True):
             markets=markets,
         )
 
+################################################################################
+# Useful for the future but unused functions
+################################################################################
 
 
 class OrderLevel(BaseModel):

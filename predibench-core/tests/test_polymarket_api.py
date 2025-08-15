@@ -139,15 +139,24 @@ def test_polymarket_api_integration():
 def test_get_events():
     """Test basic market event retrieval."""
     request_parameters = EventsRequestParameters(
-        limit=20,
+        limit=500,
         order="volume",
         ascending=False,
-        end_date_min=datetime.today() + timedelta(days=1),
-        end_date_max=datetime.today() + timedelta(days=21),
+        # end_date_min=datetime.today() + timedelta(days=1),
+        # end_date_max=datetime.today() + timedelta(days=21),
     )
     events = request_parameters.get_events()
+    for event in events:
+        for i, market in enumerate(event.markets):
+            # outcomes are usually Yes and No, but can be two different sports teams for instance
+            assert len(market.outcomes) == 2
+            if i == 0:
+                market.fill_prices(
+                    start_time=datetime.today() - timedelta(days=7),
+                    end_time=datetime.today()
+                )
     assert len(events) >= 10  # Should get at least some events
-
+test_get_events()
 
 def test_get_events_offset():
     """Test that offset parameter works correctly."""

@@ -1,6 +1,6 @@
 import json
 import textwrap
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from smolagents import ChatMessage, LiteLLMModel
 
@@ -8,8 +8,13 @@ from predibench.common import OUTPUT_PATH
 from predibench.polymarket_api import (
     MAX_INTERVAL_TIMESERIES,
     Market,
+    Event,
     MarketsRequestParameters,
+    EventsRequestParameters,
 )
+from predibench.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def _filter_interesting_questions(questions: list[str]) -> list[str]:
@@ -59,8 +64,63 @@ def _filter_out_resolved_markets(
         )
     ]
 
+def _remove_markets_without_prices_in_events(events: list[Event]) -> list[Event]:
+    """Remove markets that have no prices"""
+    for event in events:
+        market_filtered = [market for market in event.markets if market.prices is not None and len(market.prices) >= 1]
+        event.markets = market_filtered
+    return events
 
-def choose_markets(today_date: date, n_markets: int = 10) -> dict[Market]:
+
+def _filter_events_by_volume_and_markets(events: list[Event], min_volume: float = 1000, backward_mode: bool = False) -> list[Event]:
+    """Filter events based on volume threshold and presence of markets."""
+    filtered_events = []
+    for event in events:
+        if event.markets and len(event.markets) > 0:
+            # Checking that the event has been traded in the last 24 hours
+            if not backward_mode and event.volume24hr and event.volume24hr > min_volume:  # Minimum volume threshold
+                filtered_events.append(event)
+    # TODO: add filtering on markets
+    return filtered_events
+
+# TODO: add tenacity retry for the requests
+# TODO: all of the parameters here should be threated as hyper parameters
+def choose_events(today_date: datetime, time_until_ending: timedelta, n_events: int, key_for_filtering: str = "volume", min_volume: float = 1000, backward_mode: bool = False) -> list[Event]:
+    """Pick top events by volume for investment for the current week
+    
+    backward_mode: if True, then events ending around this date will be selected, but those events are probably closed, we can't use the volume24hr to filter out the events that are open.
+    """
+
+    request_parameters = EventsRequestParameters(
+        limit=500,
+        order=key_for_filtering,
+        ascending=False,
+        end_date_min=today_date,
+        end_date_max=today_date + time_until_ending,
+    )
+    events = request_parameters.get_events()
+    
+    if not backward_mode:
+        filtered_events = _filter_events_by_volume_and_markets(events=events, min_volume=min_volume)
+    else:
+        filtered_events = events
+    filtered_events = filtered_events[:n_events]
+    
+    
+    for event in filtered_events:
+        for market in event.markets:
+            if backward_mode:
+                market.fill_prices(
+                    end_time=today_date
+                )
+            else:
+                market.fill_prices()
+    
+    filtered_events = _remove_markets_without_prices_in_events(filtered_events)
+    return filtered_events
+
+
+def choose_markets(today_date: date, n_markets: int = 10) -> list[Market]:
     """Pick some interesting questions to invest in."""
     request_parameters = MarketsRequestParameters(
         limit=n_markets * 10,
@@ -72,10 +132,8 @@ def choose_markets(today_date: date, n_markets: int = 10) -> dict[Market]:
         end_date_max=today_date + timedelta(days=21),
     )
     markets = request_parameters.get_markets(
-        add_timeseries=(
-            today_date - MAX_INTERVAL_TIMESERIES,
-            today_date,
-        )
+        start_time=today_date - MAX_INTERVAL_TIMESERIES,
+        end_time=today_date,
     )
     markets = _filter_out_resolved_markets(markets)
 
@@ -85,7 +143,7 @@ def choose_markets(today_date: date, n_markets: int = 10) -> dict[Market]:
     old_questions_file = output_dir / "interesting_questions_old.json"
 
     if old_questions_file.exists():
-        print("LOADING INTERESTING QUESTIONS FROM FILE")
+        logger.info("Loading interesting questions from file")
         with open(old_questions_file, "r") as f:
             # where is the logic when from one week to another, we remove some interesting questions for newer ones ?
             interesting_questions = json.load(f)
