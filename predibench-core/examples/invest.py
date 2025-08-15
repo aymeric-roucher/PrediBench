@@ -9,8 +9,11 @@ from predibench.pnl import compute_pnls, get_historical_returns
 from predibench.common import OUTPUT_PATH
 from predibench.utils import collect_investment_choices
 from predibench.market_selection import choose_markets, choose_events
+from predibench.logging import get_logger
 
 load_dotenv()
+
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -38,7 +41,7 @@ def run_event_based_investment(time_until_ending: timedelta, max_n_events: int, 
     """Run event-based investment simulation with multiple AI models."""
     
     today_date=datetime.now(timezone.utc)
-    print("Using event-based investment approach")
+    logger.info("Using event-based investment approach")
     
     
     selected_events = choose_events(
@@ -47,9 +50,9 @@ def run_event_based_investment(time_until_ending: timedelta, max_n_events: int, 
         n_events=max_n_events
     )
     
-    print(f"Selected {len(selected_events)} events for analysis")
+    logger.info(f"Selected {len(selected_events)} events for analysis")
     for event in selected_events:
-        print(f"- {event.title} (Volume: ${event.volume:,.0f})")
+        logger.info(f"- {event.title} (Volume: ${event.volume:,.0f})")
     
     launch_agent_event_investments(
         list_models=model_names,
@@ -57,13 +60,13 @@ def run_event_based_investment(time_until_ending: timedelta, max_n_events: int, 
         events=selected_events
     )
     
-    print("Event-based investment analysis complete!")
+    logger.info("Event-based investment analysis complete!")
     # TODO: Implement PnL calculation for event-based investments
 
 
 def run_market_based_investment(hyperparams: InvestmentHyperparameters) -> None:
     """Run legacy market-based investment simulation with multiple AI models."""
-    print("Using legacy market-based investment approach") 
+    logger.info("Using legacy market-based investment approach") 
     
     selected_markets = choose_markets(
         today_date=hyperparams.end_date, 
@@ -83,8 +86,8 @@ def run_market_based_investment(hyperparams: InvestmentHyperparameters) -> None:
         investment_dates=hyperparams.investment_dates, positions_df=positions_data
     )
 
-    print("Final PnL per agent:")
-    print(final_pnl_results)
+    logger.info("Final PnL per agent:")
+    logger.info(final_pnl_results)
 
 
 def main(hyperparams: InvestmentHyperparameters) -> None:

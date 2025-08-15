@@ -6,6 +6,9 @@ from pathlib import Path
 import pandas as pd
 
 from predibench.common import OUTPUT_PATH
+from predibench.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def collect_investment_choices(output_path: Path = OUTPUT_PATH) -> pd.DataFrame:
@@ -36,8 +39,8 @@ def collect_investment_choices(output_path: Path = OUTPUT_PATH) -> pd.DataFrame:
                                 }
                             )
                         except Exception as e:
-                            print(f"Error for {file}: {e}")
-                            print(data)
+                            logger.error(f"Error for {file}: {e}")
+                            logger.error(f"Data: {data}")
                             raise e
                             continue
     return pd.DataFrame.from_records(positions)

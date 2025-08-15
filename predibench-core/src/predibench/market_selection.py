@@ -12,6 +12,9 @@ from predibench.polymarket_api import (
     MarketsRequestParameters,
     EventsRequestParameters,
 )
+from predibench.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def _filter_interesting_questions(questions: list[str]) -> list[str]:
@@ -70,7 +73,7 @@ def _filter_events_by_volume_and_markets(events: list[Event], min_volume: float 
             # Checking that the event has been traded in the last 24 hours
             if not backward_mode and event.volume24hr and event.volume24hr > min_volume:  # Minimum volume threshold
                 filtered_events.append(event)
-        
+    # TODO: add filtering on markets
     return filtered_events
 
 # TODO: add tenacity retry for the requests
@@ -164,7 +167,7 @@ def choose_markets(today_date: date, n_markets: int = 10) -> list[Market]:
     old_questions_file = output_dir / "interesting_questions_old.json"
 
     if old_questions_file.exists():
-        print("LOADING INTERESTING QUESTIONS FROM FILE")
+        logger.info("Loading interesting questions from file")
         with open(old_questions_file, "r") as f:
             # where is the logic when from one week to another, we remove some interesting questions for newer ones ?
             interesting_questions = json.load(f)

@@ -8,6 +8,9 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from predibench.polymarket_api import Market, MarketsRequestParameters
+from predibench.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class PnlCalculator:
@@ -80,9 +83,9 @@ class PnlCalculator:
             )
             return pnls_
         else:
-            print("FLAGG")
-            print(self.returns.head())
-            print(self.positions.head())
+            logger.debug("PnL calculation debug info")
+            logger.debug(f"Returns head:\n{self.returns.head()}")
+            logger.debug(f"Positions head:\n{self.positions.head()}")
             pnls_ = pd.concat(
                 [
                     self._get_positions_begin_next_day(col).reindex(
@@ -347,13 +350,13 @@ def compute_pnls(investment_dates, positions_df: pd.DataFrame):
             os.makedirs(portfolio_output_path)
         fig.write_html(portfolio_output_path + ".html")
         fig.write_image(portfolio_output_path + ".png")
-        print(
-            f"\nPortfolio visualization saved to: {portfolio_output_path}.html and {portfolio_output_path}.png"
+        logger.info(
+            f"Portfolio visualization saved to: {portfolio_output_path}.html and {portfolio_output_path}.png"
         )
 
         final_pnl = float(cumulative_pnl.iloc[-1])
-        print(f"Final Cumulative PnL for {agent_name}: {final_pnl:.4f}")
-        print(cumulative_pnl)
+        logger.info(f"Final Cumulative PnL for {agent_name}: {final_pnl:.4f}")
+        logger.info(f"Cumulative PnL:\n{cumulative_pnl}")
 
         final_pnls[agent_name] = final_pnl
         cumulative_pnls[agent_name] = cumulative_pnl
@@ -384,24 +387,24 @@ def compute_cumulative_pnl(
     positions_agent_df = positions_agent_df.loc[
         :, positions_agent_df.columns.isin(returns_df.columns)
     ]
-    print("\nAnalyzing portfolio performance with PnlCalculator...")
+    logger.info("Analyzing portfolio performance with PnlCalculator...")
 
-    print("\nPositions Table (first 15 rows):")
-    print(positions_agent_df.head(15))
-    print(f"\nPositions shape: {positions_agent_df.shape}")
+    logger.info("Positions Table (first 15 rows):")
+    logger.info(f"\n{positions_agent_df.head(15)}")
+    logger.info(f"Positions shape: {positions_agent_df.shape}")
 
-    print("\nReturns Table (first 15 rows):")
-    print(returns_df.head(15))
-    print(f"\nReturns shape: {returns_df.shape}")
+    logger.info("Returns Table (first 15 rows):")
+    logger.info(f"\n{returns_df.head(15)}")
+    logger.info(f"Returns shape: {returns_df.shape}")
 
-    print("\nData summary:")
-    print(
+    logger.info("Data summary:")
+    logger.info(
         f"  Investment positions: {(positions_agent_df != 0.0).sum().sum()} out of {positions_agent_df.size} possible"
     )
-    print(
+    logger.info(
         f"  Non-zero returns: {(returns_df != 0).sum().sum()} out of {returns_df.notna().sum().sum()} non-NaN"
     )
-    print(
+    logger.info(
         f"  Returns range: {returns_df.min().min():.4f} to {returns_df.max().max():.4f}"
     )
 
@@ -409,7 +412,7 @@ def compute_cumulative_pnl(
 
     fig = engine.plot_pnl(stock_details=True)
 
-    print(engine.get_performance_metrics().round(2))
+    logger.info(f"Performance metrics:\n{engine.get_performance_metrics().round(2)}")
 
     cumulative_pnl = engine.pnl.sum(axis=1).cumsum()
     return cumulative_pnl, fig

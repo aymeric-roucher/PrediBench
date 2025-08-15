@@ -21,8 +21,11 @@ from smolagents import (
 
 from predibench.polymarket_api import Market, Event
 from predibench.utils import OUTPUT_PATH
+from predibench.logging import get_logger
 
 load_dotenv()
+
+logger = get_logger(__name__)
 
 
 class GoogleSearchTool(Tool):
@@ -79,8 +82,8 @@ class GoogleSearchTool(Tool):
         if response.status_code == 200:
             results = response.json()
         else:
-            print(f"Error response: {response.status_code}")
-            print(f"Response text: {response.text}")
+            logger.error(f"Error response: {response.status_code}")
+            logger.error(f"Response text: {response.text}")
             raise ValueError(response.json())
 
         if self.organic_key not in results.keys():
@@ -121,7 +124,7 @@ def final_answer(
     Args:
         answer: The final investment or non-investment decision. Do not invest in any outcome if you don't have a clear preference.
     """
-    print(f"Final answer: {answer}")
+    logger.info(f"Final answer: {answer}")
     return answer
 
 
@@ -139,8 +142,8 @@ def final_event_allocation(
     """
     total_allocation = sum(allocations.values())
     if total_allocation > 100.0:
-        print(f"Warning: Total allocation ({total_allocation}%) exceeds 100%")
-    print(f"Final event allocations: {allocations}")
+        logger.warning(f"Total allocation ({total_allocation}%) exceeds 100%")
+    logger.info(f"Final event allocations: {allocations}")
     return allocations
 
 
@@ -193,8 +196,8 @@ def agent_invest_positions(
     target_date: date,
 ) -> dict:
     """Let the agent decide on investment positions: 1 to buy, -1 to sell, 0 to do nothing"""
-    print("\nCreating investment positions with agent...")
-    print(target_date, markets[list(markets.keys())[0]].prices.index)
+    logger.info("Creating investment positions with agent...")
+    logger.debug(f"Target date: {target_date}, Available dates: {markets[list(markets.keys())[0]].prices.index}")
     assert target_date in markets[list(markets.keys())[0]].prices.index
 
     output_dir = (
@@ -206,13 +209,13 @@ def agent_invest_positions(
     choices = {}
     for question_id in prices_df.columns:
         if (output_dir / f"{question_id}.json").exists():
-            print(
+            logger.info(
                 f"Getting the result for market n°'{question_id}' for {model_id} on {target_date} from file."
             )
             response = json.load(open(output_dir / f"{question_id}.json"))
             choice = response["choice"]
         else:
-            print(
+            logger.info(
                 f"No results found in {output_dir / f'{question_id}.json'}, building them new."
             )
             market = markets[question_id]
@@ -285,7 +288,7 @@ def agent_invest_in_events(
     date: date,
 ) -> dict:
     """Let the agent decide on investment allocations across events"""
-    print(f"\nCreating event-based investment allocations with agent for {len(events)} events...")
+    logger.info(f"Creating event-based investment allocations with agent for {len(events)} events...")
     
     output_dir = (
         OUTPUT_PATH
@@ -297,7 +300,7 @@ def agent_invest_in_events(
     # Check if allocation already exists
     allocation_file = output_dir / "event_allocations.json"
     if allocation_file.exists():
-        print(f"Getting event allocations for {model_id} on {date} from file.")
+        logger.info(f"Getting event allocations for {model_id} on {date} from file.")
         with open(allocation_file) as f:
             return json.load(f)
     
@@ -472,7 +475,7 @@ def launch_agent_investments(list_models, investment_dates, prices_df, markets):
             for investment_date in investment_dates:
                 agent_invest_positions(model_id, markets, prices_df, investment_date)
         except Exception as e:
-            print(f"Error for {model_id}: {e}")
+            logger.error(f"Error for {model_id}: {e}")
             raise e
             continue
 
@@ -483,9 +486,9 @@ def launch_agent_event_investments(list_models, investment_dates, events):
         try:
             for investment_date in investment_dates:
                 allocations = agent_invest_in_events(model_id, events, investment_date)
-                print(f"Model {model_id} allocations for {investment_date}: {allocations}")
+                logger.info(f"Model {model_id} allocations for {investment_date}: {allocations}")
         except Exception as e:
-            print(f"Error for {model_id}: {e}")
+            logger.error(f"Error for {model_id}: {e}")
             continue
 
 
