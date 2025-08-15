@@ -9,6 +9,7 @@ from predibench.pnl import compute_pnls, get_historical_returns
 from predibench.common import OUTPUT_PATH
 from predibench.utils import collect_investment_choices
 from predibench.market_selection import choose_markets, choose_events
+from predibench.polymarket_data import save_events_to_file, load_events_from_file
 from predibench.logging import get_logger
 
 load_dotenv()
@@ -43,14 +44,20 @@ def run_event_based_investment(time_until_ending: timedelta, max_n_events: int, 
     today_date=datetime.now(timezone.utc)
     logger.info("Using event-based investment approach")
     
+    # Check for cached events
+    cache_file = OUTPUT_PATH / "cache" / "selected_events.json"
     
-    selected_events = choose_events(
-        today_date=today_date,
-        time_until_ending=time_until_ending,
-        n_events=max_n_events
-    )
-    
-    # TODO: add a saving mechanism
+    if cache_file.exists():
+        logger.info("Loading events from cache")
+        selected_events = load_events_from_file()
+    else:
+        logger.info("Fetching events from API")
+        selected_events = choose_events(
+            today_date=today_date,
+            time_until_ending=time_until_ending,
+            n_events=max_n_events
+        )
+        save_events_to_file(selected_events)
     
     logger.info(f"Selected {len(selected_events)} events for analysis")
     for event in selected_events:
