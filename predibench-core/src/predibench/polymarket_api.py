@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 import numpy as np
@@ -201,10 +201,16 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
     interval: Literal["1m", "1w", "1d", "6h", "1h", "max"] = "max"
     start_time: datetime | None = None
     end_time: datetime | None = None
-    fidelity_minutes: int = 60 * 24  # default to daily
 
-    def get_token_daily_timeseries(self) -> pd.Series:
-        """Get token timeseries data using this request configuration."""
+    def get_token_daily_timeseries(self) -> pd.Series | None:
+        """Get token timeseries data using this request configuration.
+        
+        Why no fidelity ? Because when the market is closed in an Event that is still open (bitcoin price for instance),
+        the argument fidelity will return an empty timeseries. Better get as much data as possible.
+        
+        Some markets are present in the API and yet without prices, it is because they are not used and not traded,
+        in that case we will return None
+        """
         url = "https://clob.polymarket.com/prices-history"
 
         params = {"market": self.market}
@@ -215,12 +221,12 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
             params["endTs"] = int(self.end_time.timestamp())
         if self.start_time is None and self.end_time is None:
             params["interval"] = self.interval
-        if self.fidelity_minutes is not None:
-            params["fidelity"] = str(self.fidelity_minutes)
 
         response = requests.get(url, params=params)
         response.raise_for_status()
         data = response.json()
+        if len(data["history"]) == 0:
+            return None
 
         timeseries = (
             pd.Series(
@@ -234,7 +240,8 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
             .last()
             .ffill()
         )
-        timeseries.index = timeseries.index.tz_localize(None).date
+        timeseries.index = timeseries.index.tz_localize(timezone.utc).date
+        
         return timeseries
 
 
