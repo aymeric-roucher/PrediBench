@@ -1,6 +1,6 @@
 import json
 import textwrap
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from smolagents import ChatMessage, LiteLLMModel
 
@@ -62,39 +62,50 @@ def _filter_out_resolved_markets(
     ]
 
 
-def _filter_events_by_volume_and_markets(events: list[Event], min_volume: float = 1000) -> list[Event]:
+def _filter_events_by_volume_and_markets(events: list[Event], min_volume: float = 1000, backward_mode: bool = False) -> list[Event]:
     """Filter events based on volume threshold and presence of markets."""
     filtered_events = []
     for event in events:
         if event.markets and len(event.markets) > 0:
-            # Check if event has volume and is interesting
-            if event.volume24hr and event.volume24hr > min_volume:  # Minimum volume threshold
+            # Checking that the event has been traded in the last 24 hours
+            if not backward_mode and event.volume24hr and event.volume24hr > min_volume:  # Minimum volume threshold
                 filtered_events.append(event)
         
     return filtered_events
 
-
+# TODO: add tenacity retry for the requests
 # TODO: all of the parameters here should be threated as hyper parameters
-def choose_events(today_date: date, n_events: int) -> list[Event]:
-    """Pick top events by volume for investment."""
+def choose_events(today_date: datetime, time_until_ending: timedelta, n_events: int, key_for_filtering: str = "volume", min_volume: float = 1000, backward_mode: bool = False) -> list[Event]:
+    """Pick top events by volume for investment for the current week
+    
+    backward_mode: if True, then events ending around this date will be selected, but those events are probably closed, we can't use the volume24hr to filter out the events that are open.
+    """
+
     request_parameters = EventsRequestParameters(
         limit=500,
-        order="volume1wk",
+        order=key_for_filtering,
         ascending=False,
-        end_date_min=today_date + timedelta(days=1),
-        end_date_max=today_date + timedelta(days=21),
+        end_date_min=today_date,
+        end_date_max=today_date + time_until_ending,
     )
     events = request_parameters.get_events()
     
-    filtered_events = _filter_events_by_volume_and_markets(events=events)
+    if not backward_mode:
+        filtered_events = _filter_events_by_volume_and_markets(events=events, min_volume=min_volume)
+    else:
+        filtered_events = events
     filtered_events = filtered_events[:n_events]
     
     for event in filtered_events:
         for market in event.markets:
-            market.fill_prices(
-                start_time=today_date - timedelta(days=7),
-                end_time=today_date
-            )
+            # here it would be able to
+            if backward_mode:
+                market.fill_prices(
+                    start_time=today_date - timedelta(days=7),
+                    end_time=today_date
+                )
+            else:
+                market.fill_prices()
 
     output_dir = OUTPUT_PATH
     output_dir.mkdir(exist_ok=True)

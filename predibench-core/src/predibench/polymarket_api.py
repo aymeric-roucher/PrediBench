@@ -51,7 +51,7 @@ class Market(BaseModel, arbitrary_types_allowed=True):
     outcomes: list[MarketOutcome]
     prices: pd.Series | None = None
 
-    def fill_prices(self, start_time: datetime, end_time: datetime, interval: str = "1d") -> None:
+    def fill_prices(self, start_time: datetime | None = None, end_time: datetime | None = None) -> None:
         """Fill the prices field with timeseries data.
         
         Args:
@@ -59,15 +59,15 @@ class Market(BaseModel, arbitrary_types_allowed=True):
             end_time: End time for timeseries data
             interval: Time interval for data points (default: "1d")
         """
-        if self.outcomes and len(self.outcomes) > 0 and self.outcomes[0].clob_token_id:
+        if self.outcomes and len(self.outcomes) > 0 and self.outcomes[0].clob_token_id and self.outcomes[0].name == "Yes":
             ts_request = _HistoricalTimeSeriesRequestParameters(
                 market=self.outcomes[0].clob_token_id,
                 start_time=start_time,
                 end_time=end_time,
-                interval=interval,
             )
             self.prices = ts_request.get_token_daily_timeseries()
         else:
+            print(f"Incorrect outcomes for market {self.id}")
             self.prices = None
 
     @staticmethod
@@ -195,7 +195,7 @@ class MarketsRequestParameters(_RequestParameters):
 
 class _HistoricalTimeSeriesRequestParameters(BaseModel):
     market: str
-    interval: Literal["1m", "1w", "1d", "6h", "1h", "max"] = "1d"
+    interval: Literal["1m", "1w", "1d", "6h", "1h", "max"] = "max"
     start_time: datetime | None = None
     end_time: datetime | None = None
     fidelity_minutes: int = 60 * 24  # default to daily
@@ -210,7 +210,8 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
             params["startTs"] = int(self.start_time.timestamp())
         if self.end_time is not None:
             params["endTs"] = int(self.end_time.timestamp())
-        params["interval"] = self.interval
+        if self.start_time is None and self.end_time is None:
+            params["interval"] = self.interval
         if self.fidelity_minutes is not None:
             params["fidelity"] = str(self.fidelity_minutes)
 

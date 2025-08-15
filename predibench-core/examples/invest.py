@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
+
 
 from dotenv import load_dotenv
 
@@ -33,13 +34,17 @@ HYPERPARAMETERS = InvestmentHyperparameters(
 )
 
 
-def run_event_based_investment(hyperparams: InvestmentHyperparameters) -> None:
+def run_event_based_investment(time_until_ending: timedelta, max_n_events: int, model_names: list[str], investment_dates: list[date]) -> None:
     """Run event-based investment simulation with multiple AI models."""
+    
+    today_date=datetime.now(timezone.utc)
     print("Using event-based investment approach")
     
+    
     selected_events = choose_events(
-        today_date=hyperparams.end_date, 
-        n_events=hyperparams.n_events
+        today_date=today_date,
+        time_until_ending=time_until_ending,
+        n_events=max_n_events
     )
     
     print(f"Selected {len(selected_events)} events for analysis")
@@ -47,8 +52,8 @@ def run_event_based_investment(hyperparams: InvestmentHyperparameters) -> None:
         print(f"- {event.title} (Volume: ${event.volume:,.0f})")
     
     launch_agent_event_investments(
-        list_models=hyperparams.model_names,
-        investment_dates=hyperparams.investment_dates,
+        list_models=model_names,
+        investment_dates=investment_dates,
         events=selected_events
     )
     
@@ -92,4 +97,4 @@ def main(hyperparams: InvestmentHyperparameters) -> None:
 
 
 if __name__ == "__main__":
-    main(hyperparams=HYPERPARAMETERS)
+    run_event_based_investment(time_until_ending=timedelta(days=21), max_n_events=3, model_names=["test_random"], investment_dates=[date(2025, 7, 25), date(2025, 8, 1)])
