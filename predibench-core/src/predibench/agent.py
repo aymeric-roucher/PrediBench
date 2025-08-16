@@ -282,165 +282,6 @@ def agent_invest_positions(
     return choices
 
 
-def agent_invest_in_events(
-    model_id: str,
-    events: list[Event],
-    date: date,
-) -> dict:
-    """Let the agent decide on investment allocations across events"""
-    logger.info(f"Creating event-based investment allocations with agent for {len(events)} events...")
-    
-    output_dir = (
-        OUTPUT_PATH
-        / f"smolagent_events_{model_id}".replace("/", "--")
-        / date.strftime("%Y-%m-%d")
-    )
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # Check if allocation already exists
-    allocation_file = output_dir / "event_allocations.json"
-    if allocation_file.exists():
-        logger.info(f"Getting event allocations for {model_id} on {date} from file.")
-        with open(allocation_file) as f:
-            return json.load(f)
-    
-    # Build event descriptions for the prompt
-    events_description = ""
-    for i, event in enumerate(events):
-        events_description += f"\n\n--- EVENT {i+1}: {event.title} ---\n"
-        events_description += f"Event ID: {event.id}\n"
-        if event.description:
-            events_description += f"Description: {event.description}\n"
-        events_description += f"Volume: ${event.volume:,.2f}\n" if event.volume else "Volume: N/A\n"
-        events_description += f"Liquidity: ${event.liquidity:,.2f}\n" if event.liquidity else "Liquidity: N/A\n"
-        
-        if event.end_date:
-            events_description += f"End Date: {event.end_date.strftime('%Y-%m-%d')}\n"
-        
-        events_description += "Markets in this event:\n"
-        for j, market in enumerate(event.markets):
-            events_description += f"  {j+1}. {market.question}\n"
-            for outcome in market.outcomes:
-                events_description += f"     - {outcome.name}: {outcome.price:.3f}\n"
-            
-            # Add price history if available
-            if market.prices is not None and len(market.prices) > 0:
-                recent_prices = market.prices.tail(7)  # Last 7 days
-                events_description += f"     Recent 'Yes' price history:\n"
-                for price_date, price in recent_prices.items():
-                    events_description += f"       {price_date}: {price:.3f}\n"
-    
-    full_prompt = textwrap.dedent(f"""
-        You are a professional prediction market investor analyzing events on {date.strftime("%B %d, %Y")}.
-        
-        Your task is to allocate a $10,000 portfolio across the following events. You can allocate 0-100% to each event.
-        The total allocation should not exceed 100% of your portfolio.
-        
-        For each event, consider:
-        1. The quality and clarity of the questions
-        2. Current market prices vs your assessment of true probabilities
-        3. Available liquidity and volume
-        4. Time until resolution
-        5. Your confidence level in your predictions
-        
-        Here are the events to analyze:
-        {events_description}
-        
-        Please provide a detailed analysis of each event, then use the final_event_allocation tool to specify 
-        your percentage allocation to each event (using the event IDs).
-        
-        Example allocation: {{"event_123": 25.0, "event_456": 15.0, "event_789": 0.0}}
-        
-        Only invest in events where you have strong conviction that the market is mispricing the outcomes.
-        It's perfectly fine to allocate 0% to events you're uncertain about.
-    """)
-    
-    if model_id.endswith("-deep-research"):
-        response = run_deep_research_events(model_id, full_prompt, date)
-    elif model_id == "test_random":
-        # Random allocation for testing
-        allocations = {}
-        remaining = 100.0
-        for event in events[:-1]:  # All but last
-            allocation = np.random.uniform(0, remaining * 0.3)  # Max 30% per event
-            allocations[event.id] = round(allocation, 1)
-            remaining -= allocation
-        allocations[events[-1].id] = max(0, round(remaining * np.random.uniform(0, 0.5), 1))
-        
-        response = {"allocations": allocations}
-    else:
-        agent_response = run_smolagent_events(model_id, full_prompt, date)
-        response = {"allocations": agent_response.output if isinstance(agent_response.output, dict) else {}}
-    
-    # Save the allocation
-    with open(allocation_file, "w") as f:
-        json.dump(response, f, indent=2, default=str)
-    
-    return response.get("allocations", {})
-
-
-def run_smolagent_events(
-    model_id: str, 
-    prompt: str, 
-    cutoff_date: date
-) -> RunResult:
-    """Run smolagent with event allocation tools"""
-    if model_id.startswith("huggingface/"):
-        model = InferenceClientModel(
-            model_id=model_id.replace("huggingface/", ""),
-            requests_per_minute=10,
-        )
-    else:
-        model = OpenAIModel(
-            model_id=model_id,
-            requests_per_minute=10,
-        )
-    
-    tools = [
-        GoogleSearchTool(provider="serper", cutoff_date=cutoff_date),
-        VisitWebpageTool(),
-        final_event_allocation,
-    ]
-    
-    agent = ToolCallingAgent(
-        tools=tools, model=model, max_steps=40, return_full_result=True
-    )
-    return agent.run(prompt)
-
-
-def run_deep_research_events(
-    model_id: str,
-    prompt: str, 
-    cutoff_date: date,
-) -> dict:
-    """Run deep research for event allocation"""
-    from openai import OpenAI
-    
-    client = OpenAI(timeout=3600)
-    
-    response = client.responses.create(
-        model=model_id,
-        input=prompt + "\n\nProvide your allocation as a JSON object with event IDs as keys and percentages as values.",
-        tools=[
-            {"type": "web_search_preview"},
-            {"type": "code_interpreter", "container": {"type": "auto"}},
-        ],
-    )
-    
-    output_text = response.output_text
-    # Try to extract JSON allocation from response
-    try:
-        import re
-        json_match = re.search(r'\{.*\}', output_text, re.DOTALL)
-        if json_match:
-            allocations = json.loads(json_match.group())
-            return {"allocations": allocations}
-    except:
-        pass
-    
-    return {"allocations": {}}
-
-
 def run_deep_research(
     model_id: str,
     question: str,
@@ -467,8 +308,6 @@ def run_deep_research(
         token_usage=TokenUsage(0, 0),
         timing=Timing(0.0),
     )
-
-
 def launch_agent_investments(list_models, investment_dates, prices_df, markets):
     for model_id in list_models:
         try:
@@ -478,20 +317,6 @@ def launch_agent_investments(list_models, investment_dates, prices_df, markets):
             logger.error(f"Error for {model_id}: {e}")
             raise e
             continue
-
-
-def launch_agent_event_investments(list_models, investment_dates, events):
-    """Launch event-based investment analysis with multiple models"""
-    for model_id in list_models:
-        try:
-            for investment_date in investment_dates:
-                allocations = agent_invest_in_events(model_id, events, investment_date)
-                logger.info(f"Model {model_id} allocations for {investment_date}: {allocations}")
-        except Exception as e:
-            logger.error(f"Error for {model_id}: {e}")
-            continue
-
-
 if __name__ == "__main__":
     run_smolagent(
         "gpt-4.1",

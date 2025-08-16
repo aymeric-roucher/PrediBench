@@ -87,9 +87,10 @@ def event_from_dict(event_data: dict[str, Any]) -> Event:
     return Event(**event_data)
 
 
-def save_events_to_file(events: list[Event], filename: str = "selected_events.json") -> None:
+def save_events_to_file(events: list[Event], file_path: Path | None = None) -> None:
     """Save a list of Event objects to a JSON file."""
-    file_path = CACHE_PATH / filename
+    if file_path is None:
+        file_path = CACHE_PATH / "selected_events.json"
     
     # Use the event_to_dict function for each event
     events_data = [event_to_dict(event) for event in events]
@@ -100,9 +101,9 @@ def save_events_to_file(events: list[Event], filename: str = "selected_events.js
     logger.info(f"Saved {len(events)} events to cache: {file_path}")
 
 
-def load_events_from_file(filename: str = "selected_events.json") -> list[Event]:
+def load_events_from_file(file_path: Path | None = None) -> list[Event]:
     """Load a list of Event objects from a JSON file."""
-    file_path = CACHE_PATH / filename
+    
     if not file_path.exists():
         raise FileNotFoundError(f"Cache file not found: {file_path}")
     
