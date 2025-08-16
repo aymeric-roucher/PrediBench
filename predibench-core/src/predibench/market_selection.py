@@ -66,10 +66,13 @@ def _filter_out_resolved_markets(
 
 def _remove_markets_without_prices_in_events(events: list[Event]) -> list[Event]:
     """Remove markets that have no prices"""
+    filtered_events = []
     for event in events:
         market_filtered = [market for market in event.markets if market.prices is not None and len(market.prices) >= 1]
         event.markets = market_filtered
-    return events
+        if len(market_filtered) > 0:
+            filtered_events.append(event)
+    return filtered_events
 
 
 def _filter_events_by_volume_and_markets(events: list[Event], min_volume: float = 1000, backward_mode: bool = False) -> list[Event]:
@@ -90,13 +93,13 @@ def choose_events(today_date: datetime, time_until_ending: timedelta, n_events: 
     
     backward_mode: if True, then events ending around this date will be selected, but those events are probably closed, we can't use the volume24hr to filter out the events that are open.
     """
-
+    end_date = today_date + time_until_ending
     request_parameters = EventsRequestParameters(
         limit=500,
         order=key_for_filtering,
         ascending=False,
         end_date_min=today_date,
-        end_date_max=today_date + time_until_ending,
+        end_date_max=end_date,
     )
     events = request_parameters.get_events()
     
@@ -111,7 +114,7 @@ def choose_events(today_date: datetime, time_until_ending: timedelta, n_events: 
         for market in event.markets:
             if backward_mode:
                 market.fill_prices(
-                    end_time=today_date
+                    end_time=end_date
                 )
             else:
                 market.fill_prices()
