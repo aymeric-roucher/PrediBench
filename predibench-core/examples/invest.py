@@ -20,6 +20,7 @@ def run_investments_for_today(
     model_names: list[str], 
     output_path: Path,
     backward_date: date | None = None,
+    load_from_cache: bool = False,
 ) -> None:
     """Run event-based investment simulation with multiple AI models."""
     
@@ -41,9 +42,9 @@ def run_investments_for_today(
     # Define cache file path within the date-specific output directory
     cache_file = date_output_path / "events_cache.json"
     
-    if cache_file.exists():
+    if cache_file.exists() and load_from_cache:
         logger.info("Loading events from cache")
-        selected_events = load_events_from_file(filename=cache_file)
+        selected_events = load_events_from_file(file_path=cache_file)
     else:
         logger.info("Fetching events from API")
         selected_events = choose_events(

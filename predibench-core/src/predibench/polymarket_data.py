@@ -28,10 +28,16 @@ def market_to_dict(market: Market) -> dict[str, Any]:
     
     # Serialize pandas Series to JSON-compatible format
     if market_dict.get('prices') is not None and isinstance(market_dict['prices'], pd.Series):
+        series = market_dict['prices']
+        # Convert index to datetime first to ensure consistent serialization
+        if not isinstance(series.index, pd.DatetimeIndex):
+            series = series.copy()
+            series.index = pd.to_datetime(series.index)
+        
         market_dict['prices'] = {
-            'data': market_dict['prices'].to_dict(),
-            'index': market_dict['prices'].index.tolist(),
-            'name': market_dict['prices'].name
+            'values': series.values.tolist(),
+            'index': [idx.isoformat() for idx in series.index],
+            'name': series.name
         }
     
     return market_dict
@@ -53,13 +59,14 @@ def market_from_dict(market_data: dict[str, Any]) -> Market:
     
     # Deserialize pandas Series from JSON-compatible format
     if market_data.get('prices') is not None and isinstance(market_data['prices'], dict):
-        if 'data' in market_data['prices']:
-            prices_data = market_data['prices']
-            market_data['prices'] = pd.Series(
-                data=list(prices_data['data'].values()),
-                index=prices_data['index'],
-                name=prices_data.get('name')
-            )
+        prices_data = market_data['prices']
+        # Always deserialize as DatetimeIndex for consistency
+        index = pd.to_datetime(prices_data['index'])
+        market_data['prices'] = pd.Series(
+            data=prices_data['values'],
+            index=index,
+            name=prices_data.get('name')
+        )
     elif market_data.get('prices') is None:
         market_data['prices'] = None
     
