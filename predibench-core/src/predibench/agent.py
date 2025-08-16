@@ -21,7 +21,7 @@ from smolagents import (
 
 from predibench.polymarket_api import Market, Event
 from predibench.utils import OUTPUT_PATH
-from predibench.logging import get_logger
+from predibench.logger_config import get_logger
 
 load_dotenv()
 

@@ -24,7 +24,7 @@ from predibench.utils import convert_polymarket_time_to_datetime
 from pydantic import BaseModel
 
 from predibench.common import BASE_URL_POLYMARKET
-from predibench.logging import get_logger
+from predibench.logger_config import get_logger
 
 MAX_INTERVAL_TIMESERIES = timedelta(days=14, hours=23, minutes=0)
 # NOTE: above is refined by experience: seems independant from the resolution

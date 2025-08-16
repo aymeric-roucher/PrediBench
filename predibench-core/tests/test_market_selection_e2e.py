@@ -16,7 +16,7 @@ import pandas as pd
 
 from predibench.market_selection import choose_events
 from predibench.polymarket_data import save_events_to_file, load_events_from_file, CACHE_PATH
-from predibench.logging import get_logger
+from predibench.logger_config import get_logger
 
 logger = get_logger(__name__)
 

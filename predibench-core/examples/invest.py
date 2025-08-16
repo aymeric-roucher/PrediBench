@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from predibench.agent import launch_agent_investments
 from predibench.market_selection import choose_events
 from predibench.polymarket_data import save_events_to_file, load_events_from_file
-from predibench.logging import get_logger
+from predibench.logger_config import get_logger
 
 load_dotenv()
 

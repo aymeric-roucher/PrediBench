@@ -12,7 +12,7 @@ from predibench.polymarket_api import (
     MarketsRequestParameters,
     EventsRequestParameters,
 )
-from predibench.logging import get_logger
+from predibench.logger_config import get_logger
 
 logger = get_logger(__name__)
 
