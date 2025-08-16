@@ -3,6 +3,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 from predibench.common import OUTPUT_PATH
 from predibench.polymarket_api import Event, Market, MarketOutcome
 from predibench.logging import get_logger
@@ -24,8 +26,13 @@ def market_to_dict(market: Market) -> dict[str, Any]:
     if market_dict.get('createdAt'):
         market_dict['createdAt'] = market_dict['createdAt'].isoformat()
     
-    # Remove pandas Series data (can't serialize)
-    market_dict.pop('prices', None)
+    # Serialize pandas Series to JSON-compatible format
+    if market_dict.get('prices') is not None and isinstance(market_dict['prices'], pd.Series):
+        market_dict['prices'] = {
+            'data': market_dict['prices'].to_dict(),
+            'index': market_dict['prices'].index.tolist(),
+            'name': market_dict['prices'].name
+        }
     
     return market_dict
 
@@ -44,8 +51,17 @@ def market_from_dict(market_data: dict[str, Any]) -> Market:
         outcomes.append(MarketOutcome(**outcome_data))
     market_data['outcomes'] = outcomes
     
-    # prices will be None (not serialized)
-    market_data['prices'] = None
+    # Deserialize pandas Series from JSON-compatible format
+    if market_data.get('prices') is not None and isinstance(market_data['prices'], dict):
+        if 'data' in market_data['prices']:
+            prices_data = market_data['prices']
+            market_data['prices'] = pd.Series(
+                data=list(prices_data['data'].values()),
+                index=prices_data['index'],
+                name=prices_data.get('name')
+            )
+    elif market_data.get('prices') is None:
+        market_data['prices'] = None
     
     return Market(**market_data)
 

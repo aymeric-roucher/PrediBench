@@ -12,6 +12,8 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pandas as pd
+
 from predibench.market_selection import choose_events
 from predibench.polymarket_data import save_events_to_file, load_events_from_file, CACHE_PATH
 from predibench.logging import get_logger
@@ -109,6 +111,21 @@ def test_choose_events_event_caching_e2e():
             assert orig_market.question == loaded_market.question, f"Market question mismatch for event {i}"
             assert len(orig_market.outcomes) == len(loaded_market.outcomes), \
                 f"Market outcomes count mismatch for event {i}"
+            
+            # Check pandas Series prices preservation
+            if orig_market.prices is not None:
+                assert loaded_market.prices is not None, f"Prices Series lost during serialization for market {orig_market.id}"
+                assert isinstance(loaded_market.prices, pd.Series), f"Prices should be a pandas Series for market {orig_market.id}"
+                assert orig_market.prices.name == loaded_market.prices.name, f"Series name mismatch for market {orig_market.id}"
+                assert len(orig_market.prices) == len(loaded_market.prices), f"Series length mismatch for market {orig_market.id}"
+                
+                # Check that values and index are preserved
+                pd.testing.assert_series_equal(orig_market.prices, loaded_market.prices, 
+                                             check_names=True, check_dtype=False,
+                                             msg=f"Pandas Series content mismatch for market {orig_market.id}")
+                logger.info(f"✓ Pandas Series correctly preserved for market {orig_market.id} (length: {len(orig_market.prices)})")
+            else:
+                assert loaded_market.prices is None, f"Prices should be None for market {orig_market.id}"
     
     logger.info("✓ All data integrity checks passed!")
     
