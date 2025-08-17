@@ -22,7 +22,7 @@ def calculate_pnl_and_performance(positions_df: pd.DataFrame):
     """Calculate real PnL and performance metrics for each agent using historical market data"""
     investment_dates = sorted(positions_df["date"].unique())
     portfolio_daily_pnls, portfolio_cumulative_pnls, figures = compute_pnls(
-        investment_dates, positions_df
+        investment_dates, positions_df, write_plots=False
     )
 
     # Convert to the format expected by frontend
