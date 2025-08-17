@@ -7,7 +7,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from predibench.logging import get_logger
+from predibench.logger_config import get_logger
 from predibench.polymarket_api import Market, MarketsRequestParameters
 
 logger = get_logger(__name__)
