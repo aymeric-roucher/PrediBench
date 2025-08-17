@@ -54,14 +54,9 @@ class ModelInvestmentResult(BaseModel):
     event_results: list[EventInvestmentResult]
 
 
-class MarketDecision(BaseModel):
+class EventDecisions(BaseModel):
     reasoning: str
     decision: Literal["BUY", "SELL", "NOTHING"]
-
-
-class EventDecisions(BaseModel):
-    decisions: dict[str, MarketDecision]
-    overall_reasoning: str
 
 
 class GoogleSearchTool(Tool):
@@ -151,12 +146,12 @@ class GoogleSearchTool(Tool):
 
 
 @tool
-def validate_event_decisions_json(json_str: str) -> EventDecisions:
+def final_answer(json_str: str) -> EventDecisions:
     """
-    This tool is used to validate the output of the event decisions agent.
+    This tool is used to validate the output of the event decision agent.
     
     Args:
-        json_str (str): The JSON string to validate for event decisions.
+        json_str (str): The JSON string to validate for event decision.
         
     Returns:
         EventDecisions: The validated EventDecisions object, raises error if invalid.
@@ -214,7 +209,7 @@ def run_smolagent_for_event(
         
         You must return a valid JSON object that matches the EventDecisions schema and nothing else.
         
-        Use the validate_event_decisions_json tool to validate your output before providing the final answer.
+        Use the validate_event_decision_json tool to validate your output before providing the final answer.
         Give your final answer only if it passes the validation.
         """,
         input_variables=["question"],
@@ -227,7 +222,7 @@ def run_smolagent_for_event(
     tools = [
         GoogleSearchTool(provider="serper", cutoff_date=cutoff_date),
         VisitWebpageTool(),
-        validate_event_decisions_json,
+        final_answer,
     ]
     agent = ToolCallingAgent(
         tools=tools, model=model, max_steps=40, return_full_result=True
@@ -239,51 +234,30 @@ def run_smolagent_for_event(
     return EventDecisions.model_validate_json(result.output)
 
 
-def create_market_investment_decisions(
-    event_decisions: EventDecisions, 
-    market_data: list
-) -> list[MarketInvestmentDecision]:
-    """Convert EventDecisions to MarketInvestmentDecision objects, handling closed markets."""
-    market_decisions = []
-    
-    for market_info in market_data:
-        market_id = market_info['id']
-        
-        if market_id in event_decisions.decisions:
-            decision_data = event_decisions.decisions[market_id]
-            # Force NOTHING for closed markets
-            if market_info['is_closed']:
-                market_decision = MarketInvestmentDecision(
-                    market_id=market_id,
-                    market_question=market_info['question'],
-                    decision="NOTHING",
-                    reasoning=f"Market is closed. Original reasoning: {decision_data.reasoning}",
-                    market_price=market_info['current_price'],
-                    is_closed=True
-                )
-            else:
-                market_decision = MarketInvestmentDecision(
-                    market_id=market_id,
-                    market_question=market_info['question'],
-                    decision=decision_data.decision,
-                    reasoning=decision_data.reasoning,
-                    market_price=market_info['current_price'],
-                    is_closed=False
-                )
-        else:
-            # Fallback if market not in decisions
-            market_decision = MarketInvestmentDecision(
-                market_id=market_id,
-                market_question=market_info['question'],
-                decision="NOTHING",
-                reasoning="No decision provided by agent" + (" - Market is closed" if market_info['is_closed'] else ""),
-                market_price=market_info['current_price'],
-                is_closed=market_info['is_closed']
-            )
-        
-        market_decisions.append(market_decision)
-    
-    return market_decisions
+def create_market_investment_decision(
+    event_decision: EventDecisions, 
+    selected_market_info: dict
+) -> MarketInvestmentDecision:
+    """Convert single EventDecision to MarketInvestmentDecision object for the selected market."""
+    # Force NOTHING for closed markets
+    if selected_market_info['is_closed']:
+        return MarketInvestmentDecision(
+            market_id=selected_market_info['id'],
+            market_question=selected_market_info['question'],
+            decision="NOTHING",
+            reasoning=f"Market is closed. Original reasoning: {event_decision.reasoning}",
+            market_price=selected_market_info['current_price'],
+            is_closed=True
+        )
+    else:
+        return MarketInvestmentDecision(
+            market_id=selected_market_info['id'],
+            market_question=selected_market_info['question'],
+            decision=event_decision.decision,
+            reasoning=event_decision.reasoning,
+            market_price=selected_market_info['current_price'],
+            is_closed=False
+        )
 
 
 def run_deep_research(
@@ -362,11 +336,21 @@ def process_single_model(model: ApiModel | str, events: list[Event], target_date
 
 
 def process_event_investment(model: ApiModel | str, event: Event, target_date: date, backward_mode: bool) -> EventInvestmentResult:
-    """Process investment decisions for all markets in an event."""
-    logger.info(f"Processing event: {event.title} with {len(event.markets)} markets")
+    """Process investment decision for the selected market in an event."""
+    logger.info(f"Processing event: {event.title} with selected market")
     
-    # Prepare market data for all markets in the event
+    if not event.selected_market_id:
+        raise ValueError(f"Event '{event.title}' has no selected market for prediction")
+    
+    # Find the selected market
+    selected_market = next((m for m in event.markets if m.id == event.selected_market_id), None)
+    if not selected_market:
+        raise ValueError(f"Selected market {event.selected_market_id} not found in event {event.title}")
+    
+    # Prepare market data for all markets (for context) but focus on selected one
     market_data = []
+    selected_market_info = None
+    
     for market in event.markets:
         if market.prices is None:
             raise ValueError("markets are supposed to be filtered, this should not be possible")
@@ -404,21 +388,33 @@ def process_event_investment(model: ApiModel | str, event: Event, target_date: d
             "price_outcome_name": market.price_outcome_name or "Unknown outcome"
         }
         market_data.append(market_info)
+        
+        # Keep track of the selected market info
+        if market.id == event.selected_market_id:
+            selected_market_info = market_info
     
-    # Create comprehensive question for all markets in the event
-    market_summaries = []
+    # Create context summaries for all markets
+    context_summaries = []
+    target_market_summary = ""
+    
     for i, market_info in enumerate(market_data, 1):
         closed_status = " (MARKET CLOSED - NO BETTING ALLOWED)" if market_info['is_closed'] else ""
         outcome_name = market_info['price_outcome_name']
+        is_target = " **[TARGET MARKET FOR DECISION]**" if market_info['id'] == event.selected_market_id else ""
+        
         summary = f"""
-Market {i} (ID: {market_info['id']}){closed_status}:
+Market {i} (ID: {market_info['id']}){closed_status}{is_target}:
 Question: {market_info['question']}
 Description: {market_info['description']}
 Historical prices for the named outcome "{outcome_name}":
 {market_info['recent_prices']}
 Last available price for "{outcome_name}": {market_info['current_price']}
         """
-        market_summaries.append(summary)
+        
+        if market_info['id'] == event.selected_market_id:
+            target_market_summary = summary
+        else:
+            context_summaries.append(summary)
     
     full_question = f"""
 Date: {target_date.strftime("%B %d, %Y")}
@@ -426,44 +422,42 @@ Date: {target_date.strftime("%B %d, %Y")}
 Event: {event.title}
 Event Description: {event.description or "No description provided"}
 
-You are analyzing {len(event.markets)} markets within this event. Consider how these markets might be related and make informed investment decisions.
+IMPORTANT: You must make a decision ONLY on the TARGET MARKET marked below. The other markets are provided for context to help you understand the broader event.
 
-Markets to analyze:
-{"".join(market_summaries)}
+TARGET MARKET FOR DECISION:
+{target_market_summary}
 
-For each market, decide whether to BUY (if the shown outcome is undervalued), SELL (if the shown outcome is overvalued), or do NOTHING (if fairly priced or uncertain).
-Note: The prices shown are specifically for the named outcome in each market. BUY means you think that outcome is more likely than the current price suggests.
-Consider market correlations within this event when making decisions.
+CONTEXT MARKETS (for information only):
+{"".join(context_summaries)}
 
-Use the final_market_decisions tool to provide your decisions with reasoning for each market.
+For the TARGET MARKET ONLY, decide whether to BUY (if the shown outcome is undervalued), SELL (if the shown outcome is overvalued), or do NOTHING (if fairly priced or uncertain).
+
+Note: The prices shown are specifically for the named outcome. BUY means you think that outcome is more likely than the current price suggests.
+Consider how the context markets might relate to your target market decision.
+
+Provide your decision and reasoning for the TARGET MARKET only.
     """
     
     # Get agent decisions using smolagents
     if isinstance(model, str) and model == "test_random":
-        # Generate random decisions for testing
-        decisions_dict = {}
-        for market_info in market_data:
-            choice = np.random.choice(["BUY", "SELL", "NOTHING"], p=[0.3, 0.3, 0.4])
-            decisions_dict[market_info['id']] = MarketDecision(
-                decision=choice,
-                reasoning=f"Random decision for testing market {market_info['id']}"
-            )
-        event_decisions = EventDecisions(
-            decisions=decisions_dict,
-            overall_reasoning="Random decisions generated for testing purposes"
+        # Generate random decision for testing
+        choice = np.random.choice(["BUY", "SELL", "NOTHING"], p=[0.3, 0.3, 0.4])
+        event_decision = EventDecisions(
+            decision=choice,
+            reasoning=f"Random decision for testing market {event.selected_market_id}"
         )
     else:
-        event_decisions = run_smolagent_for_event(model, full_question, cutoff_date=target_date)
+        event_decision = run_smolagent_for_event(model, full_question, cutoff_date=target_date)
     
-    # Convert to MarketInvestmentDecision objects using helper function
-    market_decisions = create_market_investment_decisions(event_decisions, market_data)
+    # Convert to MarketInvestmentDecision object for the selected market only
+    market_decision = create_market_investment_decision(event_decision, selected_market_info)
     
     return EventInvestmentResult(
         event_id=event.id,
         event_title=event.title,
         event_description=event.description,
-        market_decisions=market_decisions,
-        overall_reasoning=event_decisions.overall_reasoning
+        market_decisions=[market_decision],  # Only one decision now
+        overall_reasoning=event_decision.reasoning
     )
 
 
@@ -479,9 +473,3 @@ def save_model_result(model_result: ModelInvestmentResult, target_date: date) ->
         f.write(model_result.model_dump_json(indent=2))
     
     logger.info(f"Saved model result to {filepath}")
-if __name__ == "__main__":
-    run_smolagent(
-        "gpt-4.1",
-        "Will the S&P 500 close above 4,500 by the end of the year?",
-        datetime(2024, 6, 1),
-    )

@@ -88,7 +88,6 @@ def compute_pnl_between_dates_for_model(model_name: str, start_date: date, end_d
 if __name__ == "__main__":
     # List of models to use for investments
     models = [
-        "test_random",
         InferenceClientModel(model_id="openai/gpt-oss-120b"),
         # InferenceClientModel(model_id="openai/gpt-oss-20b"),
         # InferenceClientModel(model_id="Qwen/Qwen3-30B-A3B-Instruct-2507"),
