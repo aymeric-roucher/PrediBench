@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date
 
 import numpy as np
 import pandas as pd
@@ -309,19 +309,19 @@ def validate_continuous_returns(
 
 
 def get_pnls(
-    investment_dates, positions_df: pd.DataFrame, write_plots: bool = False
+    positions_df: pd.DataFrame, write_plots: bool = False, end_date: date = None
 ) -> dict[str, PnlCalculator]:
     """Builds PnL calculators for each agent in the positions dataframe.
 
     Args:
-        investment_dates: list of dates to use for the investment
         positions_df: DataFrame with positions data indexed by date
         write_plots: bool, if True, will write plots to the current directory
+        end_date: date to use for the investment
     """
     # Validate that we have continuous returns data
-    expected_start = investment_dates[0]
+    expected_start = positions_df["date"].min()
     # should be a hyper parameters
-    expected_end = investment_dates[-1] + timedelta(days=7)
+    expected_end = end_date
     markets = {}
     for market_id in positions_df["market_id"].unique():
         request_parameters = MarketsRequestParameters(
@@ -342,7 +342,7 @@ def get_pnls(
             positions_df["agent_name"] == agent_name
         ].drop(columns=["agent_name"])
         positions_agent_df = positions_agent_df.loc[
-            positions_agent_df["date"].isin(investment_dates)
+            positions_agent_df["date"].isin(positions_df["date"].unique())
         ]
         positions_agent_df = positions_agent_df.loc[
             positions_df["market_id"].isin(returns_df.columns)
@@ -352,7 +352,7 @@ def get_pnls(
         )
 
         pnl_calculator = get_pnl_calculator(
-            positions_agent_df, returns_df, prices_df, investment_dates
+            positions_agent_df, returns_df, prices_df, positions_df["date"].unique()
         )
         pnl_calculators[agent_name] = pnl_calculator
 
