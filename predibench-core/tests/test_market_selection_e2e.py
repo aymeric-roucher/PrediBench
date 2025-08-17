@@ -15,8 +15,9 @@ from pathlib import Path
 import pandas as pd
 
 from predibench.market_selection import choose_events
-from predibench.polymarket_data import save_events_to_file, load_events_from_file, CACHE_PATH
+from predibench.polymarket_data import save_events_to_file, load_events_from_file
 from predibench.logger_config import get_logger
+from predibench.common import DATA_PATH
 
 logger = get_logger(__name__)
 
@@ -60,7 +61,7 @@ def test_choose_events_event_caching_e2e():
 
     # Step 2: Save events to file
     logger.info("Step 2: Saving events to file...")
-    cache_file = CACHE_PATH / "test_events_cache.json"
+    cache_file = DATA_PATH / "test_events_cache.json"
     save_events_to_file(selected_events, cache_file)
     
     # Verify file was created
