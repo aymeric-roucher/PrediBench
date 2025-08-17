@@ -8,6 +8,7 @@ from predibench.agent import launch_agent_investments
 from predibench.market_selection import choose_events
 from predibench.polymarket_data import save_events_to_file, load_events_from_file
 from predibench.logger_config import get_logger
+from smolagents.models import ApiModel, InferenceClientModel, OpenAIModel
 
 load_dotenv()
 
@@ -78,6 +79,23 @@ def compute_pnl_between_dates_for_model(model_name: str, start_date: date, end_d
     pass
 
 if __name__ == "__main__":
+    # List of models to use for investments
+    list_models = [
+        InferenceClientModel(model_id="openai/gpt-oss-120b"),
+        # InferenceClientModel(model_id="openai/gpt-oss-20b"),
+        # InferenceClientModel(model_id="Qwen/Qwen3-30B-A3B-Instruct-2507"),
+        # InferenceClientModel(model_id="deepseek-ai/DeepSeek-R1-0528"),
+        # InferenceClientModel(model_id="Qwen/Qwen3-4B-Thinking-2507"),
+        # OpenAIModel(model_id="gpt-4.1"),
+        # OpenAIModel(model_id="gpt-4o"),
+        # OpenAIModel(model_id="gpt-4.1-mini"),
+        # OpenAIModel(model_id="o4-mini"),
+        # OpenAIModel(model_id="gpt-5"),
+        # OpenAIModel(model_id="gpt-5-mini"),
+        # OpenAIModel(model_id="o3-deep-research"),
+        "test_random",
+    ]
+
     run_investments_for_today(
         time_until_ending=timedelta(days=21), 
         max_n_events=3, 

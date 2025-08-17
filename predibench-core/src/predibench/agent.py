@@ -20,6 +20,7 @@ from smolagents import (
     VisitWebpageTool,
     tool,
 )
+from smolagents.models import ApiModel
 
 from predibench.polymarket_api import Market, Event
 from predibench.utils import OUTPUT_PATH
@@ -229,19 +230,9 @@ def run_smolagent(
 
 
 def run_smolagent_for_event(
-    model_id: str, question: str, cutoff_date: datetime
+    model: ApiModel, question: str, cutoff_date: datetime
 ) -> ToolCallingAgent:
     """Run smolagent for event-level analysis with multi-market tools."""
-    if model_id.startswith("huggingface/"):
-        model = InferenceClientModel(
-            model_id=model_id.replace("huggingface/", ""),
-            requests_per_minute=10,
-        )
-    else:
-        model = OpenAIModel(
-            model_id=model_id,
-            requests_per_minute=10,
-        )
     tools = [
         GoogleSearchTool(provider="serper", cutoff_date=cutoff_date),
         VisitWebpageTool(),
@@ -463,8 +454,9 @@ def run_deep_research(
         token_usage=TokenUsage(0, 0),
         timing=Timing(0.0),
     )
+
 def launch_agent_investments(
-    list_models: list[str], 
+    list_models: list[ApiModel | str], 
     events: list[Event], 
     target_date: date | None = None,
     backward_mode: bool = False
@@ -474,7 +466,7 @@ def launch_agent_investments(
     Runs each model sequentially (will be parallelized later).
     
     Args:
-        list_models: List of model IDs to run investments with
+        list_models: List of ApiModel objects or "test_random" string to run investments with
         events: List of events to analyze
         target_date: Date for backward compatibility (defaults to today)
         backward_mode: Whether running in backward compatibility mode
@@ -485,20 +477,22 @@ def launch_agent_investments(
     logger.info(f"Running agent investments for {len(list_models)} models on {target_date}")
     logger.info(f"Processing {len(events)} events")
     
-    for model_id in list_models:
-        logger.info(f"Processing model: {model_id}")
-        process_single_model(model_id=model_id, events=events, target_date=target_date, backward_mode=backward_mode)
+    for model in list_models:
+        model_name = model.model_id if isinstance(model, ApiModel) else model
+        logger.info(f"Processing model: {model_name}")
+        process_single_model(model=model, events=events, target_date=target_date, backward_mode=backward_mode)
 
 
-def process_single_model(model_id: str, events: list[Event], target_date: date, backward_mode: bool) -> ModelInvestmentResult:
+def process_single_model(model: ApiModel | str, events: list[Event], target_date: date, backward_mode: bool) -> ModelInvestmentResult:
     """Process investments for all events for a specific model and save results."""
     event_results = []
     
     for event in events:
         logger.info(f"Processing event: {event.title}")
-        event_result = process_event_investment(model_id=model_id, event=event, target_date=target_date, backward_mode=backward_mode)
+        event_result = process_event_investment(model=model, event=event, target_date=target_date, backward_mode=backward_mode)
         event_results.append(event_result)
     
+    model_id = model.model_id if isinstance(model, ApiModel) else model
     model_result = ModelInvestmentResult(
         model_id=model_id,
         target_date=target_date,
@@ -509,7 +503,7 @@ def process_single_model(model_id: str, events: list[Event], target_date: date, 
     return model_result
 
 
-def process_event_investment(model_id: str, event: Event, target_date: date, backward_mode: bool) -> EventInvestmentResult:
+def process_event_investment(model: ApiModel | str, event: Event, target_date: date, backward_mode: bool) -> EventInvestmentResult:
     """Process investment decisions for all markets in an event."""
     logger.info(f"Processing event: {event.title} with {len(event.markets)} markets")
     
@@ -587,7 +581,7 @@ Use the final_market_decisions tool to provide your decisions with reasoning for
     """
     
     # Get agent decisions using smolagents
-    if model_id == "test_random":
+    if isinstance(model, str) and model == "test_random":
         # Generate random decisions for testing
         decisions_dict = {}
         for market_info in market_data:
@@ -600,7 +594,7 @@ Use the final_market_decisions tool to provide your decisions with reasoning for
         token_usage = None
         overall_reasoning = "Random decisions generated for testing purposes"
     else:
-        response = run_smolagent_for_event(model_id, full_question, cutoff_date=target_date)
+        response = run_smolagent_for_event(model, full_question, cutoff_date=target_date)
         response_output = response.output
         token_usage = response.token_usage._asdict() if response.token_usage else None
         overall_reasoning = str(response.messages[-1]) if response.messages else "No overall reasoning provided"
