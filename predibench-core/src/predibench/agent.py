@@ -309,7 +309,7 @@ def process_single_model(
         event_results=event_results
     )
     
-    save_model_result(model_result, target_date)
+    save_model_result(model_result, target_date, date_output_path)
     return model_result
 
 
@@ -460,9 +460,13 @@ Provide your decision and rationale for the TARGET MARKET only.
     )
 
 
-def save_model_result(model_result: ModelInvestmentResult, target_date: date) -> None:
+def save_model_result(model_result: ModelInvestmentResult, target_date: date, date_output_path: Path | None = None) -> None:
     """Save model investment result to file."""
-    output_dir = OUTPUT_PATH / "investments" / target_date.strftime("%Y-%m-%d")
+    if date_output_path is not None:
+        output_dir = date_output_path
+    else:
+        output_dir = OUTPUT_PATH / "investments" / target_date.strftime("%Y-%m-%d")
+    
     output_dir.mkdir(parents=True, exist_ok=True)
     
     filename = f"{model_result.model_id.replace('/', '--')}.json"
