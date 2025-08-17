@@ -1,26 +1,20 @@
 import json
 import os
-import textwrap
 from datetime import date, datetime
 from pathlib import Path
 from typing import Literal
 
 import numpy as np
-import pandas as pd
 from dotenv import load_dotenv
 from smolagents import (
-    ChatMessage,
-    InferenceClientModel,
-    LiteLLMModel,
-    OpenAIModel,
     RunResult,
     Timing,
     Tool,
     ToolCallingAgent,
     VisitWebpageTool,
     tool,
+    ApiModel,
 )
-from smolagents.models import ApiModel
 
 from predibench.polymarket_api import Market, Event
 from predibench.utils import OUTPUT_PATH
@@ -150,7 +144,7 @@ class GoogleSearchTool(Tool):
 @tool
 def final_answer(json_str: str) -> EventDecisions:
     """
-    This tool is used to validate the output of the event decision agent.
+    This tool is used to validate and return the final event decision.
     
     Args:
         json_str (str): The JSON string to validate for event decision.
@@ -162,44 +156,10 @@ def final_answer(json_str: str) -> EventDecisions:
     return EventDecisions(**data)
 
 
-@tool
-def final_answer(
-    answer: Literal["yes", "no", "nothing"],
-) -> Literal["yes", "no", "nothing"]:
-    """
-    Provides a final answer to the given problem.
-
-    Args:
-        answer: The final investment or non-investment decision. Do not invest in any outcome if you don't have a clear preference.
-    """
-    logger.info(f"Final answer: {answer}")
-    return answer
-
-
-@tool
-def final_market_decisions(
-    decisions: dict,
-) -> dict:
-    """
-    Provides final investment decisions for all markets in an event with rationale.
-
-    Args:
-        decisions: Dictionary mapping market_id to decision details.
-                  Example: {
-                      "market_123": {"decision": "BUY", "rationale": "Market undervalues the probability based on recent events"},
-                      "market_456": {"decision": "SELL", "rationale": "Current price overestimates likelihood due to hype"},
-                      "market_789": {"decision": "NOTHING", "rationale": "Insufficient information to make confident prediction"}
-                  }
-                  Valid decisions: "BUY", "SELL", "NOTHING"
-    """
-    logger.info(f"Final market decisions: {decisions}")
-    return decisions
-
-
 def run_smolagent_for_event(
     model: ApiModel, question: str, cutoff_date: datetime
 ) -> EventDecisions:
-    """Run smolagent for event-level analysis with multi-market tools using structured output."""
+    """Run smolagent for event-level analysis with single market decision using structured output."""
     
     # Create the parser and prompt template
     parser = PydanticOutputParser(pydantic_object=EventDecisions)
@@ -211,7 +171,7 @@ def run_smolagent_for_event(
         
         You must return a valid JSON object that matches the EventDecisions schema and nothing else.
         
-        Use the validate_event_decision_json tool to validate your output before providing the final answer.
+        Use the final_answer tool to validate your output before providing the final answer.
         Give your final answer only if it passes the validation.
         """,
         input_variables=["question"],
