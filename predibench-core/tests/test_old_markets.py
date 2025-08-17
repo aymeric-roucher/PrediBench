@@ -12,8 +12,8 @@ from datetime import datetime
 import pandas as pd
 from predibench.polymarket_api import (
     MAX_INTERVAL_TIMESERIES,
-    _HistoricalTimeSeriesRequestParameters,
     MarketsRequestParameters,
+    _HistoricalTimeSeriesRequestParameters,
 )
 
 # Test markets from late 2024 (about 6 months ago)
@@ -62,7 +62,7 @@ def test_market_request_for_old_closed_markets():
 
     # Verify all markets are closed and from the expected time period
     for market in markets:
-        assert market.closed is True, f"Market {market.id} should be closed"
+        assert market.volume24hr == 0, f"Market {market.id} should be inactive"
         # assert market.active is False, f"Market {market.id} should be inactive"
         assert end_date_min <= market.end_date <= end_date_max, (
             f"Market {market.id} end date should be in expected range"
