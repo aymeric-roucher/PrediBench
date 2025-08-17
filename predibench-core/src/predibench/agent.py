@@ -20,8 +20,6 @@ from predibench.polymarket_api import Market, Event
 from predibench.utils import OUTPUT_PATH
 from predibench.logger_config import get_logger
 from pydantic import BaseModel
-from langchain.prompts import PromptTemplate
-from langchain.output_parsers import PydanticOutputParser
 
 load_dotenv()
 
@@ -142,18 +140,22 @@ class GoogleSearchTool(Tool):
 
 
 @tool
-def final_answer(json_str: str) -> EventDecisions:
+def final_answer(rationale: str, decision: Literal["BUY", "SELL", "NOTHING"]) -> EventDecisions:
     """
     This tool is used to validate and return the final event decision.
     
+    This tool must be used only once. The rationale and decision must be provided in the same call.
+    
     Args:
-        json_str (str): The JSON string to validate for event decision.
+        rationale (str): The rationale for the decision.
+        decision (Literal["BUY", "SELL", "NOTHING"]): The decision to make.
         
     Returns:
         EventDecisions: The validated EventDecisions object, raises error if invalid.
     """
-    data = json.loads(json_str)
-    return EventDecisions(**data)
+    assert decision in ["BUY", "SELL", "NOTHING"], "Invalid decision, must be BUY, SELL or NOTHING"
+    assert len(rationale) > 0, "Rationale must be a non-empty string"
+    return EventDecisions(rationale=rationale, decision=decision)
 
 
 def run_smolagent_for_event(
@@ -162,24 +164,15 @@ def run_smolagent_for_event(
     """Run smolagent for event-level analysis with single market decision using structured output."""
     
     # Create the parser and prompt template
-    parser = PydanticOutputParser(pydantic_object=EventDecisions)
-    prompt_template = PromptTemplate(
-        template="""
-        {question}
+    template = """
+{question}
         
-        {format_instructions}
-        
-        You must return a valid JSON object that matches the EventDecisions schema and nothing else.
-        
-        Use the final_answer tool to validate your output before providing the final answer.
-        Give your final answer only if it passes the validation.
-        """,
-        input_variables=["question"],
-        partial_variables={"format_instructions": parser.get_format_instructions()}
-    )
-    
+Use the final_answer tool to validate your output before providing the final answer.
+The final_answer tool must contain the arguments rationale and decision.
+"""
+
     # Format the prompt
-    prompt = prompt_template.format(question=question)
+    prompt = template.format(question=question)
     
     tools = [
         GoogleSearchTool(provider="serper", cutoff_date=cutoff_date),
@@ -193,7 +186,7 @@ def run_smolagent_for_event(
     result = agent.run(prompt)
     
     # Parse and return the structured output
-    return EventDecisions.model_validate_json(result.output)
+    return result.output
 
 
 def create_market_investment_decision(
