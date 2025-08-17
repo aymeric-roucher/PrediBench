@@ -10,6 +10,7 @@ from predibench.polymarket_data import save_events_to_file, load_events_from_fil
 from predibench.logger_config import get_logger
 from smolagents.models import ApiModel, InferenceClientModel, OpenAIModel
 from predibench.polymarket_api import Event
+from predibench.common import DATA_PATH
 
 load_dotenv()
 
@@ -129,6 +130,6 @@ if __name__ == "__main__":
         time_until_ending=timedelta(days=21), 
         max_n_events=3, 
         models=models, 
-        output_path=Path("data"),
+        output_path=DATA_PATH,
         backward_date=date(2025, 7, 16),
     )

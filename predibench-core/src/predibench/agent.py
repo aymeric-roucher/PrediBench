@@ -19,6 +19,7 @@ from smolagents import (
 from predibench.polymarket_api import Market, Event
 from predibench.common import DATA_PATH
 from predibench.logger_config import get_logger
+from predibench.storage_utils import write_to_storage
 from pydantic import BaseModel
 
 load_dotenv()
@@ -430,12 +431,9 @@ Provide your decision and rationale for the TARGET MARKET only.
     # Save prompt to file if date_output_path is provided
     if date_output_path:
         model_id = model.model_id if isinstance(model, ApiModel) else model
-        prompt_dir = date_output_path / model_id.replace('/', '--')
-        prompt_dir.mkdir(parents=True, exist_ok=True)
-        prompt_file = prompt_dir / f"prompt_event_{event.id}.txt"
+        prompt_file = date_output_path / model_id.replace('/', '--') / f"prompt_event_{event.id}.txt"
         
-        with open(prompt_file, "w", encoding="utf-8") as f:
-            f.write(full_question)
+        write_to_storage(prompt_file, full_question)
         logger.info(f"Saved prompt to {prompt_file}")
     
     # Get agent decisions using smolagents
@@ -466,13 +464,11 @@ Provide your decision and rationale for the TARGET MARKET only.
 
 def save_model_result(model_result: ModelInvestmentResult, date_output_path: Path) -> None:
     """Save model investment result to file."""
-
-    date_output_path.mkdir(parents=True, exist_ok=True)
     
     filename = f"{model_result.model_id.replace('/', '--')}.json"
     filepath = date_output_path / filename
     
-    with open(filepath, "w") as f:
-        f.write(model_result.model_dump_json(indent=2))
+    content = model_result.model_dump_json(indent=2)
+    write_to_storage(filepath, content)
     
     logger.info(f"Saved model result to {filepath}")
