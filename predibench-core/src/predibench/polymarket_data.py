@@ -3,9 +3,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 from predibench.common import OUTPUT_PATH
 from predibench.polymarket_api import Event, Market, MarketOutcome
-from predibench.logging import get_logger
+from predibench.logger_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -24,8 +26,19 @@ def market_to_dict(market: Market) -> dict[str, Any]:
     if market_dict.get('createdAt'):
         market_dict['createdAt'] = market_dict['createdAt'].isoformat()
     
-    # Remove pandas Series data (can't serialize)
-    market_dict.pop('prices', None)
+    # Serialize pandas Series to JSON-compatible format
+    if market_dict.get('prices') is not None and isinstance(market_dict['prices'], pd.Series):
+        series = market_dict['prices']
+        # Convert index to datetime first to ensure consistent serialization
+        if not isinstance(series.index, pd.DatetimeIndex):
+            series = series.copy()
+            series.index = pd.to_datetime(series.index)
+        
+        market_dict['prices'] = {
+            'values': series.values.tolist(),
+            'index': [idx.isoformat() for idx in series.index],
+            'name': series.name
+        }
     
     return market_dict
 
@@ -44,8 +57,18 @@ def market_from_dict(market_data: dict[str, Any]) -> Market:
         outcomes.append(MarketOutcome(**outcome_data))
     market_data['outcomes'] = outcomes
     
-    # prices will be None (not serialized)
-    market_data['prices'] = None
+    # Deserialize pandas Series from JSON-compatible format
+    if market_data.get('prices') is not None and isinstance(market_data['prices'], dict):
+        prices_data = market_data['prices']
+        # Always deserialize as DatetimeIndex for consistency
+        index = pd.to_datetime(prices_data['index'])
+        market_data['prices'] = pd.Series(
+            data=prices_data['values'],
+            index=index,
+            name=prices_data.get('name')
+        )
+    elif market_data.get('prices') is None:
+        market_data['prices'] = None
     
     return Market(**market_data)
 
@@ -87,9 +110,10 @@ def event_from_dict(event_data: dict[str, Any]) -> Event:
     return Event(**event_data)
 
 
-def save_events_to_file(events: list[Event], filename: str = "selected_events.json") -> None:
+def save_events_to_file(events: list[Event], file_path: Path | None = None) -> None:
     """Save a list of Event objects to a JSON file."""
-    file_path = CACHE_PATH / filename
+    if file_path is None:
+        file_path = CACHE_PATH / "selected_events.json"
     
     # Use the event_to_dict function for each event
     events_data = [event_to_dict(event) for event in events]
@@ -100,9 +124,9 @@ def save_events_to_file(events: list[Event], filename: str = "selected_events.js
     logger.info(f"Saved {len(events)} events to cache: {file_path}")
 
 
-def load_events_from_file(filename: str = "selected_events.json") -> list[Event]:
+def load_events_from_file(file_path: Path | None = None) -> list[Event]:
     """Load a list of Event objects from a JSON file."""
-    file_path = CACHE_PATH / filename
+    
     if not file_path.exists():
         raise FileNotFoundError(f"Cache file not found: {file_path}")
     

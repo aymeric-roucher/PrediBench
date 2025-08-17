@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 
 from predibench.common import OUTPUT_PATH
-from predibench.logging import get_logger
+from predibench.logger_config import get_logger
 
 logger = get_logger(__name__)
 
