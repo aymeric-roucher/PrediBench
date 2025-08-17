@@ -298,6 +298,7 @@ class Event(BaseModel, arbitrary_types_allowed=True):
     volume1yr: float | None = None
     liquidity: float | None = None
     markets: list[Market]
+    selected_market_id: str | None = None  # ID of the selected market for prediction
 
     @staticmethod
     def from_json(event_data: dict) -> Event:
@@ -324,6 +325,16 @@ class Event(BaseModel, arbitrary_types_allowed=True):
             liquidity=float(event_data["liquidity"]) if event_data.get("liquidity") is not None else None,
             markets=markets,
         )
+    
+    def select_random_market(self) -> None:
+        """Select a random market from this event for prediction."""
+        import random
+        
+        if self.markets:
+            selected_market = random.choice(self.markets)
+            self.selected_market_id = selected_market.id
+        else:
+            self.selected_market_id = None
 
 ################################################################################
 # Useful for the future but unused functions

@@ -8,6 +8,7 @@ from plotly.subplots import make_subplots
 
 from predibench.logger_config import get_logger
 from predibench.polymarket_api import Market, MarketsRequestParameters
+from predibench.logger_config import get_logger
 
 logger = get_logger(__name__)
 
