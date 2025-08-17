@@ -18,7 +18,7 @@ WEEKLY_MARKETS_REPO = "m-ric/predibench-weekly-markets"
 AGENT_CHOICES_REPO = "m-ric/predibench-agent-choices"
 N_MARKETS = 10
 
-list_models = [
+models = [
     "huggingface/openai/gpt-oss-120b",
     "huggingface/openai/gpt-oss-20b",
     "huggingface/Qwen/Qwen3-30B-A3B-Instruct-2507",
@@ -113,7 +113,7 @@ def weekly_pipeline():
         prices_df, returns_df = get_historical_returns(markets)
 
         all_agent_choices = {}
-        for model_id in list_models:
+        for model_id in models:
             try:
                 choices = agent_invest_positions(
                     model_id, markets, prices_df, today_date

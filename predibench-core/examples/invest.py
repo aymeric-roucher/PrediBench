@@ -15,10 +15,18 @@ load_dotenv()
 logger = get_logger(__name__)
 
 
+def select_markets_for_events(events):
+    """Select one random market per event for prediction."""
+    for event in events:
+        if event.selected_market_id is not None:
+            raise ValueError(f"Event '{event.title}' already has a selected market")
+        event.select_random_market()
+
+
 def run_investments_for_today(
     time_until_ending: timedelta, 
     max_n_events: int, 
-    model_names: list[str], 
+    models: list[ApiModel | str], 
     output_path: Path,
     backward_date: date | None = None,
     load_from_cache: bool = False,
@@ -62,12 +70,12 @@ def run_investments_for_today(
         
     loaded_events = load_events_from_file(file_path=cache_file)
     
-    # now you have to do the investment agent for each event, think about the database and compute the pnl
-    # you must also implement a mechanism to have more datapoints (backward compatiblities)
-    # then frontend backend and deployment
+    select_markets_for_events(selected_events)
+    
     launch_agent_investments(
-        list_models=model_names,
-        events=selected_events
+        models=models,
+        events=selected_events,
+        date_output_path=date_output_path
     )
     
     logger.info("Event-based investment analysis complete!")
@@ -80,7 +88,7 @@ def compute_pnl_between_dates_for_model(model_name: str, start_date: date, end_d
 
 if __name__ == "__main__":
     # List of models to use for investments
-    list_models = [
+    models = [
         InferenceClientModel(model_id="openai/gpt-oss-120b"),
         # InferenceClientModel(model_id="openai/gpt-oss-20b"),
         # InferenceClientModel(model_id="Qwen/Qwen3-30B-A3B-Instruct-2507"),
@@ -93,12 +101,11 @@ if __name__ == "__main__":
         # OpenAIModel(model_id="gpt-5"),
         # OpenAIModel(model_id="gpt-5-mini"),
         # OpenAIModel(model_id="o3-deep-research"),
-        "test_random",
     ]
 
     run_investments_for_today(
         time_until_ending=timedelta(days=21), 
         max_n_events=3, 
-        model_names=["test_random"], 
+        models=models, 
         output_path=Path("data"),
     )
