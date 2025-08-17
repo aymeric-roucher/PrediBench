@@ -296,7 +296,7 @@ def process_single_model(
         event_result = process_event_investment(
             model=model, 
             event=event, 
-            target_date=target_date, 
+            target_date=target_date,
             backward_mode=backward_mode, 
             date_output_path=date_output_path,
         )
@@ -447,7 +447,11 @@ Provide your decision and rationale for the TARGET MARKET only.
             rationale=f"Random decision for testing market {event.selected_market_id}"
         )
     else:
-        event_decision = run_smolagent_for_event(model, full_question, cutoff_date=target_date)
+        if backward_mode:
+            cutoff_datetime = datetime.combine(target_date, datetime.min.time())
+        else:
+            cutoff_datetime = None
+        event_decision = run_smolagent_for_event(model, full_question, cutoff_date=cutoff_datetime)
     
     # Convert to MarketInvestmentDecision object for the selected market only
     market_decision = create_market_investment_decision(event_decision, selected_market_info)
