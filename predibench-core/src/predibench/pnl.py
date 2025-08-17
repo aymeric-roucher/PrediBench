@@ -8,7 +8,6 @@ from plotly.subplots import make_subplots
 
 from predibench.logger_config import get_logger
 from predibench.polymarket_api import Market, MarketsRequestParameters
-from predibench.logger_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -149,25 +148,30 @@ class PnlCalculator:
                     )
 
                     # Add markers for positions taken on the price chart
-                    position_changes = self.positions[question][
-                        self.positions[question] != 0
+                    positions_to_plot = self.positions[question][
+                        self.positions[question].notna()
+                        & (self.positions[question] != 0)
                     ]
-                    if len(position_changes) > 0:
+                    if len(positions_to_plot) > 0:
                         # Get price values at position change dates
                         prices_at_position_changes = price_data.loc[
-                            price_data.index.isin(position_changes.index)
+                            price_data.index.isin(positions_to_plot.index)
                         ]
                         fig.add_trace(
                             go.Scatter(
                                 x=prices_at_position_changes.index,
                                 y=prices_at_position_changes.values,
-                                text=position_changes.values,
+                                text=positions_to_plot.values,
                                 hovertemplate="Position: %{text:.2f}<br>Price: %{y:.3f}<extra></extra>",
                                 mode="markers",
                                 marker=dict(
                                     symbol=[
-                                        "triangle-up" if pos > 0 else "triangle-down"
-                                        for pos in position_changes.values
+                                        "triangle-up"
+                                        if pos > 0
+                                        else "triangle-down"
+                                        if pos < 0
+                                        else "circle"
+                                        for pos in positions_to_plot.values
                                     ],
                                     size=10,
                                     color=col_color,
@@ -304,10 +308,16 @@ def validate_continuous_returns(
         raise ValueError(f"Missing returns data for dates: {sorted(missing_dates)}")
 
 
-# investment_dates seems to be a tuple of two dates ?
 def get_pnls(
     investment_dates, positions_df: pd.DataFrame, write_plots: bool = False
 ) -> dict[str, PnlCalculator]:
+    """Builds PnL calculators for each agent in the positions dataframe.
+
+    Args:
+        investment_dates: list of dates to use for the investment
+        positions_df: DataFrame with positions data indexed by date
+        write_plots: bool, if True, will write plots to the current directory
+    """
     # Validate that we have continuous returns data
     expected_start = investment_dates[0]
     # should be a hyper parameters
@@ -362,7 +372,9 @@ def get_pnl_calculator(
 
     # Forward-fill positions to all daily dates in the returns range
     daily_index = returns_df.index[returns_df.index >= investment_dates[0]]
-    positions_agent_df = positions_agent_df.reindex(daily_index, method="ffill")
+    positions_agent_df = positions_agent_df.reindex(daily_index, method="ffill").fillna(
+        0
+    )  # fillna(0) to avoid NaN at the beginning of the investment period
     positions_agent_df = positions_agent_df.loc[
         positions_agent_df.index >= investment_dates[0]
     ]

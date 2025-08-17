@@ -24,19 +24,8 @@ def add_rationale_markers(
     """Add square markers with rationale to the price chart for each position taken"""
     colors = px.colors.qualitative.Plotly
 
-    # Filter positions where a choice was made (not 0)
-    positions_taken = agent_data[agent_data["choice"] != 0].copy()
-
-    if len(positions_taken) == 0:
-        return fig
-
-    # Group by market_id to get consistent colors
-    for i, (market_id, market_positions) in enumerate(
-        positions_taken.groupby("market_id")
-    ):
+    for i, (market_id, market_positions) in enumerate(agent_data.groupby("market_id")):
         col_color = colors[i % len(colors)]
-
-        # Add square markers at y=1 for each position
         fig.add_trace(
             go.Scatter(
                 x=market_positions["date"],
@@ -71,8 +60,9 @@ def add_rationale_markers(
 
 def calculate_pnl_and_performance(positions_df: pd.DataFrame):
     """Calculate real PnL and performance metrics for each agent using historical market data"""
-    investment_dates = sorted(positions_df["date"].unique())
-    pnl_calculators = get_pnls(investment_dates, positions_df, write_plots=False)
+    pnl_calculators = get_pnls(
+        positions_df, write_plots=False, end_date=datetime.today()
+    )
 
     # Convert to the format expected by frontend
     agents_performance = {}
