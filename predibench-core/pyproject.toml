@@ -12,6 +12,7 @@ dependencies = [
     "huggingface-hub>=0.34.3",
     "ipykernel>=6.30.0",
     "kaleido>=1.0.0",
+    "langchain>=0.3.27",
     "litellm>=1.74.15.post1",
     "markdownify>=1.1.0",
     "matplotlib>=3.10.5",

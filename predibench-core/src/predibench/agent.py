@@ -8,9 +8,7 @@ import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from smolagents import (
-    ChatMessage,
     InferenceClientModel,
-    LiteLLMModel,
     OpenAIModel,
     RunResult,
     Timing,
@@ -26,6 +24,8 @@ from predibench.polymarket_api import Market, Event
 from predibench.utils import OUTPUT_PATH
 from predibench.logger_config import get_logger
 from pydantic import BaseModel
+from langchain.prompts import PromptTemplate
+from langchain.output_parsers import PydanticOutputParser
 
 load_dotenv()
 
@@ -54,6 +54,16 @@ class ModelInvestmentResult(BaseModel):
     model_id: str
     target_date: date
     event_results: list[EventInvestmentResult]
+
+
+class MarketDecision(BaseModel):
+    decision: Literal["BUY", "SELL", "NOTHING"]
+    reasoning: str
+
+
+class EventDecisions(BaseModel):
+    decisions: dict[str, MarketDecision]
+    overall_reasoning: str
 
 
 class GoogleSearchTool(Tool):
@@ -143,6 +153,21 @@ class GoogleSearchTool(Tool):
 
 
 @tool
+def validate_event_decisions_json(json_str: str) -> EventDecisions:
+    """
+    This tool is used to validate the output of the event decisions agent.
+    
+    Args:
+        json_str (str): The JSON string to validate for event decisions.
+        
+    Returns:
+        EventDecisions: The validated EventDecisions object, raises error if invalid.
+    """
+    data = json.loads(json_str)
+    return EventDecisions(**data)
+
+
+@tool
 def final_answer(
     answer: Literal["yes", "no", "nothing"],
 ) -> Literal["yes", "no", "nothing"]:
@@ -176,256 +201,91 @@ def final_market_decisions(
     return decisions
 
 
-@tool  
-def final_event_allocation(
-    allocations: dict,
-) -> dict:
-    """
-    Provides final investment allocations across multiple events.
-
-    Args:
-        allocations: Dictionary mapping event_id to allocation amount (0-100% of portfolio).
-                    Example: {"event_123": 25.0, "event_456": 15.0, "event_789": 0.0}
-                    All allocations should sum to <= 100.0
-    """
-    total_allocation = sum(allocations.values())
-    if total_allocation > 100.0:
-        logger.warning(f"Total allocation ({total_allocation}%) exceeds 100%")
-    logger.info(f"Final event allocations: {allocations}")
-    return allocations
-
-
-if __name__ == "__main__":
-    tool = GoogleSearchTool(provider="serper", cutoff_date=datetime(2024, 6, 1))
-    results_with_filter = tool.forward("OpenAI GPT-5 news")
-
-    tool = GoogleSearchTool(provider="serper")
-    results_without_filter = tool.forward("OpenAI GPT-5 news")
-
-    assert results_with_filter != results_without_filter
-
-
-def run_smolagent(
-    model_id: str, question: str, cutoff_date: datetime
-) -> ToolCallingAgent:
-    if model_id.startswith("huggingface/"):
-        model = InferenceClientModel(
-            model_id=model_id.replace("huggingface/", ""),
-            requests_per_minute=10,
-        )
-    else:
-        model = OpenAIModel(
-            model_id=model_id,
-            requests_per_minute=10,
-        )
-    tools = [
-        GoogleSearchTool(provider="serper", cutoff_date=cutoff_date),
-        VisitWebpageTool(),
-        final_answer,
-    ]
-    agent = ToolCallingAgent(
-        tools=tools, model=model, max_steps=40, return_full_result=True
-    )
-    return agent.run(question)
-
-
 def run_smolagent_for_event(
     model: ApiModel, question: str, cutoff_date: datetime
-) -> ToolCallingAgent:
-    """Run smolagent for event-level analysis with multi-market tools."""
+) -> EventDecisions:
+    """Run smolagent for event-level analysis with multi-market tools using structured output."""
+    
+    # Create the parser and prompt template
+    parser = PydanticOutputParser(pydantic_object=EventDecisions)
+    prompt_template = PromptTemplate(
+        template="""
+        {question}
+        
+        {format_instructions}
+        
+        You must return a valid JSON object that matches the EventDecisions schema and nothing else.
+        
+        Use the validate_event_decisions_json tool to validate your output before providing the final answer.
+        Give your final answer only if it passes the validation.
+        """,
+        input_variables=["question"],
+        partial_variables={"format_instructions": parser.get_format_instructions()}
+    )
+    
+    # Format the prompt
+    prompt = prompt_template.format(question=question)
+    
     tools = [
         GoogleSearchTool(provider="serper", cutoff_date=cutoff_date),
         VisitWebpageTool(),
-        final_market_decisions,
+        validate_event_decisions_json,
     ]
     agent = ToolCallingAgent(
         tools=tools, model=model, max_steps=40, return_full_result=True
     )
-    return agent.run(question)
+    
+    result = agent.run(prompt)
+    
+    # Parse and return the structured output
+    return EventDecisions.model_validate_json(result.output)
 
 
-def validate_event_decisions(raw_output: dict, market_data: list, target_date: date) -> dict:
-    """Validate and structure event decisions using LiteLLM with structured output."""
+def create_market_investment_decisions(
+    event_decisions: EventDecisions, 
+    market_data: list
+) -> list[MarketInvestmentDecision]:
+    """Convert EventDecisions to MarketInvestmentDecision objects, handling closed markets."""
+    market_decisions = []
     
-    class MarketDecision(BaseModel):
-        decision: Literal["BUY", "SELL", "NOTHING"]
-        reasoning: str
-    
-    class EventDecisions(BaseModel):
-        decisions: dict[str, MarketDecision]
-        overall_reasoning: str
-    
-    # Prepare market IDs for validation
-    market_ids = [market_info['id'] for market_info in market_data]
-    closed_markets = [market_info['id'] for market_info in market_data if market_info['is_closed']]
-    
-    # Create validation prompt
-    validation_prompt = f"""
-    Please validate and structure the following investment decisions for date {target_date.strftime("%B %d, %Y")}:
-    
-    Raw agent output: {raw_output}
-    
-    Expected market IDs: {market_ids}
-    Closed markets (should be NOTHING): {closed_markets}
-    
-    Rules:
-    1. All closed markets must have decision "NOTHING"
-    2. Each market must have a valid decision: BUY, SELL, or NOTHING
-    3. Each decision must include reasoning
-    4. If a market is missing from the raw output, set decision to "NOTHING" with appropriate reasoning
-    
-    Please structure this into the required format with decisions for all markets.
-    """
-    
-    model = LiteLLMModel(
-        model_id="gpt-4o-mini",
-        requests_per_minute=10,
-    )
-    
-    output = model.generate(
-        [ChatMessage(role="user", content=validation_prompt)],
-        response_format={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "event_decisions",
-                "schema": EventDecisions.model_json_schema(),
-            },
-        },
-    )
-    
-    # Parse and validate the structured output
-    structured_data = json.loads(output.content)
-    validated_decisions = EventDecisions(**structured_data)
-    
-    # Ensure all markets are covered and closed markets are set to NOTHING
-    final_decisions = {}
     for market_info in market_data:
         market_id = market_info['id']
-        if market_id in validated_decisions.decisions:
-            decision_data = validated_decisions.decisions[market_id]
+        
+        if market_id in event_decisions.decisions:
+            decision_data = event_decisions.decisions[market_id]
             # Force NOTHING for closed markets
             if market_info['is_closed']:
-                final_decisions[market_id] = {
-                    "decision": "NOTHING",
-                    "reasoning": f"Market is closed. Original reasoning: {decision_data.reasoning}"
-                }
+                market_decision = MarketInvestmentDecision(
+                    market_id=market_id,
+                    market_question=market_info['question'],
+                    decision="NOTHING",
+                    reasoning=f"Market is closed. Original reasoning: {decision_data.reasoning}",
+                    market_price=market_info['current_price'],
+                    is_closed=True
+                )
             else:
-                final_decisions[market_id] = {
-                    "decision": decision_data.decision,
-                    "reasoning": decision_data.reasoning
-                }
+                market_decision = MarketInvestmentDecision(
+                    market_id=market_id,
+                    market_question=market_info['question'],
+                    decision=decision_data.decision,
+                    reasoning=decision_data.reasoning,
+                    market_price=market_info['current_price'],
+                    is_closed=False
+                )
         else:
-            # Market missing from decisions
-            final_decisions[market_id] = {
-                "decision": "NOTHING",
-                "reasoning": "No decision provided by agent" + (" - Market is closed" if market_info['is_closed'] else "")
-            }
+            # Fallback if market not in decisions
+            market_decision = MarketInvestmentDecision(
+                market_id=market_id,
+                market_question=market_info['question'],
+                decision="NOTHING",
+                reasoning="No decision provided by agent" + (" - Market is closed" if market_info['is_closed'] else ""),
+                market_price=market_info['current_price'],
+                is_closed=market_info['is_closed']
+            )
+        
+        market_decisions.append(market_decision)
     
-    return {
-        "decisions": final_decisions,
-        "overall_reasoning": validated_decisions.overall_reasoning
-    }
-
-
-# visit_webpage_tool = VisitWebpageTool()
-# print(
-#     visit_webpage_tool.forward(
-#         "https://www.axios.com/2025/07/24/openai-gpt-5-august-2025"
-#     )
-# )
-
-
-def agent_invest_positions(
-    model_id: str,
-    markets: dict[str, Market],
-    prices_df: pd.DataFrame,
-    target_date: date,
-) -> dict:
-    """Let the agent decide on investment positions: 1 to buy, -1 to sell, 0 to do nothing"""
-    logger.info("Creating investment positions with agent...")
-    logger.debug(f"Target date: {target_date}, Available dates: {markets[list(markets.keys())[0]].prices.index}")
-    assert target_date in markets[list(markets.keys())[0]].prices.index
-
-    output_dir = (
-        OUTPUT_PATH
-        / f"smolagent_{model_id}".replace("/", "--")
-        / target_date.strftime("%Y-%m-%d")
-    )
-    os.makedirs(output_dir, exist_ok=True)
-    choices = {}
-    for question_id in prices_df.columns:
-        if (output_dir / f"{question_id}.json").exists():
-            logger.info(
-                f"Getting the result for market n°'{question_id}' for {model_id} on {target_date} from file."
-            )
-            response = json.load(open(output_dir / f"{question_id}.json"))
-            choice = response["choice"]
-        else:
-            logger.info(
-                f"No results found in {output_dir / f'{question_id}.json'}, building them new."
-            )
-            market = markets[question_id]
-            assert market.id == question_id
-            if np.isnan(prices_df.loc[target_date, question_id]):
-                continue
-            prices_str = (
-                prices_df.loc[:target_date, question_id]
-                .dropna()
-                .to_string(index=True, header=False)
-            )
-            full_question = textwrap.dedent(
-                f"""Let's say we are the {target_date.strftime("%B %d, %Y")}.
-                Please answer the below question by yes or no. But first, run a detailed analysis. You can search the web for information.
-                One good method for analyzing is to break down the question into sub-parts, like a tree, and assign probabilities to each sub-branch of the tree, to get a total probability of the question being true.
-                Here is the question:
-                {market.question}
-                More details:
-                {market.description}
-
-                Here are the latest rates for the 'yes' to that question (rates for 'yes' and 'no' sum to 1), to guide you:
-                {prices_str}
-
-                Invest in yes only if you think the yes is underrated, and invest in no only if you think that the yes is overrated.
-                What would you decide: buy yes, buy no, or do nothing?
-                """
-            )
-            if model_id.endswith("-deep-research"):
-                response = run_deep_research(
-                    model_id,
-                    full_question,
-                    cutoff_date=target_date,
-                )
-            elif model_id == "test_random":
-                response = RunResult(
-                    output=("yes" if np.random.random() < 0.3 else "nothing"),
-                    messages=[{"value": "ok here is the reasoning process"}],
-                    state={},
-                    token_usage=TokenUsage(0, 0),
-                    timing=Timing(0.0),
-                )
-            else:
-                response = run_smolagent(
-                    model_id,
-                    full_question,
-                    cutoff_date=target_date,
-                )
-                for message in response.messages:
-                    message["model_input_messages"] = "removed"  # Clean logs
-            choice = response.output
-            choices[question_id] = choice
-
-            with open(output_dir / f"{question_id}.json", "w") as f:
-                json.dump(
-                    {
-                        "question": market.question,
-                        "market_id": market.id,
-                        "choice": choice,
-                        "messages": response.messages,
-                    },
-                    f,
-                    default=str,
-                )
-    return choices
+    return market_decisions
 
 
 def run_deep_research(
@@ -511,7 +371,7 @@ def process_event_investment(model: ApiModel | str, event: Event, target_date: d
     market_data = []
     for market in event.markets:
         if market.prices is None:
-            market.fill_prices(end_time=datetime.combine(target_date, datetime.min.time()))
+            raise ValueError("markets are supposed to be filtered, this should not be possible")
         
         # Check if market is closed and get price data
         if market.prices is not None and target_date in market.prices.index:
@@ -556,7 +416,7 @@ def process_event_investment(model: ApiModel | str, event: Event, target_date: d
 Market {i} (ID: {market_info['id']}){closed_status}:
 Question: {market_info['question']}
 Description: {market_info['description']}
-Historical prices for "{outcome_name}":
+Historical prices for the named outcome "{outcome_name}":
 {market_info['recent_prices']}
 Last available price for "{outcome_name}": {market_info['current_price']}
         """
@@ -586,54 +446,28 @@ Use the final_market_decisions tool to provide your decisions with reasoning for
         decisions_dict = {}
         for market_info in market_data:
             choice = np.random.choice(["BUY", "SELL", "NOTHING"], p=[0.3, 0.3, 0.4])
-            decisions_dict[market_info['id']] = {
-                "decision": choice,
-                "reasoning": f"Random decision for testing market {market_info['id']}"
-            }
-        response_output = decisions_dict
+            decisions_dict[market_info['id']] = MarketDecision(
+                decision=choice,
+                reasoning=f"Random decision for testing market {market_info['id']}"
+            )
+        event_decisions = EventDecisions(
+            decisions=decisions_dict,
+            overall_reasoning="Random decisions generated for testing purposes"
+        )
         token_usage = None
-        overall_reasoning = "Random decisions generated for testing purposes"
     else:
-        response = run_smolagent_for_event(model, full_question, cutoff_date=target_date)
-        response_output = response.output
-        token_usage = response.token_usage._asdict() if response.token_usage else None
-        overall_reasoning = str(response.messages[-1]) if response.messages else "No overall reasoning provided"
+        event_decisions = run_smolagent_for_event(model, full_question, cutoff_date=target_date)
+        token_usage = None  # TODO: Extract token usage from agent if needed
     
-    # Validate and structure the output using LiteLLM
-    structured_result = validate_event_decisions(response_output, market_data, target_date)
-    
-    # Create market decisions
-    market_decisions = []
-    for market_info in market_data:
-        market_id = market_info['id']
-        if market_id in structured_result['decisions']:
-            decision_data = structured_result['decisions'][market_id]
-            market_decision = MarketInvestmentDecision(
-                market_id=market_id,
-                market_question=market_info['question'],
-                decision=decision_data['decision'],
-                reasoning=decision_data.get('reasoning', 'No reasoning provided'),
-                market_price=market_info['current_price'],
-                is_closed=market_info['is_closed']
-            )
-        else:
-            # Fallback if market not in decisions
-            market_decision = MarketInvestmentDecision(
-                market_id=market_id,
-                market_question=market_info['question'],
-                decision="NOTHING",
-                reasoning="No decision provided by agent",
-                market_price=market_info['current_price'],
-                is_closed=market_info['is_closed']
-            )
-        market_decisions.append(market_decision)
+    # Convert to MarketInvestmentDecision objects using helper function
+    market_decisions = create_market_investment_decisions(event_decisions, market_data)
     
     return EventInvestmentResult(
         event_id=event.id,
         event_title=event.title,
         event_description=event.description,
         market_decisions=market_decisions,
-        overall_reasoning=structured_result.get('overall_reasoning', overall_reasoning),
+        overall_reasoning=event_decisions.overall_reasoning,
         token_usage=token_usage
     )
 
