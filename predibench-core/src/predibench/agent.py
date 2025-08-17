@@ -448,7 +448,7 @@ Provide your decision and rationale for the TARGET MARKET only.
         )
     else:
         if backward_mode:
-            cutoff_datetime = target_date
+            cutoff_datetime = datetime.combine(target_date, datetime.min.time())
         else:
             cutoff_datetime = None
         event_decision = run_smolagent_for_event(model, full_question, cutoff_date=cutoff_datetime)
