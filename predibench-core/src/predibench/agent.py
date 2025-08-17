@@ -47,8 +47,7 @@ class EventInvestmentResult(BaseModel):
     event_id: str
     event_title: str
     event_description: str | None = None
-    market_decisions: list[MarketInvestmentDecision]
-    overall_reasoning: str  # Overall reasoning for the event
+    market_decision: MarketInvestmentDecision
 
 
 class ModelInvestmentResult(BaseModel):
@@ -471,8 +470,7 @@ Provide your decision and reasoning for the TARGET MARKET only.
         event_id=event.id,
         event_title=event.title,
         event_description=event.description,
-        market_decisions=[market_decision],  # Only one decision now
-        overall_reasoning=event_decision.reasoning
+        market_decision=market_decision,
     )
 
 
