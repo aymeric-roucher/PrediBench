@@ -38,7 +38,7 @@ class MarketInvestmentDecision(BaseModel):
     market_id: str
     market_question: str
     decision: Literal["BUY", "SELL", "NOTHING"]
-    reasoning: str | None = None
+    rationale: str | None = None
     market_price: float | None = None
     is_closed: bool = False
 
@@ -57,7 +57,7 @@ class ModelInvestmentResult(BaseModel):
 
 
 class EventDecisions(BaseModel):
-    reasoning: str
+    rationale: str
     decision: Literal["BUY", "SELL", "NOTHING"]
 
 
@@ -181,14 +181,14 @@ def final_market_decisions(
     decisions: dict,
 ) -> dict:
     """
-    Provides final investment decisions for all markets in an event with reasoning.
+    Provides final investment decisions for all markets in an event with rationale.
 
     Args:
         decisions: Dictionary mapping market_id to decision details.
                   Example: {
-                      "market_123": {"decision": "BUY", "reasoning": "Market undervalues the probability based on recent events"},
-                      "market_456": {"decision": "SELL", "reasoning": "Current price overestimates likelihood due to hype"},
-                      "market_789": {"decision": "NOTHING", "reasoning": "Insufficient information to make confident prediction"}
+                      "market_123": {"decision": "BUY", "rationale": "Market undervalues the probability based on recent events"},
+                      "market_456": {"decision": "SELL", "rationale": "Current price overestimates likelihood due to hype"},
+                      "market_789": {"decision": "NOTHING", "rationale": "Insufficient information to make confident prediction"}
                   }
                   Valid decisions: "BUY", "SELL", "NOTHING"
     """
@@ -247,7 +247,7 @@ def create_market_investment_decision(
             market_id=selected_market_info['id'],
             market_question=selected_market_info['question'],
             decision="NOTHING",
-            reasoning=f"Market is closed. Original reasoning: {event_decision.reasoning}",
+            rationale=f"Market is closed. Original rationale: {event_decision.rationale}",
             market_price=selected_market_info['current_price'],
             is_closed=True
         )
@@ -256,7 +256,7 @@ def create_market_investment_decision(
             market_id=selected_market_info['id'],
             market_question=selected_market_info['question'],
             decision=event_decision.decision,
-            reasoning=event_decision.reasoning,
+            rationale=event_decision.rationale,
             market_price=selected_market_info['current_price'],
             is_closed=False
         )
@@ -438,7 +438,7 @@ For the TARGET MARKET ONLY, decide whether to BUY (if the shown outcome is under
 Note: The prices shown are specifically for the named outcome. BUY means you think that outcome is more likely than the current price suggests.
 Consider how the context markets might relate to your target market decision.
 
-Provide your decision and reasoning for the TARGET MARKET only.
+Provide your decision and rationale for the TARGET MARKET only.
     """
     
     # Save prompt to file if date_output_path is provided
@@ -458,7 +458,7 @@ Provide your decision and reasoning for the TARGET MARKET only.
         choice = np.random.choice(["BUY", "SELL", "NOTHING"], p=[0.3, 0.3, 0.4])
         event_decision = EventDecisions(
             decision=choice,
-            reasoning=f"Random decision for testing market {event.selected_market_id}"
+            rationale=f"Random decision for testing market {event.selected_market_id}"
         )
     else:
         event_decision = run_smolagent_for_event(model, full_question, cutoff_date=target_date)
