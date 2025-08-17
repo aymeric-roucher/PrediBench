@@ -1,4 +1,3 @@
-import os
 from datetime import date, timedelta
 
 import numpy as np
@@ -305,9 +304,9 @@ def validate_continuous_returns(
 
 
 # investment_dates seems to be a tuple of two dates ?
-def compute_pnls(
+def get_pnls(
     investment_dates, positions_df: pd.DataFrame, write_plots: bool = False
-):
+) -> dict[str, PnlCalculator]:
     # Validate that we have continuous returns data
     expected_start = investment_dates[0]
     # should be a hyper parameters
@@ -326,10 +325,7 @@ def compute_pnls(
 
     validate_continuous_returns(returns_df, expected_start, expected_end)
 
-    portfolio_daily_pnls = {}
-    portfolio_cumulative_pnls = {}
-    figures = {}
-
+    pnl_calculators = {}
     for agent_name in positions_df["agent_name"].unique():
         positions_agent_df = positions_df[
             positions_df["agent_name"] == agent_name
@@ -347,36 +343,9 @@ def compute_pnls(
         pnl_calculator = get_pnl_calculator(
             positions_agent_df, returns_df, prices_df, investment_dates
         )
+        pnl_calculators[agent_name] = pnl_calculator
 
-        fig = pnl_calculator.plot_pnl(stock_details=True)
-
-        logger.info(
-            f"Performance metrics:\n{pnl_calculator.get_performance_metrics().round(2)}"
-        )
-
-        portfolio_cumulative_pnl = pnl_calculator.portfolio_cumulative_pnl
-        portfolio_daily_pnl = pnl_calculator.portfolio_daily_pnl
-
-        if write_plots:
-            portfolio_output_path = f"./portfolio_performance/{agent_name}"
-            if not os.path.exists(portfolio_output_path):
-                os.makedirs(portfolio_output_path)
-            fig.write_html(portfolio_output_path + ".html")
-            fig.write_image(portfolio_output_path + ".png")
-            logger.info(
-                f"Portfolio visualization saved to: {portfolio_output_path}.html and {portfolio_output_path}.png"
-            )
-
-        logger.info(
-            f"Final Cumulative PnL for {agent_name}: {portfolio_cumulative_pnl.iloc[-1]:.4f}"
-        )
-        logger.info(f"Cumulative PnL:\n{portfolio_cumulative_pnl}")
-
-        portfolio_cumulative_pnls[agent_name] = portfolio_cumulative_pnl
-        portfolio_daily_pnls[agent_name] = portfolio_daily_pnl
-        figures[agent_name] = fig
-
-    return portfolio_daily_pnls, portfolio_cumulative_pnls, figures
+    return pnl_calculators
 
 
 def get_pnl_calculator(
