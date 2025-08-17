@@ -447,7 +447,8 @@ Provide your decision and rationale for the TARGET MARKET only.
             rationale=f"Random decision for testing market {event.selected_market_id}"
         )
     else:
-        event_decision = run_smolagent_for_event(model, full_question, cutoff_date=target_date)
+        cutoff_datetime = datetime.combine(target_date, datetime.min.time()) if isinstance(target_date, date) else target_date
+        event_decision = run_smolagent_for_event(model, full_question, cutoff_date=cutoff_datetime)
     
     # Convert to MarketInvestmentDecision object for the selected market only
     market_decision = create_market_investment_decision(event_decision, selected_market_info)

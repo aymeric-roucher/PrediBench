@@ -88,6 +88,8 @@ def run_investments_for_today(
     results_per_model = launch_agent_investments(
         models=models,
         events=events_with_selected_markets,
+        target_date=base_date,
+        backward_mode=backward_mode,
         date_output_path=date_output_path
     )
     logger.info("Event-based investment analysis complete!")
@@ -103,4 +105,5 @@ if __name__ == "__main__":
         max_n_events=3, 
         models=models, 
         output_path=Path("data"),
+        backward_date=date(2025, 7, 16),
     )

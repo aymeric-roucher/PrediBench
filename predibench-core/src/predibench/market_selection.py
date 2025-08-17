@@ -80,7 +80,11 @@ def _filter_events_by_volume_and_markets(events: list[Event], min_volume: float 
     filtered_events = []
     for event in events:
         if event.markets and len(event.markets) > 0:
-            if not backward_mode and event.volume24hr and event.volume24hr > min_volume:  # Minimum volume threshold
+            if backward_mode:
+                # In backward mode, we can't rely on volume24hr as it may not be available for historical events
+                # Just ensure events have markets
+                filtered_events.append(event)
+            elif event.volume24hr and event.volume24hr > min_volume:  # Minimum volume threshold
                 filtered_events.append(event)
     return filtered_events
 
@@ -101,10 +105,7 @@ def choose_events(today_date: datetime, time_until_ending: timedelta, n_events: 
     )
     events = request_parameters.get_events()
     
-    if not backward_mode:
-        filtered_events = _filter_events_by_volume_and_markets(events=events, min_volume=min_volume)
-    else:
-        filtered_events = events
+    filtered_events = _filter_events_by_volume_and_markets(events=events, min_volume=min_volume, backward_mode=backward_mode)
     filtered_events = filtered_events[:n_events]
     
     
