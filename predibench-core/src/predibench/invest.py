@@ -45,6 +45,7 @@ def run_investments_for_today(
     output_path: Path,
     backward_date: date | None = None,
     load_from_cache: bool = False,
+    filter_crypto_events: bool = True,
 ) -> list[ModelInvestmentResult]:
     """Run event-based investment simulation with multiple AI models."""
     
@@ -75,7 +76,8 @@ def run_investments_for_today(
             today_date=base_date,
             time_until_ending=time_until_ending,
             n_events=max_n_events,
-            backward_mode=backward_mode
+            backward_mode=backward_mode,
+            filter_crypto_events=filter_crypto_events
         )
         save_events_to_file(events=selected_events, file_path=cache_file)
             
