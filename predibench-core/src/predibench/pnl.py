@@ -7,8 +7,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from predibench.polymarket_api import Market, MarketsRequestParameters
 from predibench.logging import get_logger
+from predibench.polymarket_api import Market, MarketsRequestParameters
 
 logger = get_logger(__name__)
 
@@ -40,6 +40,11 @@ class PnlCalculator:
         self.to_vol_target = to_vol_target
         self.vol_targeting_window = vol_targeting_window
         self.pnl = self.calculate_pnl()
+        self.portfolio_daily_pnl = self.pnl.sum(axis=1)
+        self.portfolio_cumulative_pnl = self.portfolio_daily_pnl.cumsum()
+        self.portfolio_mean_pnl = self.portfolio_daily_pnl.mean()
+        self.portfolio_std_pnl = self.portfolio_daily_pnl.std()
+        self.portfolio_sum_pnl = self.portfolio_daily_pnl.sum()
 
     def _assert_index_is_date(self, df: pd.DataFrame):
         from datetime import date
@@ -71,7 +76,7 @@ class PnlCalculator:
             self.new_positions = (
                 (self.positions / volatility).resample("1D").last().ffill()
             )
-            pnls_ = pd.concat(
+            pnls = pd.concat(
                 [
                     self.new_positions[col]
                     .reindex(self.returns[col].dropna().index)
@@ -81,12 +86,12 @@ class PnlCalculator:
                 ],
                 axis=1,
             )
-            return pnls_
+            return pnls
         else:
             logger.debug("PnL calculation debug info")
             logger.debug(f"Returns head:\n{self.returns.head()}")
             logger.debug(f"Positions head:\n{self.positions.head()}")
-            pnls_ = pd.concat(
+            pnls = pd.concat(
                 [
                     self._get_positions_begin_next_day(col).reindex(
                         self.returns[col].dropna().index, fill_value=0
@@ -96,14 +101,13 @@ class PnlCalculator:
                 ],
                 axis=1,
             )
-            return pnls_
+            return pnls
 
     def plot_pnl(self, stock_details: bool = False):
         if not stock_details:
-            cumulative_pnl = self.pnl.sum(axis=1).cumsum()
             fig = px.line(
-                x=cumulative_pnl.index,
-                y=cumulative_pnl.values,
+                x=self.portfolio_cumulative_pnl.index,
+                y=self.portfolio_cumulative_pnl,
                 labels={"x": "Date", "y": "Cumulative PnL"},
             )
             fig.data[0].update(mode="markers+lines")
@@ -203,18 +207,18 @@ class PnlCalculator:
             return fig
 
     def vol_pnl_daily(self):
-        return self.pnl.sum(axis=1).std()
+        return self.portfolio_std_pnl
 
     def vol_pnl_annualized(self):
-        return self.pnl.sum(axis=1).std() * self.sharpe_constant_normalization
+        return self.portfolio_std_pnl * self.sharpe_constant_normalization
 
     def sharpe_daily(self):
-        return self.pnl.sum(axis=1).mean() / self.pnl.sum(axis=1).std()
+        return self.portfolio_mean_pnl / self.portfolio_std_pnl
 
     def sharpe_annualized(self):
         return (
-            self.pnl.sum(axis=1).mean()
-            / self.pnl.sum(axis=1).std()
+            self.portfolio_mean_pnl
+            / self.portfolio_std_pnl
             * self.sharpe_constant_normalization
         )
 
@@ -222,8 +226,7 @@ class PnlCalculator:
         """
         Sortino Ratio = (Mean Return - Risk-Free Rate) / Downside Deviation
         """
-        daily_pnl = self.pnl.sum(axis=1)
-        excess_returns = daily_pnl - risk_free_rate
+        excess_returns = self.portfolio_daily_pnl - risk_free_rate
         downside_returns = excess_returns[excess_returns < 0]
         downside_deviation = np.std(downside_returns, ddof=1)
         if downside_deviation == 0:
@@ -235,7 +238,7 @@ class PnlCalculator:
         Maximum Drawdown = (Peak - Trough) / Peak
         Assumes daily returns
         """
-        cumulative_returns = self.pnl.sum(axis=1).cumsum()
+        cumulative_returns = self.portfolio_cumulative_pnl
         peak = cumulative_returns.cummax()
         drawdown = (peak - cumulative_returns) / peak
         return drawdown.max()
@@ -246,7 +249,7 @@ class PnlCalculator:
         Assumes daily returns
         """
         max_drawdown = self.max_drawdown()
-        annualized_return = self.pnl.sum(axis=1).mean() * 252
+        annualized_return = self.portfolio_mean_pnl * 252
         if max_drawdown == 0:
             return np.inf
         return annualized_return / abs(max_drawdown)
@@ -313,10 +316,8 @@ def compute_pnls(investment_dates, positions_df: pd.DataFrame):
             id=market_id,
         )
         market = request_parameters.get_markets(
-            add_timeseries=(
-                expected_start,
-                expected_end,
-            )  # 15 days back is the maximum allowed by the API
+            start_time=expected_start,
+            end_time=expected_end,  # 15 days back is the maximum allowed by the API
         )[0]
         markets[market_id] = market
     returns_df, prices_df = get_historical_returns(markets)
@@ -384,9 +385,6 @@ def compute_cumulative_pnl(
     ]
     returns_df = returns_df.loc[returns_df.index >= investment_dates[0]]
 
-    positions_agent_df = positions_agent_df.loc[
-        :, positions_agent_df.columns.isin(returns_df.columns)
-    ]
     logger.info("Analyzing portfolio performance with PnlCalculator...")
 
     logger.info("Positions Table (first 15 rows):")
