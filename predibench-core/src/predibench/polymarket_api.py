@@ -53,6 +53,7 @@ class Market(BaseModel, arbitrary_types_allowed=True):
     liquidity: float | None
     outcomes: list[MarketOutcome]
     prices: pd.Series | None = None
+    price_outcome_name: str | None = None  # Name of the outcome the prices represent
 
     def fill_prices(self, start_time: datetime | None = None, end_time: datetime | None = None) -> None:
         """Fill the prices field with timeseries data.
@@ -69,9 +70,12 @@ class Market(BaseModel, arbitrary_types_allowed=True):
                 end_time=end_time,
             )
             self.prices = ts_request.get_token_daily_timeseries()
+            self.price_outcome_name = self.outcomes[0].name  # Store which outcome the prices represent
+            assert self.price_outcome_name.lower() != "no", f"Price outcome should be YES or a sport's team name."
         else:
             logger.error(f"Incorrect outcomes for market {self.id} with name {self.question} and outcomes {self.outcomes}")
             self.prices = None
+            self.price_outcome_name = None
 
     @staticmethod
     def from_json(market_data: dict) -> Market | None:

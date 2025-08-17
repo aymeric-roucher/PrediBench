@@ -548,7 +548,8 @@ def process_event_investment(model_id: str, event: Event, target_date: date, bac
             "description": market.description,
             "recent_prices": recent_prices,
             "current_price": current_price,
-            "is_closed": is_closed
+            "is_closed": is_closed,
+            "price_outcome_name": market.price_outcome_name or "Unknown outcome"
         }
         market_data.append(market_info)
     
@@ -556,13 +557,14 @@ def process_event_investment(model_id: str, event: Event, target_date: date, bac
     market_summaries = []
     for i, market_info in enumerate(market_data, 1):
         closed_status = " (MARKET CLOSED - NO BETTING ALLOWED)" if market_info['is_closed'] else ""
+        outcome_name = market_info['price_outcome_name']
         summary = f"""
 Market {i} (ID: {market_info['id']}){closed_status}:
 Question: {market_info['question']}
 Description: {market_info['description']}
-Historical YES prices:
+Historical prices for "{outcome_name}":
 {market_info['recent_prices']}
-Last available price: {market_info['current_price']}
+Last available price for "{outcome_name}": {market_info['current_price']}
         """
         market_summaries.append(summary)
     
@@ -577,7 +579,8 @@ You are analyzing {len(event.markets)} markets within this event. Consider how t
 Markets to analyze:
 {"".join(market_summaries)}
 
-For each market, decide whether to BUY (if undervalued), SELL (if overvalued), or do NOTHING (if fairly priced or uncertain).
+For each market, decide whether to BUY (if the shown outcome is undervalued), SELL (if the shown outcome is overvalued), or do NOTHING (if fairly priced or uncertain).
+Note: The prices shown are specifically for the named outcome in each market. BUY means you think that outcome is more likely than the current price suggests.
 Consider market correlations within this event when making decisions.
 
 Use the final_market_decisions tool to provide your decisions with reasoning for each market.
