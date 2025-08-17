@@ -305,7 +305,9 @@ def validate_continuous_returns(
 
 
 # investment_dates seems to be a tuple of two dates ?
-def compute_pnls(investment_dates, positions_df: pd.DataFrame):
+def compute_pnls(
+    investment_dates, positions_df: pd.DataFrame, write_plots: bool = False
+):
     # Validate that we have continuous returns data
     expected_start = investment_dates[0]
     # should be a hyper parameters
@@ -324,8 +326,8 @@ def compute_pnls(investment_dates, positions_df: pd.DataFrame):
 
     validate_continuous_returns(returns_df, expected_start, expected_end)
 
-    final_pnls = {}
-    cumulative_pnls = {}
+    portfolio_daily_pnls = {}
+    portfolio_cumulative_pnls = {}
     figures = {}
 
     for agent_name in positions_df["agent_name"].unique():
@@ -342,36 +344,47 @@ def compute_pnls(investment_dates, positions_df: pd.DataFrame):
             "A this stage, dataframe should not be empty!"
         )
 
-        cumulative_pnl, fig = compute_cumulative_pnl(
+        pnl_calculator = get_pnl_calculator(
             positions_agent_df, returns_df, prices_df, investment_dates
         )
 
-        portfolio_output_path = f"./portfolio_performance/{agent_name}"
-        if not os.path.exists(portfolio_output_path):
-            os.makedirs(portfolio_output_path)
-        fig.write_html(portfolio_output_path + ".html")
-        fig.write_image(portfolio_output_path + ".png")
+        fig = pnl_calculator.plot_pnl(stock_details=True)
+
         logger.info(
-            f"Portfolio visualization saved to: {portfolio_output_path}.html and {portfolio_output_path}.png"
+            f"Performance metrics:\n{pnl_calculator.get_performance_metrics().round(2)}"
         )
 
-        final_pnl = float(cumulative_pnl.iloc[-1])
-        logger.info(f"Final Cumulative PnL for {agent_name}: {final_pnl:.4f}")
-        logger.info(f"Cumulative PnL:\n{cumulative_pnl}")
+        portfolio_cumulative_pnl = pnl_calculator.portfolio_cumulative_pnl
+        portfolio_daily_pnl = pnl_calculator.portfolio_daily_pnl
 
-        final_pnls[agent_name] = final_pnl
-        cumulative_pnls[agent_name] = cumulative_pnl
+        if write_plots:
+            portfolio_output_path = f"./portfolio_performance/{agent_name}"
+            if not os.path.exists(portfolio_output_path):
+                os.makedirs(portfolio_output_path)
+            fig.write_html(portfolio_output_path + ".html")
+            fig.write_image(portfolio_output_path + ".png")
+            logger.info(
+                f"Portfolio visualization saved to: {portfolio_output_path}.html and {portfolio_output_path}.png"
+            )
+
+        logger.info(
+            f"Final Cumulative PnL for {agent_name}: {portfolio_cumulative_pnl.iloc[-1]:.4f}"
+        )
+        logger.info(f"Cumulative PnL:\n{portfolio_cumulative_pnl}")
+
+        portfolio_cumulative_pnls[agent_name] = portfolio_cumulative_pnl
+        portfolio_daily_pnls[agent_name] = portfolio_daily_pnl
         figures[agent_name] = fig
 
-    return final_pnls, cumulative_pnls, figures
+    return portfolio_daily_pnls, portfolio_cumulative_pnls, figures
 
 
-def compute_cumulative_pnl(
+def get_pnl_calculator(
     positions_agent_df: pd.DataFrame,
     returns_df: pd.DataFrame,
     prices_df: pd.DataFrame,
     investment_dates: list,
-) -> pd.DataFrame:
+) -> PnlCalculator:
     # Convert positions_agent_df to have date as index, question as columns, and choice as values
     positions_agent_df = positions_agent_df.pivot(
         index="date", columns="market_id", values="choice"
@@ -406,14 +419,7 @@ def compute_cumulative_pnl(
         f"  Returns range: {returns_df.min().min():.4f} to {returns_df.max().max():.4f}"
     )
 
-    engine = PnlCalculator(positions_agent_df, returns_df, prices_df)
-
-    fig = engine.plot_pnl(stock_details=True)
-
-    logger.info(f"Performance metrics:\n{engine.get_performance_metrics().round(2)}")
-
-    cumulative_pnl = engine.pnl.sum(axis=1).cumsum()
-    return cumulative_pnl, fig
+    return PnlCalculator(positions_agent_df, returns_df, prices_df)
 
 
 def get_historical_returns(
