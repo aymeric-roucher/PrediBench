@@ -9,19 +9,34 @@ from predibench.market_selection import choose_events
 from predibench.polymarket_data import save_events_to_file, load_events_from_file
 from predibench.logger_config import get_logger
 from smolagents.models import ApiModel, InferenceClientModel, OpenAIModel
+from predibench.polymarket_api import Event
 
 load_dotenv()
 
 logger = get_logger(__name__)
 
 
-def select_markets_for_events(events):
-    """Select one random market per event for prediction."""
+def select_markets_for_events(events: list[Event]) -> list[Event]:
+    """Select the market with highest volume1wk that has outcomes[0] price between 0.05 and 0.95."""
+    events_with_selected_markets = []
     for event in events:
         if event.selected_market_id is not None:
             raise ValueError(f"Event '{event.title}' already has a selected market")
-        event.select_random_market()
+        
+        eligible_markets = []
+        for market in event.markets:
+            if (market.volume1wk is not None and 
+                market.outcomes and 
+                len(market.outcomes) > 0 and
+                0.05 < market.outcomes[0].price < 0.95):
+                eligible_markets.append(market)
+        
+        if eligible_markets:
+            best_market = max(eligible_markets, key=lambda m: m.volume1wk)
+            event.selected_market_id = best_market.id
+            events_with_selected_markets.append(event)
 
+    return events_with_selected_markets
 
 def run_investments_for_today(
     time_until_ending: timedelta, 
@@ -70,11 +85,11 @@ def run_investments_for_today(
         
     loaded_events = load_events_from_file(file_path=cache_file)
     
-    select_markets_for_events(selected_events)
+    events_with_selected_markets = select_markets_for_events(selected_events)
     
     launch_agent_investments(
         models=models,
-        events=selected_events,
+        events=events_with_selected_markets,
         date_output_path=date_output_path
     )
     
