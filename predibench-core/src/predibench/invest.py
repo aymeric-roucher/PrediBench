@@ -4,7 +4,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from predibench.agent import launch_agent_investments
+from predibench.agent import launch_agent_investments, ModelInvestmentResult
 from predibench.market_selection import choose_events
 from predibench.polymarket_data import save_events_to_file, load_events_from_file
 from predibench.logger_config import get_logger
@@ -45,7 +45,7 @@ def run_investments_for_today(
     output_path: Path,
     backward_date: date | None = None,
     load_from_cache: bool = False,
-) -> None:
+) -> list[ModelInvestmentResult]:
     """Run event-based investment simulation with multiple AI models."""
     
     if backward_date is None:
@@ -82,9 +82,7 @@ def run_investments_for_today(
     logger.info(f"Selected {len(selected_events)} events for analysis")
     for event in selected_events:
         logger.info(f"- {event.title} (Volume: ${event.volume:,.0f})")
-        
-    loaded_events = load_events_from_file(file_path=cache_file)
-    
+      
     events_with_selected_markets = select_markets_for_events(selected_events)
     
     results_per_model = launch_agent_investments(
@@ -92,14 +90,8 @@ def run_investments_for_today(
         events=events_with_selected_markets,
         date_output_path=date_output_path
     )
-    
     logger.info("Event-based investment analysis complete!")
-    # TODO: Implement PnL calculation for event-based investments
-
-
-
-def compute_pnl_between_dates_for_model(model_name: str, start_date: date, end_date: date) -> float:
-    pass
+    return results_per_model
 
 if __name__ == "__main__":
     models = [
