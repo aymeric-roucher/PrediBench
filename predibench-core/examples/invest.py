@@ -87,7 +87,7 @@ def run_investments_for_today(
     
     events_with_selected_markets = select_markets_for_events(selected_events)
     
-    launch_agent_investments(
+    results_per_model = launch_agent_investments(
         models=models,
         events=events_with_selected_markets,
         date_output_path=date_output_path
@@ -102,20 +102,8 @@ def compute_pnl_between_dates_for_model(model_name: str, start_date: date, end_d
     pass
 
 if __name__ == "__main__":
-    # List of models to use for investments
     models = [
         InferenceClientModel(model_id="openai/gpt-oss-120b"),
-        # InferenceClientModel(model_id="openai/gpt-oss-20b"),
-        # InferenceClientModel(model_id="Qwen/Qwen3-30B-A3B-Instruct-2507"),
-        # InferenceClientModel(model_id="deepseek-ai/DeepSeek-R1-0528"),
-        # InferenceClientModel(model_id="Qwen/Qwen3-4B-Thinking-2507"),
-        # OpenAIModel(model_id="gpt-4.1"),
-        # OpenAIModel(model_id="gpt-4o"),
-        # OpenAIModel(model_id="gpt-4.1-mini"),
-        # OpenAIModel(model_id="o4-mini"),
-        # OpenAIModel(model_id="gpt-5"),
-        # OpenAIModel(model_id="gpt-5-mini"),
-        # OpenAIModel(model_id="o3-deep-research"),
     ]
 
     run_investments_for_today(

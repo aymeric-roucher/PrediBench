@@ -248,7 +248,7 @@ def launch_agent_investments(
     target_date: date | None = None,
     backward_mode: bool = False,
     date_output_path: Path | None = None,
-) -> None:
+) -> list[ModelInvestmentResult]:
     """
     Launch agent investments for events on a specific date.
     Runs each model sequentially (will be parallelized later).
@@ -265,16 +265,20 @@ def launch_agent_investments(
     logger.info(f"Running agent investments for {len(models)} models on {target_date}")
     logger.info(f"Processing {len(events)} events")
     
+    results = []
     for model in models:
         model_name = model.model_id if isinstance(model, ApiModel) else model
         logger.info(f"Processing model: {model_name}")
-        process_single_model(
+        model_result = process_single_model(
             model=model, 
             events=events, 
             target_date=target_date, 
             backward_mode=backward_mode, 
             date_output_path=date_output_path,
         )
+        results.append(model_result)
+    
+    return results
 
 
 def process_single_model(
