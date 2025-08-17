@@ -7,7 +7,8 @@ from predibench.agent import launch_agent_investments, ModelInvestmentResult
 from predibench.market_selection import choose_events
 from predibench.polymarket_data import save_events_to_file, load_events_from_file
 from predibench.logger_config import get_logger
-from smolagents.models import ApiModel, InferenceClientModel, OpenAIModel
+from smolagents.models import ApiModel
+from predibench.retry_models import RetryInferenceClientModel, wrap_model_with_retry
 from predibench.polymarket_api import Event
 from predibench.common import DATA_PATH
 from predibench.storage_utils import upload_results_to_hf_dataset
@@ -128,7 +129,7 @@ def run_investments_for_today(
 
 if __name__ == "__main__":
     models = [
-        InferenceClientModel(model_id="openai/gpt-oss-120b"),
+        RetryInferenceClientModel(model_id="openai/gpt-oss-120b"),
     ]
 
     run_investments_for_today(

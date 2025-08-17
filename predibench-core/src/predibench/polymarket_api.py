@@ -25,6 +25,7 @@ from pydantic import BaseModel
 
 from predibench.common import BASE_URL_POLYMARKET
 from predibench.logger_config import get_logger
+from predibench.retry_config import http_retry
 
 MAX_INTERVAL_TIMESERIES = timedelta(days=14, hours=23, minutes=0)
 # NOTE: above is refined by experience: seems independant from the resolution
@@ -158,6 +159,7 @@ class _RequestParameters(BaseModel):
 
 class MarketsRequestParameters(_RequestParameters):
     
+    @http_retry
     def get_markets(
         self, start_time: datetime | None = None, end_time: datetime | None = None
     ) -> list[Market]:
@@ -206,6 +208,7 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
     start_time: datetime | None = None
     end_time: datetime | None = None
 
+    @http_retry
     def get_token_daily_timeseries(self) -> pd.Series | None:
         """Get token timeseries data using this request configuration.
         
@@ -254,6 +257,7 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
 
 class EventsRequestParameters(_RequestParameters):
     
+    @http_retry
     def get_events(self) -> list[Event]:
         """Get events from Polymarket API using this request configuration."""
         url = f"{BASE_URL_POLYMARKET}/events"
@@ -358,6 +362,7 @@ class OrderBook(BaseModel):
     asks: list[OrderLevel]
 
     @staticmethod
+    @http_retry
     def get_order_book(token_id: str) -> OrderBook:
         """Get order book for a specific token ID from Polymarket CLOB API.
 

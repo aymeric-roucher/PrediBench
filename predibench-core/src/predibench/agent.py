@@ -1,4 +1,3 @@
-import json
 import os
 from datetime import date, datetime
 from pathlib import Path
@@ -16,10 +15,11 @@ from smolagents import (
     ApiModel,
 )
 
-from predibench.polymarket_api import Market, Event
-from predibench.common import DATA_PATH
+from predibench.polymarket_api import Event
 from predibench.logger_config import get_logger
 from predibench.storage_utils import write_to_storage
+from predibench.retry_config import http_retry, llm_retry
+from predibench.retry_models import wrap_model_with_retry
 from pydantic import BaseModel
 
 load_dotenv()
@@ -79,6 +79,7 @@ class GoogleSearchTool(Tool):
             )
         self.cutoff_date = cutoff_date
 
+    @http_retry
     def forward(self, query: str) -> str:
         import requests
 
@@ -159,6 +160,7 @@ def final_answer(rationale: str, decision: Literal["BUY", "SELL", "NOTHING"]) ->
     return EventDecisions(rationale=rationale, decision=decision)
 
 
+@llm_retry
 def run_smolagent_for_event(
     model: ApiModel, question: str, cutoff_date: datetime
 ) -> EventDecisions:
@@ -216,11 +218,13 @@ def create_market_investment_decision(
         )
 
 
+@llm_retry
 def run_deep_research(
     model_id: str,
     question: str,
     cutoff_date: date,
 ) -> RunResult:
+    # Note: cutoff_date parameter is kept for API compatibility but not used in OpenAI responses
     from openai import OpenAI
 
     client = OpenAI(timeout=3600)
@@ -268,10 +272,12 @@ def launch_agent_investments(
     
     results = []
     for model in models:
-        model_name = model.model_id if isinstance(model, ApiModel) else model
+        # Wrap model with retry logic if it's an ApiModel
+        retry_model = wrap_model_with_retry(model)
+        model_name = retry_model.model_id if isinstance(retry_model, ApiModel) else retry_model
         logger.info(f"Processing model: {model_name}")
         model_result = process_single_model(
-            model=model, 
+            model=retry_model, 
             events=events, 
             target_date=target_date, 
             backward_mode=backward_mode, 

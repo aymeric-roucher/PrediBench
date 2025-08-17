@@ -12,6 +12,7 @@ from predibench.polymarket_api import (
     EventsRequestParameters,
 )
 from predibench.logger_config import get_logger
+from predibench.retry_config import http_retry
 
 logger = get_logger(__name__)
 
@@ -55,8 +56,8 @@ def _filter_events_by_volume_and_markets(events: list[Event], min_volume: float 
                 filtered_events.append(event)
     return filtered_events
 
-# TODO: add tenacity retry for the requests
 # TODO: all of the parameters here should be threated as hyper parameters
+@http_retry
 def choose_events(today_date: datetime, time_until_ending: timedelta, n_events: int, key_for_filtering: str = "volume", min_volume: float = 1000, backward_mode: bool = False, filter_crypto_events: bool = True) -> list[Event]:
     """Pick top events by volume for investment for the current week
     
