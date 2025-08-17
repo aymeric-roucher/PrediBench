@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datasets import load_dataset
-from predibench.pnl import compute_pnls
+from predibench.pnl import get_pnls
 
 # Configuration
 AGENT_CHOICES_REPO = "m-ric/predibench-agent-choices"
@@ -18,31 +18,86 @@ def load_agent_choices():
     return dataset.to_pandas()
 
 
+def add_rationale_markers(
+    fig: go.Figure, agent_data: pd.DataFrame, prices: pd.DataFrame
+):
+    """Add square markers with rationale to the price chart for each position taken"""
+    colors = px.colors.qualitative.Plotly
+
+    # Filter positions where a choice was made (not 0)
+    positions_taken = agent_data[agent_data["choice"] != 0].copy()
+
+    if len(positions_taken) == 0:
+        return fig
+
+    # Group by market_id to get consistent colors
+    for i, (market_id, market_positions) in enumerate(
+        positions_taken.groupby("market_id")
+    ):
+        col_color = colors[i % len(colors)]
+
+        # Add square markers at y=1 for each position
+        fig.add_trace(
+            go.Scatter(
+                x=market_positions["date"],
+                y=prices.loc[market_positions["date"]][market_id],
+                mode="markers",
+                marker=dict(
+                    symbol="square",
+                    size=12,
+                    color=col_color,
+                    line=dict(width=2, color="black"),
+                ),
+                hovertemplate="<b>Position Taken</b><br>"
+                + "Date: %{x}<br>"
+                + "Market: "
+                + str(market_id)[:40]
+                + "<br>"
+                + "Choice: %{customdata[0]}<br>"
+                + "Rationale: %{customdata[1]}<br>"
+                + "<extra></extra>",
+                customdata=list(
+                    zip(market_positions["choice"], market_positions["rationale"])
+                ),
+                showlegend=False,
+                name=f"Positions - {str(market_id)[:20]}",
+            ),
+            row=1,  # Add to the price chart (top subplot)
+            col=1,
+        )
+
+    return fig
+
+
 def calculate_pnl_and_performance(positions_df: pd.DataFrame):
     """Calculate real PnL and performance metrics for each agent using historical market data"""
     investment_dates = sorted(positions_df["date"].unique())
-    portfolio_daily_pnls, portfolio_cumulative_pnls, figures = compute_pnls(
-        investment_dates, positions_df, write_plots=False
-    )
+    pnl_calculators = get_pnls(investment_dates, positions_df, write_plots=False)
 
     # Convert to the format expected by frontend
     agents_performance = {}
     for agent in positions_df["agent_name"].unique():
+        pnl_calculator = pnl_calculators[agent]
         agent_data = positions_df[positions_df["agent_name"] == agent].copy()
-        daily_pnl = portfolio_daily_pnls[agent]
-        cumulative_pnl = portfolio_cumulative_pnls[agent]
+        daily_pnl = pnl_calculator.portfolio_daily_pnl
+        cumulative_pnl = pnl_calculator.portfolio_cumulative_pnl
+        prices = pnl_calculator.prices
+
+        # Enhance the figure with rationale markers
+        enhanced_figure = add_rationale_markers(
+            pnl_calculator.plot_pnl(stock_details=True), agent_data, prices
+        )
 
         agents_performance[agent] = {
-            "total_decisions": len(agent_data),
             "long_positions": len(agent_data[agent_data["choice"] == 1]),
             "short_positions": len(agent_data[agent_data["choice"] == -1]),
             "no_positions": len(agent_data[agent_data["choice"] == 0]),
-            "cumulative_pnl": portfolio_cumulative_pnls[agent].iloc[-1],
+            "cumulative_pnl": pnl_calculator.portfolio_cumulative_pnl.iloc[-1],
             "annualized_sharpe_ratio": (daily_pnl.mean() / daily_pnl.std())
             * np.sqrt(252),
             "daily_cumulative_pnl": cumulative_pnl.tolist(),
             "dates": cumulative_pnl.index.tolist(),
-            "figure": figures[agent],
+            "figure": enhanced_figure,
         }
 
     return agents_performance
@@ -58,7 +113,6 @@ def create_leaderboard(performance_data):
                 "Agent": agent.replace("smolagent_", "").replace("--", "/"),
                 "Cumulative PnL": f"{metrics['cumulative_pnl']:.3f}",
                 "Annualized Sharpe Ratio": f"{metrics['annualized_sharpe_ratio']:.3f}",
-                "Total Decisions": metrics["total_decisions"],
                 "Long Positions": metrics["long_positions"],
                 "Short Positions": metrics["short_positions"],
                 "No Position": metrics["no_positions"],
@@ -121,66 +175,26 @@ def create_pnl_plot(performance_data):
     return fig
 
 
-def refresh_data():
-    """Refresh all data and return updated components"""
-    df = load_agent_choices()
-    performance_data = calculate_pnl_and_performance(df)
-
-    leaderboard = create_leaderboard(performance_data)
-    pnl_plot = create_pnl_plot(performance_data)
-    agent_list = [
-        agent.replace("smolagent_", "").replace("--", "/")
-        for agent in performance_data.keys()
-    ]
-    portfolio_list = list(performance_data.keys())
-    first_portfolio_plot = (
-        performance_data[portfolio_list[0]]["figure"] if portfolio_list else None
-    )
-
-    return (
-        leaderboard,
-        pnl_plot,
-        gr.update(choices=agent_list),
-        gr.update(
-            choices=portfolio_list, value=portfolio_list[0] if portfolio_list else None
-        ),
-        first_portfolio_plot,
-        f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-    )
-
-
 # Initialize data
 df = load_agent_choices()
 performance_data = calculate_pnl_and_performance(df)
 
 # Create Gradio interface
 with gr.Blocks(title="PrediBench Leaderboard", theme=gr.themes.Soft()) as demo:
-    gr.Markdown("# 🏆 PrediBench Agent Leaderboard")
+    gr.Markdown("# 🏆 PrediBench - Can LLMs predict the future?")
     gr.Markdown(
-        "Track the performance of AI agents making predictions on Polymarket questions"
+        f"Track the performance of AI agents making predictions on Polymarket questions. Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
     )
 
-    with gr.Row():
-        refresh_btn = gr.Button("🔄 Refresh Data", variant="primary")
-        last_updated = gr.Textbox(
-            value=f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            label="Status",
-            interactive=False,
-            scale=3,
-        )
-
     with gr.Tabs():
-        with gr.TabItem("📊 Leaderboard"):
-            gr.Markdown("### Agent Performance Ranking")
+        with gr.TabItem("🏆 Leaderboard"):
             leaderboard_table = gr.Dataframe(
                 value=create_leaderboard(performance_data), interactive=False, wrap=True
             )
 
             pnl_plot = gr.Plot(value=create_pnl_plot(performance_data))
 
-        with gr.TabItem("📊 Portfolio Details"):
-            gr.Markdown("### Detailed Portfolio Analysis")
-
+        with gr.TabItem("🔍 Portfolio Details"):
             with gr.Row():
                 portfolio_dropdown = gr.Dropdown(
                     choices=[agent for agent in performance_data.keys()],
@@ -208,18 +222,6 @@ with gr.Blocks(title="PrediBench Leaderboard", theme=gr.themes.Soft()) as demo:
                 inputs=portfolio_dropdown,
                 outputs=portfolio_plot,
             )
-
-    # Refresh functionality
-    refresh_btn.click(
-        fn=refresh_data,
-        outputs=[
-            leaderboard_table,
-            pnl_plot,
-            portfolio_dropdown,
-            portfolio_plot,
-            last_updated,
-        ],
-    )
 
 if __name__ == "__main__":
     demo.launch(server_name="0.0.0.0", server_port=7860)
