@@ -314,7 +314,7 @@ def run_deep_research(
     )
 
 def launch_agent_investments(
-    list_models: list[ApiModel | str], 
+    models: list[ApiModel | str], 
     events: list[Event], 
     target_date: date | None = None,
     backward_mode: bool = False
@@ -324,7 +324,7 @@ def launch_agent_investments(
     Runs each model sequentially (will be parallelized later).
     
     Args:
-        list_models: List of ApiModel objects or "test_random" string to run investments with
+        models: List of ApiModel objects or "test_random" string to run investments with
         events: List of events to analyze
         target_date: Date for backward compatibility (defaults to today)
         backward_mode: Whether running in backward compatibility mode
@@ -332,10 +332,10 @@ def launch_agent_investments(
     if target_date is None:
         target_date = date.today()
     
-    logger.info(f"Running agent investments for {len(list_models)} models on {target_date}")
+    logger.info(f"Running agent investments for {len(models)} models on {target_date}")
     logger.info(f"Processing {len(events)} events")
     
-    for model in list_models:
+    for model in models:
         model_name = model.model_id if isinstance(model, ApiModel) else model
         logger.info(f"Processing model: {model_name}")
         process_single_model(model=model, events=events, target_date=target_date, backward_mode=backward_mode)

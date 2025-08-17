@@ -18,7 +18,7 @@ logger = get_logger(__name__)
 def run_investments_for_today(
     time_until_ending: timedelta, 
     max_n_events: int, 
-    model_names: list[str], 
+    models: list[ApiModel | str], 
     output_path: Path,
     backward_date: date | None = None,
     load_from_cache: bool = False,
@@ -66,7 +66,7 @@ def run_investments_for_today(
     # you must also implement a mechanism to have more datapoints (backward compatiblities)
     # then frontend backend and deployment
     launch_agent_investments(
-        list_models=model_names,
+        models=models,
         events=selected_events
     )
     
@@ -80,7 +80,7 @@ def compute_pnl_between_dates_for_model(model_name: str, start_date: date, end_d
 
 if __name__ == "__main__":
     # List of models to use for investments
-    list_models = [
+    models = [
         "test_random",
         InferenceClientModel(model_id="openai/gpt-oss-120b"),
         # InferenceClientModel(model_id="openai/gpt-oss-20b"),
@@ -99,6 +99,6 @@ if __name__ == "__main__":
     run_investments_for_today(
         time_until_ending=timedelta(days=21), 
         max_n_events=3, 
-        model_names=["test_random"], 
+        models=models, 
         output_path=Path("data"),
     )
