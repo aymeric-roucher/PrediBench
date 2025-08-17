@@ -1,33 +1,25 @@
 import json
 import os
-import textwrap
 from datetime import date, datetime
 from pathlib import Path
 from typing import Literal
 
 import numpy as np
-import pandas as pd
 from dotenv import load_dotenv
 from smolagents import (
-    ChatMessage,
-    InferenceClientModel,
-    LiteLLMModel,
-    OpenAIModel,
     RunResult,
     Timing,
     Tool,
     ToolCallingAgent,
     VisitWebpageTool,
     tool,
+    ApiModel,
 )
-from smolagents.models import ApiModel
 
 from predibench.polymarket_api import Market, Event
 from predibench.utils import OUTPUT_PATH
 from predibench.logger_config import get_logger
 from pydantic import BaseModel
-from langchain.prompts import PromptTemplate
-from langchain.output_parsers import PydanticOutputParser
 
 load_dotenv()
 
@@ -38,7 +30,7 @@ class MarketInvestmentDecision(BaseModel):
     market_id: str
     market_question: str
     decision: Literal["BUY", "SELL", "NOTHING"]
-    reasoning: str | None = None
+    rationale: str | None = None
     market_price: float | None = None
     is_closed: bool = False
 
@@ -47,8 +39,7 @@ class EventInvestmentResult(BaseModel):
     event_id: str
     event_title: str
     event_description: str | None = None
-    market_decisions: list[MarketInvestmentDecision]
-    overall_reasoning: str  # Overall reasoning for the event
+    market_decision: MarketInvestmentDecision
 
 
 class ModelInvestmentResult(BaseModel):
@@ -58,7 +49,7 @@ class ModelInvestmentResult(BaseModel):
 
 
 class EventDecisions(BaseModel):
-    reasoning: str
+    rationale: str
     decision: Literal["BUY", "SELL", "NOTHING"]
 
 
@@ -149,78 +140,39 @@ class GoogleSearchTool(Tool):
 
 
 @tool
-def final_answer(json_str: str) -> EventDecisions:
+def final_answer(rationale: str, decision: Literal["BUY", "SELL", "NOTHING"]) -> EventDecisions:
     """
-    This tool is used to validate the output of the event decision agent.
+    This tool is used to validate and return the final event decision.
+    
+    This tool must be used only once. The rationale and decision must be provided in the same call.
     
     Args:
-        json_str (str): The JSON string to validate for event decision.
+        rationale (str): The rationale for the decision.
+        decision (Literal["BUY", "SELL", "NOTHING"]): The decision to make.
         
     Returns:
         EventDecisions: The validated EventDecisions object, raises error if invalid.
     """
-    data = json.loads(json_str)
-    return EventDecisions(**data)
-
-
-@tool
-def final_answer(
-    answer: Literal["yes", "no", "nothing"],
-) -> Literal["yes", "no", "nothing"]:
-    """
-    Provides a final answer to the given problem.
-
-    Args:
-        answer: The final investment or non-investment decision. Do not invest in any outcome if you don't have a clear preference.
-    """
-    logger.info(f"Final answer: {answer}")
-    return answer
-
-
-@tool
-def final_market_decisions(
-    decisions: dict,
-) -> dict:
-    """
-    Provides final investment decisions for all markets in an event with reasoning.
-
-    Args:
-        decisions: Dictionary mapping market_id to decision details.
-                  Example: {
-                      "market_123": {"decision": "BUY", "reasoning": "Market undervalues the probability based on recent events"},
-                      "market_456": {"decision": "SELL", "reasoning": "Current price overestimates likelihood due to hype"},
-                      "market_789": {"decision": "NOTHING", "reasoning": "Insufficient information to make confident prediction"}
-                  }
-                  Valid decisions: "BUY", "SELL", "NOTHING"
-    """
-    logger.info(f"Final market decisions: {decisions}")
-    return decisions
+    assert decision in ["BUY", "SELL", "NOTHING"], "Invalid decision, must be BUY, SELL or NOTHING"
+    assert len(rationale) > 0, "Rationale must be a non-empty string"
+    return EventDecisions(rationale=rationale, decision=decision)
 
 
 def run_smolagent_for_event(
     model: ApiModel, question: str, cutoff_date: datetime
 ) -> EventDecisions:
-    """Run smolagent for event-level analysis with multi-market tools using structured output."""
+    """Run smolagent for event-level analysis with single market decision using structured output."""
     
     # Create the parser and prompt template
-    parser = PydanticOutputParser(pydantic_object=EventDecisions)
-    prompt_template = PromptTemplate(
-        template="""
-        {question}
+    template = """
+{question}
         
-        {format_instructions}
-        
-        You must return a valid JSON object that matches the EventDecisions schema and nothing else.
-        
-        Use the validate_event_decision_json tool to validate your output before providing the final answer.
-        Give your final answer only if it passes the validation.
-        """,
-        input_variables=["question"],
-        partial_variables={"format_instructions": parser.get_format_instructions()}
-    )
-    
+Use the final_answer tool to validate your output before providing the final answer.
+The final_answer tool must contain the arguments rationale and decision.
+"""
+
     # Format the prompt
-    prompt = prompt_template.format(question=question)
+    prompt = template.format(question=question)
     
     tools = [
         GoogleSearchTool(provider="serper", cutoff_date=cutoff_date),
@@ -234,7 +186,7 @@ def run_smolagent_for_event(
     result = agent.run(prompt)
     
     # Parse and return the structured output
-    return EventDecisions.model_validate_json(result.output)
+    return result.output
 
 
 def create_market_investment_decision(
@@ -248,7 +200,7 @@ def create_market_investment_decision(
             market_id=selected_market_info['id'],
             market_question=selected_market_info['question'],
             decision="NOTHING",
-            reasoning=f"Market is closed. Original reasoning: {event_decision.reasoning}",
+            rationale=f"Market is closed. Original rationale: {event_decision.rationale}",
             market_price=selected_market_info['current_price'],
             is_closed=True
         )
@@ -257,7 +209,7 @@ def create_market_investment_decision(
             market_id=selected_market_info['id'],
             market_question=selected_market_info['question'],
             decision=event_decision.decision,
-            reasoning=event_decision.reasoning,
+            rationale=event_decision.rationale,
             market_price=selected_market_info['current_price'],
             is_closed=False
         )
@@ -439,7 +391,7 @@ For the TARGET MARKET ONLY, decide whether to BUY (if the shown outcome is under
 Note: The prices shown are specifically for the named outcome. BUY means you think that outcome is more likely than the current price suggests.
 Consider how the context markets might relate to your target market decision.
 
-Provide your decision and reasoning for the TARGET MARKET only.
+Provide your decision and rationale for the TARGET MARKET only.
     """
     
     # Save prompt to file if date_output_path is provided
@@ -459,7 +411,7 @@ Provide your decision and reasoning for the TARGET MARKET only.
         choice = np.random.choice(["BUY", "SELL", "NOTHING"], p=[0.3, 0.3, 0.4])
         event_decision = EventDecisions(
             decision=choice,
-            reasoning=f"Random decision for testing market {event.selected_market_id}"
+            rationale=f"Random decision for testing market {event.selected_market_id}"
         )
     else:
         event_decision = run_smolagent_for_event(model, full_question, cutoff_date=target_date)
@@ -471,8 +423,7 @@ Provide your decision and reasoning for the TARGET MARKET only.
         event_id=event.id,
         event_title=event.title,
         event_description=event.description,
-        market_decisions=[market_decision],  # Only one decision now
-        overall_reasoning=event_decision.reasoning
+        market_decision=market_decision,
     )
 
 
