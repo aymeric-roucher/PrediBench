@@ -5,16 +5,10 @@ from typing import Any
 
 import pandas as pd
 
-from predibench.common import OUTPUT_PATH
 from predibench.polymarket_api import Event, Market, MarketOutcome
 from predibench.logger_config import get_logger
 
 logger = get_logger(__name__)
-
-# Create cache directory if it doesn't exist
-CACHE_PATH = OUTPUT_PATH / "cache"
-CACHE_PATH.mkdir(parents=True, exist_ok=True)
-
 
 def market_to_dict(market: Market) -> dict[str, Any]:
     """Convert a Market object to a dictionary for JSON serialization."""
@@ -110,10 +104,8 @@ def event_from_dict(event_data: dict[str, Any]) -> Event:
     return Event(**event_data)
 
 
-def save_events_to_file(events: list[Event], file_path: Path | None = None) -> None:
+def save_events_to_file(events: list[Event], file_path: Path) -> None:
     """Save a list of Event objects to a JSON file."""
-    if file_path is None:
-        file_path = CACHE_PATH / "selected_events.json"
     
     # Use the event_to_dict function for each event
     events_data = [event_to_dict(event) for event in events]
@@ -124,7 +116,7 @@ def save_events_to_file(events: list[Event], file_path: Path | None = None) -> N
     logger.info(f"Saved {len(events)} events to cache: {file_path}")
 
 
-def load_events_from_file(file_path: Path | None = None) -> list[Event]:
+def load_events_from_file(file_path: Path) -> list[Event]:
     """Load a list of Event objects from a JSON file."""
     
     if not file_path.exists():

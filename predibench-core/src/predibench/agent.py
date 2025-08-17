@@ -17,7 +17,7 @@ from smolagents import (
 )
 
 from predibench.polymarket_api import Market, Event
-from predibench.utils import OUTPUT_PATH
+from predibench.common import DATA_PATH
 from predibench.logger_config import get_logger
 from pydantic import BaseModel
 
@@ -309,7 +309,7 @@ def process_single_model(
         event_results=event_results
     )
     
-    save_model_result(model_result, target_date, date_output_path)
+    save_model_result(model_result=model_result, date_output_path=date_output_path)
     return model_result
 
 
@@ -464,17 +464,13 @@ Provide your decision and rationale for the TARGET MARKET only.
     )
 
 
-def save_model_result(model_result: ModelInvestmentResult, target_date: date, date_output_path: Path | None = None) -> None:
+def save_model_result(model_result: ModelInvestmentResult, date_output_path: Path) -> None:
     """Save model investment result to file."""
-    if date_output_path is not None:
-        output_dir = date_output_path
-    else:
-        output_dir = OUTPUT_PATH / "investments" / target_date.strftime("%Y-%m-%d")
-    
-    output_dir.mkdir(parents=True, exist_ok=True)
+
+    date_output_path.mkdir(parents=True, exist_ok=True)
     
     filename = f"{model_result.model_id.replace('/', '--')}.json"
-    filepath = output_dir / filename
+    filepath = date_output_path / filename
     
     with open(filepath, "w") as f:
         f.write(model_result.model_dump_json(indent=2))

@@ -4,7 +4,6 @@ from datetime import date, datetime, timedelta
 
 from smolagents import ChatMessage, LiteLLMModel
 
-from predibench.common import OUTPUT_PATH
 from predibench.polymarket_api import (
     MAX_INTERVAL_TIMESERIES,
     Market,
