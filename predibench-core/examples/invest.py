@@ -15,6 +15,14 @@ load_dotenv()
 logger = get_logger(__name__)
 
 
+def select_markets_for_events(events):
+    """Select one random market per event for prediction."""
+    for event in events:
+        if event.selected_market_id is not None:
+            raise ValueError(f"Event '{event.title}' already has a selected market")
+        event.select_random_market()
+
+
 def run_investments_for_today(
     time_until_ending: timedelta, 
     max_n_events: int, 
@@ -62,9 +70,8 @@ def run_investments_for_today(
         
     loaded_events = load_events_from_file(file_path=cache_file)
     
-    # now you have to do the investment agent for each event, think about the database and compute the pnl
-    # you must also implement a mechanism to have more datapoints (backward compatiblities)
-    # then frontend backend and deployment
+    select_markets_for_events(selected_events)
+    
     launch_agent_investments(
         models=models,
         events=selected_events

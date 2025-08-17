@@ -55,8 +55,8 @@ class ModelInvestmentResult(BaseModel):
 
 
 class MarketDecision(BaseModel):
-    decision: Literal["BUY", "SELL", "NOTHING"]
     reasoning: str
+    decision: Literal["BUY", "SELL", "NOTHING"]
 
 
 class EventDecisions(BaseModel):
