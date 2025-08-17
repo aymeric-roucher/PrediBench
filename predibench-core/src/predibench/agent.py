@@ -247,7 +247,7 @@ def launch_agent_investments(
     events: list[Event], 
     target_date: date | None = None,
     backward_mode: bool = False,
-    date_output_path: Path | None = None
+    date_output_path: Path | None = None,
 ) -> None:
     """
     Launch agent investments for events on a specific date.
@@ -268,16 +268,34 @@ def launch_agent_investments(
     for model in models:
         model_name = model.model_id if isinstance(model, ApiModel) else model
         logger.info(f"Processing model: {model_name}")
-        process_single_model(model=model, events=events, target_date=target_date, backward_mode=backward_mode, date_output_path=date_output_path)
+        process_single_model(
+            model=model, 
+            events=events, 
+            target_date=target_date, 
+            backward_mode=backward_mode, 
+            date_output_path=date_output_path,
+        )
 
 
-def process_single_model(model: ApiModel | str, events: list[Event], target_date: date, backward_mode: bool, date_output_path: Path | None = None) -> ModelInvestmentResult:
+def process_single_model(
+    model: ApiModel | str, 
+    events: list[Event], 
+    target_date: date, 
+    backward_mode: bool, 
+    date_output_path: Path | None = None,
+) -> ModelInvestmentResult:
     """Process investments for all events for a specific model and save results."""
     event_results = []
     
     for event in events:
         logger.info(f"Processing event: {event.title}")
-        event_result = process_event_investment(model=model, event=event, target_date=target_date, backward_mode=backward_mode, date_output_path=date_output_path)
+        event_result = process_event_investment(
+            model=model, 
+            event=event, 
+            target_date=target_date, 
+            backward_mode=backward_mode, 
+            date_output_path=date_output_path,
+        )
         event_results.append(event_result)
     
     model_id = model.model_id if isinstance(model, ApiModel) else model
@@ -291,7 +309,15 @@ def process_single_model(model: ApiModel | str, events: list[Event], target_date
     return model_result
 
 
-def process_event_investment(model: ApiModel | str, event: Event, target_date: date, backward_mode: bool, date_output_path: Path | None = None) -> EventInvestmentResult:
+def process_event_investment(
+    model: ApiModel | str, 
+    event: Event, 
+    target_date: date, 
+    backward_mode: bool, 
+    date_output_path: Path | None = None,
+    main_market_price_history_limit: int = 200,
+    other_markets_price_history_limit: int = 20
+) -> EventInvestmentResult:
     """Process investment decision for the selected market in an event."""
     logger.info(f"Processing event: {event.title} with selected market")
     
@@ -311,23 +337,26 @@ def process_event_investment(model: ApiModel | str, event: Event, target_date: d
         if market.prices is None:
             raise ValueError("markets are supposed to be filtered, this should not be possible")
         
+        # Determine price history limit based on whether this is the selected market
+        price_limit = main_market_price_history_limit if market.id == event.selected_market_id else other_markets_price_history_limit
+        
         # Check if market is closed and get price data
         if market.prices is not None and target_date in market.prices.index:
-            recent_prices = (
-                market.prices.loc[:target_date]
-                .dropna()
-                .to_string(index=True, header=False)
-            )
+            price_data = market.prices.loc[:target_date].dropna()
+            # Limit price history
+            if len(price_data) > price_limit:
+                price_data = price_data.tail(price_limit)
+            recent_prices = price_data.to_string(index=True, header=False)
             current_price = float(market.prices.loc[target_date])
             is_closed = False
         else:
             # Market is closed - get all available historical prices
             if market.prices is not None and len(market.prices) > 0:
-                recent_prices = (
-                    market.prices
-                    .dropna()
-                    .to_string(index=True, header=False)
-                )
+                price_data = market.prices.dropna()
+                # Limit price history
+                if len(price_data) > price_limit:
+                    price_data = price_data.tail(price_limit)
+                recent_prices = price_data.to_string(index=True, header=False)
                 current_price = float(market.prices.dropna().iloc[-1])
             else:
                 recent_prices = "No price data available"
