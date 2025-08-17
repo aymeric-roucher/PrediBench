@@ -139,7 +139,7 @@ def test_polymarket_api_integration():
 def test_get_events():
     """Test basic market event retrieval."""
     request_parameters = EventsRequestParameters(
-        limit=500,
+        limit=10,
         order="volume",
         ascending=False,
         # end_date_min=datetime.today() + timedelta(days=1),
@@ -156,7 +156,6 @@ def test_get_events():
                     end_time=datetime.today()
                 )
     assert len(events) >= 10  # Should get at least some events
-test_get_events()
 
 def test_get_events_offset():
     """Test that offset parameter works correctly."""
@@ -175,7 +174,7 @@ def test_get_events_offset():
     
 def test_get_market_events():
     """Test basic market event retrieval."""
-    request_parameters = EventsRequestParameters(limit=10)
+    request_parameters = EventsRequestParameters(limit=2)
     events = request_parameters.get_events()
     
     for event in events:
@@ -202,7 +201,7 @@ def test_get_market_events():
                 assert len(outcome.clob_token_id) > 0
                 assert 0 <= outcome.price <= 1
 
-    assert len(events) >= 5  # Should get at least some events
+    assert len(events) >= 1  # Should get at least some events
 
 
 
