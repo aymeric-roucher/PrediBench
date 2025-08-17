@@ -74,7 +74,8 @@ def run_investments_for_today(
     
     launch_agent_investments(
         models=models,
-        events=selected_events
+        events=selected_events,
+        date_output_path=date_output_path
     )
     
     logger.info("Event-based investment analysis complete!")

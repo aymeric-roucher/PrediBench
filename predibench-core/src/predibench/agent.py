@@ -2,6 +2,7 @@ import json
 import os
 import textwrap
 from datetime import date, datetime
+from pathlib import Path
 from typing import Literal
 
 import numpy as np
@@ -291,7 +292,8 @@ def launch_agent_investments(
     models: list[ApiModel | str], 
     events: list[Event], 
     target_date: date | None = None,
-    backward_mode: bool = False
+    backward_mode: bool = False,
+    date_output_path: Path | None = None
 ) -> None:
     """
     Launch agent investments for events on a specific date.
@@ -312,16 +314,16 @@ def launch_agent_investments(
     for model in models:
         model_name = model.model_id if isinstance(model, ApiModel) else model
         logger.info(f"Processing model: {model_name}")
-        process_single_model(model=model, events=events, target_date=target_date, backward_mode=backward_mode)
+        process_single_model(model=model, events=events, target_date=target_date, backward_mode=backward_mode, date_output_path=date_output_path)
 
 
-def process_single_model(model: ApiModel | str, events: list[Event], target_date: date, backward_mode: bool) -> ModelInvestmentResult:
+def process_single_model(model: ApiModel | str, events: list[Event], target_date: date, backward_mode: bool, date_output_path: Path | None = None) -> ModelInvestmentResult:
     """Process investments for all events for a specific model and save results."""
     event_results = []
     
     for event in events:
         logger.info(f"Processing event: {event.title}")
-        event_result = process_event_investment(model=model, event=event, target_date=target_date, backward_mode=backward_mode)
+        event_result = process_event_investment(model=model, event=event, target_date=target_date, backward_mode=backward_mode, date_output_path=date_output_path)
         event_results.append(event_result)
     
     model_id = model.model_id if isinstance(model, ApiModel) else model
@@ -335,7 +337,7 @@ def process_single_model(model: ApiModel | str, events: list[Event], target_date
     return model_result
 
 
-def process_event_investment(model: ApiModel | str, event: Event, target_date: date, backward_mode: bool) -> EventInvestmentResult:
+def process_event_investment(model: ApiModel | str, event: Event, target_date: date, backward_mode: bool, date_output_path: Path | None = None) -> EventInvestmentResult:
     """Process investment decision for the selected market in an event."""
     logger.info(f"Processing event: {event.title} with selected market")
     
@@ -437,6 +439,17 @@ Consider how the context markets might relate to your target market decision.
 
 Provide your decision and reasoning for the TARGET MARKET only.
     """
+    
+    # Save prompt to file if date_output_path is provided
+    if date_output_path:
+        model_id = model.model_id if isinstance(model, ApiModel) else model
+        prompt_dir = date_output_path / model_id.replace('/', '--')
+        prompt_dir.mkdir(parents=True, exist_ok=True)
+        prompt_file = prompt_dir / f"prompt_event_{event.id}.txt"
+        
+        with open(prompt_file, "w", encoding="utf-8") as f:
+            f.write(full_question)
+        logger.info(f"Saved prompt to {prompt_file}")
     
     # Get agent decisions using smolagents
     if isinstance(model, str) and model == "test_random":
