@@ -12,7 +12,6 @@ from smolagents import (
     OpenAIModel,
     RunResult,
     Timing,
-    TokenUsage,
     Tool,
     ToolCallingAgent,
     VisitWebpageTool,
@@ -47,7 +46,6 @@ class EventInvestmentResult(BaseModel):
     event_description: str | None = None
     market_decisions: list[MarketInvestmentDecision]
     overall_reasoning: str  # Overall reasoning for the event
-    token_usage: dict | None = None
 
 
 class ModelInvestmentResult(BaseModel):
@@ -311,7 +309,7 @@ def run_deep_research(
         output=choice,
         steps=[],
         state={},
-        token_usage=TokenUsage(0, 0),
+        token_usage=None,
         timing=Timing(0.0),
     )
 
@@ -454,10 +452,8 @@ Use the final_market_decisions tool to provide your decisions with reasoning for
             decisions=decisions_dict,
             overall_reasoning="Random decisions generated for testing purposes"
         )
-        token_usage = None
     else:
         event_decisions = run_smolagent_for_event(model, full_question, cutoff_date=target_date)
-        token_usage = None  # TODO: Extract token usage from agent if needed
     
     # Convert to MarketInvestmentDecision objects using helper function
     market_decisions = create_market_investment_decisions(event_decisions, market_data)
@@ -467,8 +463,7 @@ Use the final_market_decisions tool to provide your decisions with reasoning for
         event_title=event.title,
         event_description=event.description,
         market_decisions=market_decisions,
-        overall_reasoning=event_decisions.overall_reasoning,
-        token_usage=token_usage
+        overall_reasoning=event_decisions.overall_reasoning
     )
 
 
