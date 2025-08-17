@@ -22,10 +22,33 @@ from smolagents import (
 from predibench.polymarket_api import Market, Event
 from predibench.utils import OUTPUT_PATH
 from predibench.logger_config import get_logger
+from pydantic import BaseModel
 
 load_dotenv()
 
 logger = get_logger(__name__)
+
+
+class MarketInvestmentDecision(BaseModel):
+    market_id: str
+    market_question: str
+    decision: str  # "yes", "no", or "nothing"
+    reasoning: str
+    confidence: float | None = None
+    market_price: float | None = None
+    token_usage: dict | None = None
+
+
+class EventInvestmentResult(BaseModel):
+    event_id: str
+    event_title: str
+    market_decisions: list[MarketInvestmentDecision]
+
+
+class ModelInvestmentResult(BaseModel):
+    model_id: str
+    target_date: date
+    event_results: list[EventInvestmentResult]
 
 
 class GoogleSearchTool(Tool):
@@ -308,15 +331,126 @@ def run_deep_research(
         token_usage=TokenUsage(0, 0),
         timing=Timing(0.0),
     )
-def launch_agent_investments(list_models, investment_dates, prices_df, markets):
+def launch_agent_investments(
+    list_models: list[str], 
+    events: list[Event], 
+    target_date: date | None = None,
+    backward_mode: bool = False
+) -> None:
+    """
+    Launch agent investments for events on a specific date.
+    Runs each model sequentially (will be parallelized later).
+    
+    Args:
+        list_models: List of model IDs to run investments with
+        events: List of events to analyze
+        target_date: Date for backward compatibility (defaults to today)
+        backward_mode: Whether running in backward compatibility mode
+    """
+    if target_date is None:
+        target_date = date.today()
+    
+    logger.info(f"Running agent investments for {len(list_models)} models on {target_date}")
+    logger.info(f"Processing {len(events)} events")
+    
     for model_id in list_models:
-        try:
-            for investment_date in investment_dates:
-                agent_invest_positions(model_id, markets, prices_df, investment_date)
-        except Exception as e:
-            logger.error(f"Error for {model_id}: {e}")
-            raise e
-            continue
+        logger.info(f"Processing model: {model_id}")
+        process_single_model(model_id=model_id, events=events, target_date=target_date, backward_mode=backward_mode)
+
+
+def process_single_model(model_id: str, events: list[Event], target_date: date, backward_mode: bool) -> ModelInvestmentResult:
+    """Process investments for all events for a specific model and save results."""
+    event_results = []
+    
+    for event in events:
+        logger.info(f"Processing event: {event.title}")
+        market_decisions = []
+        
+        for market in event.markets:
+            decision = process_market_investment(model_id=model_id, market=market, target_date=target_date, backward_mode=backward_mode)
+            market_decisions.append(decision)
+        
+        event_result = EventInvestmentResult(
+            event_id=event.id,
+            event_title=event.title,
+            market_decisions=market_decisions
+        )
+        event_results.append(event_result)
+    
+    model_result = ModelInvestmentResult(
+        model_id=model_id,
+        target_date=target_date,
+        event_results=event_results
+    )
+    
+    save_model_result(model_result, target_date)
+    return model_result
+
+
+def process_market_investment(model_id: str, market: Market, target_date: date, backward_mode: bool) -> MarketInvestmentDecision:
+    """Process investment decision for a single market."""
+    if market.prices is None:
+        market.fill_prices(end_time=datetime.combine(target_date, datetime.min.time()))
+
+    # Create the investment question
+    prices_str = (
+        market.prices.loc[:target_date]
+        .dropna()
+        .tail(10)  # Last 10 data points
+        .to_string(index=True, header=False)
+    )
+    
+    full_question = f"""
+    Date: {target_date.strftime("%B %d, %Y")}
+    
+    Question: {market.question}
+    Description: {market.description}
+    
+    Recent YES prices:
+    {prices_str}
+    
+    Should you invest in YES, NO, or do NOTHING?
+    Provide final answer as: yes, no, or nothing
+    """
+    
+    # Get agent decision
+    if model_id == "test_random":
+        choice = np.random.choice(["yes", "no", "nothing"], p=[0.3, 0.3, 0.4])
+        reasoning = "Random decision for testing"
+        confidence = np.random.uniform(0.1, 0.9)
+        token_usage = None
+    else:
+        response = run_smolagent(model_id, full_question, cutoff_date=target_date)
+        choice = response.output
+        reasoning = str(response.messages[-1]) if response.messages else "No reasoning provided"
+        confidence = None
+        token_usage = response.token_usage._asdict() if response.token_usage else None
+    
+    current_price = float(market.prices.loc[target_date]) if market.prices is not None and target_date in market.prices.index else None
+    
+    return MarketInvestmentDecision(
+        market_id=market.id,
+        market_question=market.question,
+        decision=choice,
+        reasoning=reasoning,
+        confidence=confidence,
+        market_price=current_price,
+        token_usage=token_usage
+    )
+
+
+def save_model_result(model_result: ModelInvestmentResult, target_date: date) -> None:
+    """Save model investment result to file."""
+    output_dir = OUTPUT_PATH / "investments" / target_date.strftime("%Y-%m-%d")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    filename = f"{model_result.model_id.replace('/', '--')}.json"
+    filepath = output_dir / filename
+    
+    with open(filepath, "w") as f:
+        f.write(model_result.model_dump_json(indent=2))
+    
+    logger.info(f"Saved model result to {filepath}")
 if __name__ == "__main__":
     run_smolagent(
         "gpt-4.1",

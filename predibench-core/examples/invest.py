@@ -58,6 +58,8 @@ def run_investments_for_today(
     logger.info(f"Selected {len(selected_events)} events for analysis")
     for event in selected_events:
         logger.info(f"- {event.title} (Volume: ${event.volume:,.0f})")
+        
+    loaded_events = load_events_from_file(file_path=cache_file)
     
     # now you have to do the investment agent for each event, think about the database and compute the pnl
     # you must also implement a mechanism to have more datapoints (backward compatiblities)
@@ -72,8 +74,8 @@ def run_investments_for_today(
 
 
 
-
-
+def compute_pnl_between_dates_for_model(model_name: str, start_date: date, end_date: date) -> float:
+    pass
 
 if __name__ == "__main__":
     run_investments_for_today(
