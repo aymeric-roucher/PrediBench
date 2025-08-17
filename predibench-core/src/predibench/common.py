@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 PREDIBENCH_PATH = Path(__file__).parent
-PREDIBENCH_REPO_PATH = PREDIBENCH_PATH.parent.parent
+PREDIBENCH_REPO_PATH = PREDIBENCH_PATH.parent.parent.parent
 
 DATA_PATH = PREDIBENCH_REPO_PATH / "data"
 DATA_PATH.mkdir(parents=True, exist_ok=True)

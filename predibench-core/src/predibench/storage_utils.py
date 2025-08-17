@@ -108,20 +108,23 @@ def _write_to_bucket_or_data_dir(content: str, blob_name: str) -> bool:
 
 
 
-def write_job_file_to_storage(domain_name: str, job_id: str, filename: str, content: str) -> bool:
+def write_to_storage(file_path: Path, content: str) -> bool:
     """
-    Write content to a job-specific file in the storage structure: domain_name/job_id/filename
+    Write content to a file in storage at the given path relative to DATA_PATH.
+    
+    Args:
+        file_path: Path object that must be relative to DATA_PATH
+        content: Content to write to the file
+    
+    Raises:
+        ValueError: If the path is not relative to DATA_PATH
     """
-    blob_name = f"{domain_name}/{job_id}/{filename}"
-    return _write_to_bucket_or_data_dir(content, blob_name)
-
-
-def write_job_file_from_path_to_storage(domain_name: str, job_id: str, filename: str, file_path: Path) -> bool:
-    """
-    Upload a file from local path to job-specific storage: domain_name/job_id/filename
-    """
-    blob_name = f"{domain_name}/{job_id}/{filename}"
-    return _write_file_to_bucket_or_data_dir(file_path, blob_name)
+    # Ensure the path is relative to DATA_PATH
+    if not file_path.is_relative_to(DATA_PATH):
+        raise ValueError(f"Path {file_path} is not relative to DATA_PATH {DATA_PATH}")
+    
+    relative_path = file_path.relative_to(DATA_PATH)
+    return _write_to_bucket_or_data_dir(content, str(relative_path))
 
 
 def _read_file_from_bucket_or_data_dir(blob_name: str) -> str:
@@ -141,12 +144,26 @@ def _read_file_from_bucket_or_data_dir(blob_name: str) -> str:
     else:
         raise FileNotFoundError(f"File not found locally or in bucket: {blob_name}")
 
-def read_job_file_from_storage(domain_name: str, job_id: str, filename: str) -> str:
+def read_from_storage(file_path: Path) -> str:
     """
-    Read a job-specific file from storage: domain_name/job_id/filename
+    Read a file from storage at the given path relative to DATA_PATH.
+    
+    Args:
+        file_path: Path object that must be relative to DATA_PATH
+    
+    Returns:
+        Content of the file as string
+    
+    Raises:
+        ValueError: If the path is not relative to DATA_PATH
+        FileNotFoundError: If the file is not found in storage
     """
-    blob_name = f"{domain_name}/{job_id}/{filename}"
-    return _read_file_from_bucket_or_data_dir(blob_name)
+    # Ensure the path is relative to DATA_PATH
+    if not file_path.is_relative_to(DATA_PATH):
+        raise ValueError(f"Path {file_path} is not relative to DATA_PATH {DATA_PATH}")
+    
+    relative_path = file_path.relative_to(DATA_PATH)
+    return _read_file_from_bucket_or_data_dir(str(relative_path))
 
 if __name__ == "__main__":
     print(has_bucket_access())
