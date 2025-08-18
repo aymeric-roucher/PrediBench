@@ -67,6 +67,7 @@ def _filter_events_by_volume_and_markets(
                 filtered_events.append(event)
     return filtered_events
 
+
 def _select_markets_for_events(
     events: list[Event], base_date: date, backward_mode: bool = False
 ) -> list[Event]:
@@ -165,9 +166,9 @@ def choose_events(
                 market.fill_prices()
 
     filtered_events = _remove_markets_without_prices_in_events(filtered_events)
-    
+
     events_with_selected_markets = _select_markets_for_events(
         events=filtered_events, base_date=today_date, backward_mode=backward_mode
     )
-    
+
     return events_with_selected_markets
