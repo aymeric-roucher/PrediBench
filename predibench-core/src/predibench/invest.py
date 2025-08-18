@@ -8,14 +8,17 @@ from predibench.agent import launch_agent_investments, ModelInvestmentResult
 from predibench.market_selection import choose_events
 from predibench.polymarket_data import save_events_to_file, load_events_from_file
 from predibench.logger_config import get_logger
-from smolagents.models import ApiModel, InferenceClientModel, OpenAIModel
 from predibench.polymarket_api import Event
+from predibench.retry_models import InferenceClientModelWithRetry
 from predibench.common import DATA_PATH, ENV_VAR_HF_TOKEN
 from datasets import load_dataset, Dataset
 
 load_dotenv()
 
 logger = get_logger(__name__)
+
+
+
 
 def upload_results_to_hf_dataset(results_per_model: list[ModelInvestmentResult], base_date: date) -> None:
     """Upload investment results to the Hugging Face dataset."""
@@ -177,7 +180,7 @@ def run_investments_for_today(
 
 if __name__ == "__main__":
     models = [
-        InferenceClientModel(model_id="openai/gpt-oss-120b"),
+        InferenceClientModelWithRetry(model_id="openai/gpt-oss-120b"),
     ]
 
     run_investments_for_today(
