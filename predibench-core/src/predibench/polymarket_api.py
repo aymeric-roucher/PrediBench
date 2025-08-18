@@ -4,12 +4,8 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
-import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
 import requests
-from predibench.utils import convert_polymarket_time_to_datetime
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 # TODO: respect rate limits:
 # **API Rate Limits**
@@ -23,9 +19,16 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 # DELETE /order	500 requests / 10s (50/s)	Burst; throttle requests over the maximum configured rate
 # DELETE /order	3000 requests / 10 min (5/s)	Throttle requests over the maximum configured rate
 from pydantic import BaseModel
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from predibench.common import BASE_URL_POLYMARKET
 from predibench.logger_config import get_logger
+from predibench.utils import convert_polymarket_time_to_datetime
 
 MAX_INTERVAL_TIMESERIES = timedelta(days=14, hours=23, minutes=0)
 # NOTE: above is refined by experience: seems independant from the resolution
@@ -33,27 +36,34 @@ MAX_INTERVAL_TIMESERIES = timedelta(days=14, hours=23, minutes=0)
 logger = get_logger(__name__)
 
 
-def _split_date_range(start_time: datetime, end_time: datetime) -> list[tuple[datetime, datetime]]:
+def _split_date_range(
+    start_time: datetime, end_time: datetime
+) -> list[tuple[datetime, datetime]]:
     """Split a date range into chunks of MAX_INTERVAL_TIMESERIES or smaller.
-    
+
     Args:
         start_time: Start datetime
         end_time: End datetime
-        
+
     Returns:
         List of (start, end) datetime tuples, each representing a chunk <= MAX_INTERVAL_TIMESERIES
     """
-    if end_time - start_time <= MAX_INTERVAL_TIMESERIES:
-        return [(start_time, end_time)]
-    
+    # Generate segment start times using pd.date_range
+    segment_starts = pd.date_range(
+        start=start_time, end=end_time, freq=MAX_INTERVAL_TIMESERIES
+    )
+
     chunks = []
-    current_start = start_time
-    
-    while current_start < end_time:
-        current_end = min(current_start + MAX_INTERVAL_TIMESERIES, end_time)
-        chunks.append((current_start, current_end))
-        current_start = current_end + timedelta(seconds=1)  # Add 1 second to avoid overlap
-        
+    for i, segment_start in enumerate(segment_starts):
+        if i == len(segment_starts) - 1:
+            # Last segment: end at the original end_time
+            chunk_end = end_time
+        else:
+            # Regular segment: end at next segment start - 1 second to avoid overlap
+            chunk_end = segment_starts[i + 1] - timedelta(hours=1)
+
+        chunks.append((segment_start.to_pydatetime(), chunk_end))
+
     return chunks
 
 
@@ -80,9 +90,11 @@ class Market(BaseModel, arbitrary_types_allowed=True):
     prices: pd.Series | None = None
     price_outcome_name: str | None = None  # Name of the outcome the prices represent
 
-    def fill_prices(self, start_time: datetime | None = None, end_time: datetime | None = None) -> None:
+    def fill_prices(
+        self, start_time: datetime | None = None, end_time: datetime | None = None
+    ) -> None:
         """Fill the prices field with timeseries data.
-        
+
         Args:
             start_time: Start time for timeseries data
             end_time: End time for timeseries data
@@ -95,10 +107,16 @@ class Market(BaseModel, arbitrary_types_allowed=True):
                 end_time=end_time,
             )
             self.prices = ts_request.get_token_daily_timeseries()
-            self.price_outcome_name = self.outcomes[0].name  # Store which outcome the prices represent
-            assert self.price_outcome_name.lower() != "no", f"Price outcome should be YES or a sport's team name."
+            self.price_outcome_name = self.outcomes[
+                0
+            ].name  # Store which outcome the prices represent
+            assert self.price_outcome_name.lower() != "no", (
+                "Price outcome should be YES or a sport's team name."
+            )
         else:
-            logger.error(f"Incorrect outcomes for market {self.id} with name {self.question} and outcomes {self.outcomes}")
+            logger.error(
+                f"Incorrect outcomes for market {self.id} with name {self.question} and outcomes {self.outcomes}"
+            )
             self.prices = None
             self.price_outcome_name = None
 
@@ -106,25 +124,29 @@ class Market(BaseModel, arbitrary_types_allowed=True):
     def from_json(market_data: dict) -> Market | None:
         """Convert a market JSON object to a PolymarketMarket dataclass."""
 
-        if not "outcomes" in market_data:
-            logger.warning(f"Outcomes missing for market:\n{market_data['id']}\n{market_data['question']}")
+        if "outcomes" not in market_data:
+            logger.warning(
+                f"Outcomes missing for market:\n{market_data['id']}\n{market_data['question']}"
+            )
             return None
-        
+
         outcomes = json.loads(market_data["outcomes"])
         if len(outcomes) < 2:
-            # There should be at least 2 
+            # There should be at least 2
             # Who will the world's richest person be on February 27, 2021?
-            logger.warning(f"Expected 2 outcomes, got {len(outcomes)} for market:\n{market_data['id']}\n{market_data['question']}")
+            logger.warning(
+                f"Expected 2 outcomes, got {len(outcomes)} for market:\n{market_data['id']}\n{market_data['question']}"
+            )
             return None
         outcome_names = json.loads(market_data["outcomes"])
-        
+
         # Handle missing price data
         if "outcomePrices" in market_data:
             outcome_prices = json.loads(market_data["outcomePrices"])
         else:
             # Default to 0.5 for all outcomes if prices not available
             outcome_prices = [0.5] * len(outcomes)
-            
+
         # Handle missing token IDs
         if "clobTokenIds" in market_data:
             outcome_clob_token_ids = json.loads(market_data["clobTokenIds"])
@@ -144,13 +166,25 @@ class Market(BaseModel, arbitrary_types_allowed=True):
             ],
             slug=market_data["slug"],
             description=market_data["description"],
-            end_date=convert_polymarket_time_to_datetime(market_data["endDate"]) if "endDate" in market_data else None,
+            end_date=convert_polymarket_time_to_datetime(market_data["endDate"])
+            if "endDate" in market_data
+            else None,
             createdAt=convert_polymarket_time_to_datetime(market_data["createdAt"]),
-            volumeNum=float(market_data["volumeNum"]) if market_data.get("volumeNum") is not None else None,
-            volume24hr=float(market_data["volume24hr"]) if market_data.get("volume24hr") is not None else None,
-            volume1wk=float(market_data["volume1wk"]) if market_data.get("volume1wk") is not None else None,
-            volume1mo=float(market_data["volume1mo"]) if market_data.get("volume1mo") is not None else None,
-            volume1yr=float(market_data["volume1yr"]) if market_data.get("volume1yr") is not None else None,
+            volumeNum=float(market_data["volumeNum"])
+            if market_data.get("volumeNum") is not None
+            else None,
+            volume24hr=float(market_data["volume24hr"])
+            if market_data.get("volume24hr") is not None
+            else None,
+            volume1wk=float(market_data["volume1wk"])
+            if market_data.get("volume1wk") is not None
+            else None,
+            volume1mo=float(market_data["volume1mo"])
+            if market_data.get("volume1mo") is not None
+            else None,
+            volume1yr=float(market_data["volume1yr"])
+            if market_data.get("volume1yr") is not None
+            else None,
             liquidity=float(market_data["liquidity"])
             if "liquidity" in market_data and market_data["liquidity"] is not None
             else None,
@@ -181,12 +215,18 @@ class _RequestParameters(BaseModel):
     tag_id: int | None = None
     related_tags: bool | None = None
 
+
 class MarketsRequestParameters(_RequestParameters):
-    
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=10, max=60),
-        retry=retry_if_exception_type((requests.exceptions.RequestException, requests.exceptions.Timeout, requests.exceptions.ConnectionError))
+        retry=retry_if_exception_type(
+            (
+                requests.exceptions.RequestException,
+                requests.exceptions.Timeout,
+                requests.exceptions.ConnectionError,
+            )
+        ),
     )
     def get_markets(
         self, start_time: datetime | None = None, end_time: datetime | None = None
@@ -216,19 +256,26 @@ class MarketsRequestParameters(_RequestParameters):
             filtered_markets = []
             excluded_count = 0
             for market in markets:
-                if market.end_date is None or not (self.end_date_min <= market.end_date <= self.end_date_max):
+                if market.end_date is None or not (
+                    self.end_date_min <= market.end_date <= self.end_date_max
+                ):
                     excluded_count += 1
-                    logger.warning(f"Excluded market {market.question} because it doesn't fit the date criteria")
+                    logger.warning(
+                        f"Excluded market {market.question} because it doesn't fit the date criteria"
+                    )
                 else:
                     filtered_markets.append(market)
             if excluded_count > 0:
-                logger.warning(f"Excluded {excluded_count} markets that don't fit the date criteria")
+                logger.warning(
+                    f"Excluded {excluded_count} markets that don't fit the date criteria"
+                )
             markets = filtered_markets
 
         if start_time and end_time:
             for market in markets:
                 market.fill_prices(start_time, end_time)
         return markets
+
 
 class _HistoricalTimeSeriesRequestParameters(BaseModel):
     market: str
@@ -239,55 +286,68 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=10, max=60),
-        retry=retry_if_exception_type((requests.exceptions.RequestException, requests.exceptions.Timeout, requests.exceptions.ConnectionError))
+        retry=retry_if_exception_type(
+            (
+                requests.exceptions.RequestException,
+                requests.exceptions.Timeout,
+                requests.exceptions.ConnectionError,
+            )
+        ),
     )
     def get_token_daily_timeseries(self) -> pd.Series | None:
         """Get token timeseries data using this request configuration.
-        
+
         Why no fidelity ? Because when the market is closed in an Event that is still open (bitcoin price for instance),
         the argument fidelity will return an empty timeseries. Better get as much data as possible.
-        
+
         Some markets are present in the API and yet without prices, it is because they are not used and not traded,
         in that case we will return None
-        
+
         If the requested date range exceeds MAX_INTERVAL_TIMESERIES, this method will split the range
         into multiple requests and concatenate the results.
         """
         # If no date range specified or range is within limit, use original logic
-        if (self.start_time is None or self.end_time is None or 
-            (self.end_time - self.start_time) <= MAX_INTERVAL_TIMESERIES):
+        if (
+            self.start_time is None
+            or self.end_time is None
+            or (self.end_time - self.start_time) <= MAX_INTERVAL_TIMESERIES
+        ):
             return self._get_single_timeseries_request()
-        
+
         # Split the date range into chunks
         date_chunks = _split_date_range(self.start_time, self.end_time)
-        logger.info(f"Splitting date range into {len(date_chunks)} chunks for market {self.market}")
-        
+        logger.info(
+            f"Splitting date range into {len(date_chunks)} chunks for market {self.market}"
+        )
+
         all_timeseries = []
-        
+
         for chunk_start, chunk_end in date_chunks:
             # Create a new instance for this chunk to avoid modifying self
             chunk_request = _HistoricalTimeSeriesRequestParameters(
                 market=self.market,
                 interval=self.interval,
                 start_time=chunk_start,
-                end_time=chunk_end
+                end_time=chunk_end,
             )
-            
+
             chunk_timeseries = chunk_request._get_single_timeseries_request()
             if chunk_timeseries is not None:
                 all_timeseries.append(chunk_timeseries)
-        
+
         if not all_timeseries:
             return None
-        
+
         # Concatenate all timeseries
         combined_timeseries = pd.concat(all_timeseries).sort_index()
-        
+
         # Remove duplicates (keep last value for each date)
-        combined_timeseries = combined_timeseries[~combined_timeseries.index.duplicated(keep='last')]
-        
+        combined_timeseries = combined_timeseries[
+            ~combined_timeseries.index.duplicated(keep="last")
+        ]
+
         return combined_timeseries
-    
+
     def _get_single_timeseries_request(self) -> pd.Series | None:
         """Make a single API request for timeseries data."""
         url = "https://clob.polymarket.com/prices-history"
@@ -314,25 +374,30 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
             .ffill()
         )
         timeseries.index = timeseries.index.tz_localize(timezone.utc).date
-        
+
         # Filter timeseries to only include dates between start_time and end_time
         if self.start_time is not None:
             start_date = self.start_time.date()
             timeseries = timeseries[timeseries.index >= start_date]
-        
+
         if self.end_time is not None:
             end_date = self.end_time.date()
             timeseries = timeseries[timeseries.index <= end_date]
-        
+
         return timeseries
 
 
 class EventsRequestParameters(_RequestParameters):
-    
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=10, max=60),
-        retry=retry_if_exception_type((requests.exceptions.RequestException, requests.exceptions.Timeout, requests.exceptions.ConnectionError))
+        retry=retry_if_exception_type(
+            (
+                requests.exceptions.RequestException,
+                requests.exceptions.Timeout,
+                requests.exceptions.ConnectionError,
+            )
+        ),
     )
     def get_events(self) -> list[Event]:
         """Get events from Polymarket API using this request configuration."""
@@ -354,12 +419,12 @@ class EventsRequestParameters(_RequestParameters):
         response = requests.get(url, params=params)
         response.raise_for_status()
         output = response.json()
-        
+
         events = []
         for event_data in output:
             event = Event.from_json(event_data)
             events.append(event)
-        
+
         return events
 
 
@@ -388,33 +453,50 @@ class Event(BaseModel, arbitrary_types_allowed=True):
             market = Market.from_json(market_data)
             if market is not None:
                 markets.append(market)
-        
+
         return Event(
             id=event_data["id"],
             slug=event_data["slug"],
             title=event_data["title"],
             description=event_data.get("description"),
-            start_date=convert_polymarket_time_to_datetime(event_data["startDate"]) if "startDate" in event_data else None,
-            end_date=convert_polymarket_time_to_datetime(event_data["endDate"]) if "endDate" in event_data else None,
+            start_date=convert_polymarket_time_to_datetime(event_data["startDate"])
+            if "startDate" in event_data
+            else None,
+            end_date=convert_polymarket_time_to_datetime(event_data["endDate"])
+            if "endDate" in event_data
+            else None,
             createdAt=convert_polymarket_time_to_datetime(event_data["createdAt"]),
-            volume=float(event_data["volume"]) if event_data.get("volume") is not None else None,
-            volume24hr=float(event_data["volume24hr"]) if event_data.get("volume24hr") is not None else None,
-            volume1wk=float(event_data["volume1wk"]) if event_data.get("volume1wk") is not None else None,
-            volume1mo=float(event_data["volume1mo"]) if event_data.get("volume1mo") is not None else None,
-            volume1yr=float(event_data["volume1yr"]) if event_data.get("volume1yr") is not None else None,
-            liquidity=float(event_data["liquidity"]) if event_data.get("liquidity") is not None else None,
+            volume=float(event_data["volume"])
+            if event_data.get("volume") is not None
+            else None,
+            volume24hr=float(event_data["volume24hr"])
+            if event_data.get("volume24hr") is not None
+            else None,
+            volume1wk=float(event_data["volume1wk"])
+            if event_data.get("volume1wk") is not None
+            else None,
+            volume1mo=float(event_data["volume1mo"])
+            if event_data.get("volume1mo") is not None
+            else None,
+            volume1yr=float(event_data["volume1yr"])
+            if event_data.get("volume1yr") is not None
+            else None,
+            liquidity=float(event_data["liquidity"])
+            if event_data.get("liquidity") is not None
+            else None,
             markets=markets,
         )
-    
+
     def select_random_market(self) -> None:
         """Select a random market from this event for prediction."""
         import random
-        
+
         if self.markets:
             selected_market = random.choice(self.markets)
             self.selected_market_id = selected_market.id
         else:
             self.selected_market_id = None
+
 
 ################################################################################
 # Useful for the future but unused functions
@@ -441,7 +523,13 @@ class OrderBook(BaseModel):
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=10, max=60),
-        retry=retry_if_exception_type((requests.exceptions.RequestException, requests.exceptions.Timeout, requests.exceptions.ConnectionError))
+        retry=retry_if_exception_type(
+            (
+                requests.exceptions.RequestException,
+                requests.exceptions.Timeout,
+                requests.exceptions.ConnectionError,
+            )
+        ),
     )
     def get_order_book(token_id: str) -> OrderBook:
         """Get order book for a specific token ID from Polymarket CLOB API.
@@ -459,8 +547,12 @@ class OrderBook(BaseModel):
         response.raise_for_status()
         data = response.json()
 
-        bids = [OrderLevel(price=bid["price"], size=bid["size"]) for bid in data["bids"]]
-        asks = [OrderLevel(price=ask["price"], size=ask["size"]) for ask in data["asks"]]
+        bids = [
+            OrderLevel(price=bid["price"], size=bid["size"]) for bid in data["bids"]
+        ]
+        asks = [
+            OrderLevel(price=ask["price"], size=ask["size"]) for ask in data["asks"]
+        ]
 
         return OrderBook(
             market=data["market"],
@@ -473,6 +565,3 @@ class OrderBook(BaseModel):
             bids=bids,
             asks=asks,
         )
-    
-    
-
