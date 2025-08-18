@@ -74,7 +74,7 @@ class PnlCalculator:
                 .ffill()
             )
             self.new_positions = (
-                (self.positions / volatility).resample("1D").last().ffill()
+                (self.positions / volatility).resample("1D").last().ffill(limit=7)
             )
             pnls = pd.concat(
                 [
@@ -159,13 +159,15 @@ class PnlCalculator:
 
                     if len(positions_to_plot) > 0:
                         # Get price values at position change dates
-                        prices_at_position_changes = price_data.loc[
-                            price_data.index.isin(positions_to_plot.index)
-                        ]
+                        inter_index = positions_to_plot.index.intersection(
+                            price_data.index
+                        )
+                        prices_at_positions = price_data.loc[inter_index]
+                        positions_to_plot = positions_to_plot.loc[inter_index]
                         fig.add_trace(
                             go.Scatter(
-                                x=prices_at_position_changes.index,
-                                y=prices_at_position_changes.values,
+                                x=prices_at_positions.index,
+                                y=prices_at_positions.values,
                                 text=positions_to_plot.values,
                                 hovertemplate="Date: %{x}<br>Position: %{text:.2f}<br>Price: %{y:.3f}<extra></extra>",
                                 mode="markers",
@@ -208,7 +210,7 @@ class PnlCalculator:
             fig.update_xaxes(title_text="Date", row=2, col=1)
             fig.update_yaxes(title_text="Price", row=1, col=1)
             fig.update_yaxes(
-                title_text="Cumulative PnL", tickformat=".0f", row=2, col=1
+                title_text="Cumulative PnL", tickformat=".1f", row=2, col=1
             )
             fig.update_layout(
                 legend_title="Stock",
