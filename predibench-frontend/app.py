@@ -5,8 +5,12 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.io as pio
 from datasets import load_dataset
 from predibench.pnl import get_pnls
+
+# Set Plotly dark theme as default
+pio.templates.default = "plotly_dark"
 
 # Configuration
 AGENT_CHOICES_REPO = "m-ric/predibench-agent-choices"
@@ -124,7 +128,14 @@ def create_pnl_plot(performance_data):
 
     colors = px.colors.qualitative.Set1
 
-    for i, agent in enumerate(performance_data.keys()):
+    # Sort agents by descending final PnL
+    sorted_agents = sorted(
+        performance_data.keys(),
+        key=lambda agent: performance_data[agent]["cumulative_pnl"],
+        reverse=True,
+    )
+
+    for i, agent in enumerate(sorted_agents):
         if agent not in performance_data:
             continue
 
@@ -144,19 +155,18 @@ def create_pnl_plot(performance_data):
                 mode="lines+markers",
                 hovertemplate="<b>%{fullData.name}</b><br>"
                 + "Date: %{x}<br>"
-                + "Cumulative PnL: %{y:.3f}<br>"
+                + "Cumulative PnL: %{y:.2f}<br>"
                 + "<extra></extra>",
             )
         )
 
     fig.update_layout(
-        title="Agent Performance - Cumulative PnL Over Time",
         xaxis_title="Date",
         yaxis_title="Cumulative PnL",
         hovermode="x unified",
-        template="plotly_white",
         height=500,
         showlegend=True,
+        yaxis=dict(tickformat=".2f"),
     )
 
     # Add horizontal line at 0
@@ -182,7 +192,10 @@ with gr.Blocks(title="PrediBench Leaderboard", theme=gr.themes.Soft()) as demo:
                 value=create_leaderboard(performance_data), interactive=False, wrap=True
             )
 
-            pnl_plot = gr.Plot(value=create_pnl_plot(performance_data))
+            pnl_plot = gr.Plot(
+                value=create_pnl_plot(performance_data),
+                label="Cumulative PnL Over Time",
+            )
 
         with gr.TabItem("🔍 Portfolio Details"):
             with gr.Row():
@@ -191,14 +204,15 @@ with gr.Blocks(title="PrediBench Leaderboard", theme=gr.themes.Soft()) as demo:
                     value=list(performance_data.keys())[0]
                     if performance_data
                     else None,
-                    label="Select Agent Portfolio",
+                    label="Select model",
                     scale=3,
                 )
 
             portfolio_plot = gr.Plot(
                 value=performance_data[list(performance_data.keys())[0]]["figure"]
                 if performance_data
-                else None
+                else None,
+                label="Cumulative PnL Over Time",
             )
 
             # Update portfolio plot when agent selection changes
@@ -214,4 +228,4 @@ with gr.Blocks(title="PrediBench Leaderboard", theme=gr.themes.Soft()) as demo:
             )
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860)
+    demo.launch(server_name="0.0.0.0", server_port=7861)

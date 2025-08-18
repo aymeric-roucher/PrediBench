@@ -25,7 +25,7 @@ class PnlCalculator:
     ):
         """
         positions: Daily positions: pd.DataFrame with columns as markets and index as dates. A position noted with date D as index is the position at the end of day D, which will be impacted by returns of day D+1
-        returns: Daily returns: pd.DataFrame with columns as markets and index as dates
+        returns: Daily returns: pd.DataFrame with columns as markets and index as dates. These can be absolute or relative, but if they're relative the sum across portfolio won't mean anything.
         prices: Price data: pd.DataFrame with columns as markets and index as dates
         to_vol_target: bool, if True, will target volatility
         vol_targeting_window: str, window for volatility targeting
@@ -39,7 +39,9 @@ class PnlCalculator:
         self.to_vol_target = to_vol_target
         self.vol_targeting_window = vol_targeting_window
         self.pnl = self.calculate_pnl()
-        self.portfolio_daily_pnl = self.pnl.sum(axis=1)
+        self.portfolio_daily_pnl = self.pnl.sum(
+            axis=1
+        )  # NOTE: this assumes all positions equal, it's false ofc
         self.portfolio_cumulative_pnl = self.portfolio_daily_pnl.cumsum()
         self.portfolio_mean_pnl = self.portfolio_daily_pnl.mean()
         self.portfolio_std_pnl = self.portfolio_daily_pnl.std()
@@ -127,30 +129,29 @@ class PnlCalculator:
 
             colors = px.colors.qualitative.Plotly
             columns = list(self.pnl.columns)
-            for i, question in enumerate(columns):
+            for i, market_id in enumerate(columns):
                 col_color = colors[i % len(colors)]
-                cumulative_pnl = self.pnl[question].cumsum()
+                cumulative_pnl = self.pnl[market_id].cumsum()
 
                 # Add price evolution trace to subplot 1 (top)
-                if question in self.prices.columns:
-                    price_data = self.prices[question].dropna()
+                if market_id in self.prices.columns:
+                    price_data = self.prices[market_id].dropna()
                     fig.add_trace(
                         go.Scatter(
                             x=price_data.index,
                             y=price_data.values,
                             mode="lines",
-                            name=question[:40],
+                            name=market_id[:40],
                             line=dict(color=col_color),
-                            legendgroup=question[:40],
+                            legendgroup=market_id[:40],
                         ),
                         row=1,
                         col=1,
                     )
 
                     # Add markers for positions taken on the price chart
-                    positions_to_plot = self.positions[question][
-                        self.positions[question].notna()
-                        & (self.positions[question] != 0)
+                    positions_to_plot = self.positions[market_id][
+                        self.positions[market_id].notna()
                     ]
                     if len(positions_to_plot) > 0:
                         # Get price values at position change dates
@@ -178,7 +179,8 @@ class PnlCalculator:
                                     line=dict(width=1, color="black"),
                                 ),
                                 showlegend=False,
-                                legendgroup=question[:40],
+                                legendgroup=market_id[:40],
+                                name="Positions - " + market_id[:40],
                             ),
                             row=1,
                             col=1,
@@ -192,7 +194,8 @@ class PnlCalculator:
                         mode="markers+lines",
                         line=dict(color=col_color),
                         showlegend=False,
-                        legendgroup=question[:40],
+                        legendgroup=market_id[:40],
+                        name=market_id[:40],
                     ),
                     row=2,
                     col=1,

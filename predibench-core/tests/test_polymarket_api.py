@@ -11,6 +11,8 @@ from predibench.polymarket_api import (
     Event,
     _HistoricalTimeSeriesRequestParameters,
     OrderBook,
+    _split_date_range,
+    MAX_INTERVAL_TIMESERIES,
 )
 from predibench.utils import convert_polymarket_time_to_datetime
 
@@ -203,6 +205,118 @@ def test_get_market_events():
 
     assert len(events) >= 1  # Should get at least some events
 
+
+
+def test_split_date_range_small():
+    """Test that small date ranges don't get split."""
+    start_time = datetime(2024, 1, 1)
+    end_time = datetime(2024, 1, 10)
+    
+    chunks = _split_date_range(start_time, end_time)
+    
+    assert len(chunks) == 1
+    assert chunks[0] == (start_time, end_time)
+
+
+def test_split_date_range_exact_limit():
+    """Test date range exactly at the limit."""
+    start_time = datetime(2024, 1, 1)
+    end_time = start_time + MAX_INTERVAL_TIMESERIES
+    
+    chunks = _split_date_range(start_time, end_time)
+    
+    assert len(chunks) == 1
+    assert chunks[0] == (start_time, end_time)
+
+
+def test_split_date_range_large():
+    """Test that large date ranges get split into multiple chunks."""
+    start_time = datetime(2024, 1, 1)
+    end_time = datetime(2024, 1, 31)  # 30 days, should be split
+    
+    chunks = _split_date_range(start_time, end_time)
+    
+    assert len(chunks) > 1
+    
+    # Check that chunks cover the entire range without gaps
+    assert chunks[0][0] == start_time
+    assert chunks[-1][1] == end_time
+    
+    # Check that each chunk is within the limit
+    for chunk_start, chunk_end in chunks:
+        assert chunk_end - chunk_start <= MAX_INTERVAL_TIMESERIES
+    
+    # Check that chunks don't overlap (except by 1 second)
+    for i in range(len(chunks) - 1):
+        current_end = chunks[i][1]
+        next_start = chunks[i + 1][0]
+        assert next_start == current_end + timedelta(seconds=1)
+
+
+def test_split_date_range_very_large():
+    """Test splitting a very large date range (60 days)."""
+    start_time = datetime(2024, 1, 1)
+    end_time = datetime(2024, 3, 1)  # ~60 days
+    
+    chunks = _split_date_range(start_time, end_time)
+    
+    # Should split into at least 4 chunks (60 days / 14 days ≈ 4.3)
+    assert len(chunks) >= 4
+    
+    # Verify continuity
+    reconstructed_range = chunks[-1][1] - chunks[0][0]
+    original_range = end_time - start_time
+    # Allow for small differences due to the 1-second gaps between chunks
+    assert abs((reconstructed_range - original_range).total_seconds()) <= len(chunks) - 1
+
+
+def test_historical_timeseries_date_range_splitting():
+    """Test that the HistoricalTimeSeriesRequestParameters correctly handles large date ranges."""
+    # Mock a token ID for testing (we'll use a dummy one)
+    dummy_token_id = "test_token"
+    
+    # Test with a large date range
+    large_start = datetime(2024, 1, 1)
+    large_end = datetime(2024, 2, 1)  # 31 days
+    
+    request_params = _HistoricalTimeSeriesRequestParameters(
+        market=dummy_token_id,
+        start_time=large_start,
+        end_time=large_end,
+        interval="1d"
+    )
+    
+    # Check that the date range would be split
+    time_diff = large_end - large_start
+    assert time_diff > MAX_INTERVAL_TIMESERIES, "Test date range should exceed the limit"
+    
+    # Test with a small date range
+    small_start = datetime(2024, 1, 1)
+    small_end = datetime(2024, 1, 10)  # 9 days
+    
+    request_params_small = _HistoricalTimeSeriesRequestParameters(
+        market=dummy_token_id,
+        start_time=small_start,
+        end_time=small_end,
+        interval="1d"
+    )
+    
+    # Check that the small date range wouldn't be split
+    time_diff_small = small_end - small_start
+    assert time_diff_small <= MAX_INTERVAL_TIMESERIES, "Small date range should be within the limit"
+
+
+def test_max_interval_timeseries_constant():
+    """Test that the MAX_INTERVAL_TIMESERIES constant has expected value."""
+    expected_days = 14
+    expected_hours = 23
+    
+    assert MAX_INTERVAL_TIMESERIES.days == expected_days
+    assert MAX_INTERVAL_TIMESERIES.seconds == expected_hours * 3600
+    
+    # Total should be just under 15 days
+    total_hours = MAX_INTERVAL_TIMESERIES.total_seconds() / 3600
+    assert 24 * 14 <= total_hours < 24 * 15
 
 
 if __name__ == "__main__":

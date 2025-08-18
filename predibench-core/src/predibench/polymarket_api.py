@@ -33,6 +33,30 @@ MAX_INTERVAL_TIMESERIES = timedelta(days=14, hours=23, minutes=0)
 logger = get_logger(__name__)
 
 
+def _split_date_range(start_time: datetime, end_time: datetime) -> list[tuple[datetime, datetime]]:
+    """Split a date range into chunks of MAX_INTERVAL_TIMESERIES or smaller.
+    
+    Args:
+        start_time: Start datetime
+        end_time: End datetime
+        
+    Returns:
+        List of (start, end) datetime tuples, each representing a chunk <= MAX_INTERVAL_TIMESERIES
+    """
+    if end_time - start_time <= MAX_INTERVAL_TIMESERIES:
+        return [(start_time, end_time)]
+    
+    chunks = []
+    current_start = start_time
+    
+    while current_start < end_time:
+        current_end = min(current_start + MAX_INTERVAL_TIMESERIES, end_time)
+        chunks.append((current_start, current_end))
+        current_start = current_end + timedelta(seconds=1)  # Add 1 second to avoid overlap
+        
+    return chunks
+
+
 class MarketOutcome(BaseModel):
     clob_token_id: str
     name: str
@@ -225,7 +249,47 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
         
         Some markets are present in the API and yet without prices, it is because they are not used and not traded,
         in that case we will return None
+        
+        If the requested date range exceeds MAX_INTERVAL_TIMESERIES, this method will split the range
+        into multiple requests and concatenate the results.
         """
+        # If no date range specified or range is within limit, use original logic
+        if (self.start_time is None or self.end_time is None or 
+            (self.end_time - self.start_time) <= MAX_INTERVAL_TIMESERIES):
+            return self._get_single_timeseries_request()
+        
+        # Split the date range into chunks
+        date_chunks = _split_date_range(self.start_time, self.end_time)
+        logger.info(f"Splitting date range into {len(date_chunks)} chunks for market {self.market}")
+        
+        all_timeseries = []
+        
+        for chunk_start, chunk_end in date_chunks:
+            # Create a new instance for this chunk to avoid modifying self
+            chunk_request = _HistoricalTimeSeriesRequestParameters(
+                market=self.market,
+                interval=self.interval,
+                start_time=chunk_start,
+                end_time=chunk_end
+            )
+            
+            chunk_timeseries = chunk_request._get_single_timeseries_request()
+            if chunk_timeseries is not None:
+                all_timeseries.append(chunk_timeseries)
+        
+        if not all_timeseries:
+            return None
+        
+        # Concatenate all timeseries
+        combined_timeseries = pd.concat(all_timeseries).sort_index()
+        
+        # Remove duplicates (keep last value for each date)
+        combined_timeseries = combined_timeseries[~combined_timeseries.index.duplicated(keep='last')]
+        
+        return combined_timeseries
+    
+    def _get_single_timeseries_request(self) -> pd.Series | None:
+        """Make a single API request for timeseries data."""
         url = "https://clob.polymarket.com/prices-history"
 
         params = {"market": self.market}
