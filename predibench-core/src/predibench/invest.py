@@ -61,12 +61,19 @@ def run_investments_for_today(
     for event in selected_events:
         logger.info(f"  - {event.title} (Volume: ${event.volume:,.0f})")
 
+    timestamp = get_timestamp_string()
+    hf_token = os.getenv(ENV_VAR_HF_TOKEN)
+    
     results = run_agent_investments(
         models=models,
         events=selected_events,
         target_date=base_date,
         backward_mode=backward_mode,
         date_output_path=date_output_path,
+        dataset_name=dataset_name,
+        split=split,
+        hf_token_for_dataset=hf_token,
+        timestamp_for_saving=timestamp,
     )
 
     logger.info("Investment analysis complete!")
