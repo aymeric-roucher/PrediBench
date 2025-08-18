@@ -21,7 +21,20 @@ jobs:
 
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
-
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      
+    - name: Install dependencies
+      run: |
+        cd predibench-core
+        uv sync
+        
     - name: Test GCP bucket write access
       env:
         BUCKET_PREDIBENCH: ${{ secrets.BUCKET_PREDIBENCH }}
@@ -37,20 +50,7 @@ jobs:
             print('❌ Bucket write access failed')
             exit(1)
         "
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.13'
-    
-    - name: Install uv
-      uses: astral-sh/setup-uv@v4
-      
-    - name: Install dependencies
-      run: |
-        cd predibench-core
-        uv sync
         
-
     - name: Run tests
       run: |
         cd predibench-core
