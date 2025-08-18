@@ -1,4 +1,4 @@
-name: Test and Deploy
+name: Test and Deploy Backward
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  test_backward:
     runs-on: ubuntu-latest
     
     steps:
@@ -54,6 +54,6 @@ jobs:
         SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
       run: |
         cd predibench-core
-        uv run python scripts/main_backward.py all
+        uv run python scripts/main_backward.py
 
   

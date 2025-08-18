@@ -36,7 +36,6 @@ def main(
 ):
     """Main script to run investment analysis with all models across past weeks."""
 
-    models = list(MODEL_MAP.values())
     all_results = []
     
     logger.info("Starting investment analysis with all models across past weeks")
@@ -67,6 +66,7 @@ def main(
                 output_path=DATA_PATH,
                 backward_date=backward_date,
                 dataset_name="charles-azam/predibench",
+                split="test2",
             )
             
             all_results.extend(results)
