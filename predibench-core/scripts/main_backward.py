@@ -56,22 +56,17 @@ def main(
         
         logger.info(f"Processing date: {target_date} ({'today' if is_today else 'backward mode'})")
         
-        for model_name, model in MODEL_MAP.items():
-            logger.info(f"Running analysis for model: {model_name}")
-            
-            results = run_investments_for_today(
-                time_until_ending=timedelta(days=days_ahead),
-                max_n_events=max_events,
-                models=[model],  # Run one model at a time
-                output_path=DATA_PATH,
-                backward_date=backward_date,
-                dataset_name="charles-azam/predibench",
-                split="test2",
-            )
-            
-            all_results.extend(results)
-            logger.info(f"Completed analysis for {model_name} on {target_date}")
-            continue
+        
+        run_investments_for_today(
+            time_until_ending=timedelta(days=days_ahead),
+            max_n_events=max_events,
+            models=list(MODEL_MAP.values()),  # Run one model at a time
+            output_path=DATA_PATH,
+            backward_date=backward_date,
+            dataset_name="m-ric/predibench-agent-choices",
+            split="test3",
+        )
+
 
     logger.info(f"All analyses completed. Total results: {len(all_results)}")
 
