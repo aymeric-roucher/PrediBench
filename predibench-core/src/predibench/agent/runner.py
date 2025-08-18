@@ -13,6 +13,7 @@ from predibench.agent.smolagents_utils import run_smolagents, EventDecisions, ru
 from smolagents import (
     ApiModel,
 )
+import os
 
 load_dotenv()
 
@@ -266,7 +267,12 @@ Provide your decision and rationale for the TARGET MARKET only.
         else:
             cutoff_datetime = None
         event_decision = run_smolagents(
-            model, full_question, cutoff_date=cutoff_datetime
+            model=model, 
+            question=full_question, 
+            cutoff_date=cutoff_datetime,
+            search_provider="serper",
+            search_api_key=os.getenv("SERPER_API_KEY"),
+            max_steps=20
         )
 
     # Convert to MarketInvestmentDecision for selected market

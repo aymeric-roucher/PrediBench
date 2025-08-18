@@ -20,10 +20,10 @@ logger = get_logger(__name__)
 
 
 def run_investments_for_today(
-    event_selection_window: timedelta,
-    max_n_events: int,
     models: list[ApiModel | str],
+    max_n_events: int,
     output_path: Path,
+    event_selection_window: timedelta,
     backward_date: date | None = None,
     load_from_cache: bool = False,
     filter_crypto_events: bool = True,
@@ -84,12 +84,11 @@ def run_investments_for_today(
 if __name__ == "__main__":
     models = [
         InferenceClientModelWithRetry(model_id="openai/gpt-oss-120b"),
-        "o3-deep-research",
     ]
 
     run_investments_for_today(
         event_selection_window=timedelta(days=7 * 6),
-        max_n_events=20,
+        max_n_events=5,
         models=models,
         output_path=DATA_PATH,
     )
