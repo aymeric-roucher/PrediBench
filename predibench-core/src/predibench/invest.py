@@ -21,11 +21,11 @@ logger = get_logger(__name__)
 
 
 def upload_results_to_hf_dataset(
-    results_per_model: list[ModelInvestmentResult], base_date: date
+    results_per_model: list[ModelInvestmentResult], base_date: date, dataset_name: str = "m-ric/predibench-agent-choices", split: str = "train"
 ) -> None:
     """Upload investment results to the Hugging Face dataset."""
     # Load the existing dataset
-    ds = load_dataset("m-ric/predibench-agent-choices")
+    ds = load_dataset(dataset_name)
 
     # Prepare new data rows
     new_rows = []
@@ -56,12 +56,18 @@ def upload_results_to_hf_dataset(
         new_dataset = Dataset.from_list(new_rows)
         # Concatenate with existing dataset using datasets.concatenate_datasets
 
-        combined_dataset = concatenate_datasets([ds["train"], new_dataset])
+        # Check if split exists, if not use empty dataset
+        try:
+            existing_data = ds[split]
+        except KeyError:
+            existing_data = Dataset.from_list([])
+        
+        combined_dataset = concatenate_datasets([existing_data, new_dataset])
 
         # Push back to hub as a pull request (safer approach)
         combined_dataset.push_to_hub(
-            "m-ric/predibench-agent-choices",
-            split="train",
+            dataset_name,
+            split=split,
             token=os.getenv(ENV_VAR_HF_TOKEN),
         )
 
@@ -138,6 +144,8 @@ def run_investments_for_today(
     backward_date: date | None = None,
     load_from_cache: bool = False,
     filter_crypto_events: bool = True,
+    dataset_name: str = "m-ric/predibench-agent-choices",
+    split: str = "train",
 ) -> list[ModelInvestmentResult]:
     """Run event-based investment simulation with multiple AI models."""
 
@@ -192,7 +200,7 @@ def run_investments_for_today(
 
     # Upload results to Hugging Face dataset
     upload_results_to_hf_dataset(
-        results_per_model=results_per_model, base_date=base_date
+        results_per_model=results_per_model, base_date=base_date, dataset_name=dataset_name, split=split
     )
 
     logger.info("Event-based investment analysis complete!")
