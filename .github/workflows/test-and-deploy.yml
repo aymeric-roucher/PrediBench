@@ -40,16 +40,7 @@ jobs:
         BUCKET_PREDIBENCH: ${{ secrets.BUCKET_PREDIBENCH }}
       run: |
         cd predibench-core
-        uv run python -c "
-        from predibench.storage_utils import has_bucket_access
-        
-        print('Testing GCP bucket write access...')
-        if has_bucket_access():
-            print('✅ Bucket write access confirmed')
-        else:
-            print('❌ Bucket write access failed')
-            exit(1)
-        "
+        uv run python src/predibench/storage_utils.py
         
     - name: Run tests
       run: |
