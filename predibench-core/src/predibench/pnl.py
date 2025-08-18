@@ -30,7 +30,7 @@ class PnlCalculator:
         vol_targeting_window: str, window for volatility targeting
         """
         self.positions = positions
-        self.returns = positions.pct_change()
+        self.returns = prices.pct_change(periods=1).copy()
         self._assert_index_is_date(self.positions)
         self._assert_index_is_date(self.returns)
         self.prices = prices
