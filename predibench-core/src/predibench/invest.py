@@ -19,6 +19,10 @@ load_dotenv()
 logger = get_logger(__name__)
 
 
+def get_timestamp_string() -> str:
+    """Generate a timestamp string for filenames to avoid overwriting."""
+    return datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
+
 
 
 def upload_results_to_hf_dataset(results_per_model: list[ModelInvestmentResult], base_date: date) -> None:
@@ -143,7 +147,8 @@ def run_investments_for_today(
     date_output_path.mkdir(parents=True, exist_ok=True)
     
     # Define cache file path within the date-specific output directory
-    cache_file = date_output_path / "events_cache.json"
+    timestamp = get_timestamp_string()
+    cache_file = date_output_path / f"events_cache_{timestamp}.json"
     
     if cache_file.exists() and load_from_cache:
         logger.info("Loading events from cache")
@@ -186,8 +191,7 @@ if __name__ == "__main__":
 
     run_investments_for_today(
         time_until_ending=timedelta(days=21), 
-        max_n_events=3, 
+        max_n_events=10, 
         models=models, 
         output_path=DATA_PATH,
-        backward_date=date(2025, 7, 16),
     )
