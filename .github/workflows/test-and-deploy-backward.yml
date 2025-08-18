@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: investment-analysis
+  group: investment-analysis-backward
   cancel-in-progress: true
 
 jobs:
