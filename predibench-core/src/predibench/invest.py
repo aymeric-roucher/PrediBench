@@ -25,6 +25,7 @@ def run_investments_for_today(
     output_path: Path,
     event_selection_window: timedelta,
     backward_date: date | None = None,
+    cache_file_path: Path | None = None,
     load_from_cache: bool = False,
     filter_crypto_events: bool = True,
     dataset_name: str = "m-ric/predibench-agent-choices",
@@ -41,11 +42,11 @@ def run_investments_for_today(
     date_output_path = output_path / base_date.strftime("%Y-%m-%d")
     date_output_path.mkdir(parents=True, exist_ok=True)
 
-    cache_file = date_output_path / f"events_cache_{get_timestamp_string()}.json"
+    cache_file_path = cache_file_path or date_output_path / f"events_cache_{get_timestamp_string()}.json"
 
-    if cache_file.exists() and load_from_cache:
+    if cache_file_path.exists() and load_from_cache:
         logger.info("Loading events from cache")
-        selected_events = load_events_from_file(cache_file)
+        selected_events = load_events_from_file(cache_file_path)
     else:
         logger.info("Fetching events from API")
         selected_events = choose_events(
@@ -54,7 +55,7 @@ def run_investments_for_today(
             n_events=max_n_events,
             backward_mode=backward_mode,
             filter_crypto_events=filter_crypto_events,
-            save_path=cache_file,
+            save_path=cache_file_path,
         )
 
     logger.info(f"Selected {len(selected_events)} events:")
