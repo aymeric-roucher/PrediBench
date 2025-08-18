@@ -28,20 +28,18 @@ def main(
 ):
     """Main script to run investment analysis with a single model."""
     
-    if model_name not in MODEL_MAP:
-        if model_name == "all":
-            models = list(MODEL_MAP.values())
-        elif model_name == "huggingface":
-            models = [model for model in MODEL_MAP.values() if model.model_id.startswith("huggingface")]
-        elif model_name == "openai":
-            models = [model for model in MODEL_MAP.values() if model.model_id.startswith("openai")]
-        else:
-            available_models = ", ".join(MODEL_MAP.keys())
-            typer.echo(f"Error: Model '{model_name}' not found. Available models: {available_models}")
-            raise typer.Exit(1)
-    
-    model = MODEL_MAP[model_name]
-    models = [model]
+    if model_name == "all":
+        models = list(MODEL_MAP.values())
+    elif model_name == "huggingface":
+        models = [model for model_name, model in MODEL_MAP.items() if model_name.startswith("huggingface")]
+    elif model_name == "openai":
+        models = [model for model_name_key, model in MODEL_MAP.items() if model_name_key.startswith("openai")]
+    elif model_name in MODEL_MAP:
+        models = [MODEL_MAP[model_name]]
+    else:
+        available_models = ", ".join(list(MODEL_MAP.keys()) + ["all", "huggingface", "openai"])
+        typer.echo(f"Error: Model '{model_name}' not found. Available models: {available_models}")
+        raise typer.Exit(1)
     
     logger.info(f"Starting investment analysis with model: {model_name}")
     

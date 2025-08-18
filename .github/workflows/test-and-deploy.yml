@@ -44,9 +44,16 @@ jobs:
         cd predibench-core
         uv run python -m pytest tests/ -v
         
-    - name: Run component tests
+    - name: Run investment analysis with all models
+      env:
+        BUCKET_PREDIBENCH: ${{ secrets.BUCKET_PREDIBENCH }}
+        HF_TOKEN_PREDIBENCH: ${{ secrets.HF_TOKEN_PREDIBENCH }}
+        HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+        SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
       run: |
         cd predibench-core
-        uv run python test_components.py
+        uv run python scripts/main.py all
 
   
