@@ -1,17 +1,13 @@
-import json
-import textwrap
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
-from smolagents import ChatMessage, LiteLLMModel
 
 from predibench.polymarket_api import (
-    MAX_INTERVAL_TIMESERIES,
-    Market,
     Event,
-    MarketsRequestParameters,
     EventsRequestParameters,
 )
 from predibench.logger_config import get_logger
+from predibench.polymarket_data import save_events_to_file
 
 logger = get_logger(__name__)
 
@@ -68,21 +64,80 @@ def _filter_events_by_volume_and_markets(
     return filtered_events
 
 
-# TODO: add tenacity retry for the requests
-# TODO: all of the parameters here should be threated as hyper parameters
+def _select_markets_for_events(
+    events: list[Event], base_date: date, backward_mode: bool = False
+) -> list[Event]:
+    """Select the market with highest volume1wk that has outcomes[0] price between 0.05 and 0.95."""
+
+    if backward_mode:
+        # In backward mode: filter events by end_date > base_date (if end_date exists) and select markets by volume
+        events_with_selected_markets = []
+        for event in events:
+            # Filter events where end_date is after base_date, or keep if end_date doesn't exist
+            if event.end_date is None or event.end_date.date() > base_date:
+                if event.selected_market_id is not None:
+                    raise ValueError(
+                        f"Event '{event.title}' already has a selected market"
+                    )
+
+                # Select market with highest volume1wk (no price constraints in backward mode)
+                eligible_markets = [
+                    market
+                    for market in event.markets
+                    if market.end_date is None or market.end_date.date() > base_date
+                ]
+
+                if eligible_markets:
+                    best_market = max(eligible_markets, key=lambda m: m.volumeNum)
+                    event.selected_market_id = best_market.id
+                    events_with_selected_markets.append(event)
+
+                    end_date_str = (
+                        event.end_date.date() if event.end_date else "no end date"
+                    )
+                    logger.info(
+                        f"Backward mode: Selected event '{event.title}' ending {end_date_str}"
+                    )
+
+        return events_with_selected_markets
+
+    events_with_selected_markets = []
+    for event in events:
+        if event.selected_market_id is not None:
+            raise ValueError(f"Event '{event.title}' already has a selected market")
+
+        eligible_markets = []
+        for market in event.markets:
+            if (
+                market.volume1wk is not None
+                and market.outcomes
+                and len(market.outcomes) > 0
+                and 0.05 < market.outcomes[0].price < 0.95
+            ):
+                eligible_markets.append(market)
+
+        if eligible_markets:
+            best_market = max(eligible_markets, key=lambda m: m.volume1wk)
+            event.selected_market_id = best_market.id
+            events_with_selected_markets.append(event)
+
+    return events_with_selected_markets
+
+
 def choose_events(
     today_date: datetime,
-    time_until_ending: timedelta,
+    event_selection_window: timedelta,
     n_events: int,
     min_volume: float = 1000,
     backward_mode: bool = False,
     filter_crypto_events: bool = True,
+    save_path: Path | None = None,
 ) -> list[Event]:
     """Pick top events by volume for investment for the current week
 
     backward_mode: if True, then events ending around this date will be selected, but those events are probably closed, we can't use the volume24hr to filter out the events that are open.
     """
-    end_date = today_date + time_until_ending
+    end_date = today_date + event_selection_window
     request_parameters = EventsRequestParameters(
         limit=500,
         order="volume1wk" if not backward_mode else "volume",
@@ -108,4 +163,14 @@ def choose_events(
                 market.fill_prices()
 
     filtered_events = _remove_markets_without_prices_in_events(filtered_events)
-    return filtered_events
+
+    events_with_selected_markets = _select_markets_for_events(
+        events=filtered_events, base_date=today_date, backward_mode=backward_mode
+    )
+
+    save_events_to_file(
+        events=events_with_selected_markets,
+        file_path=save_path
+    )
+
+    return events_with_selected_markets

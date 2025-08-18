@@ -179,9 +179,9 @@ def create_pnl_plot(performance_data):
 # Initialize data
 df = load_agent_choices()
 # Filter data to only include rows where timestamp_uploaded is before 2025-08-18
-df['timestamp_uploaded'] = pd.to_datetime(df['timestamp_uploaded'])
-cutoff_date = pd.to_datetime('2025-08-18')
-df = df[df['timestamp_uploaded'] < cutoff_date]
+df["timestamp_uploaded"] = pd.to_datetime(df["timestamp_uploaded"])
+cutoff_date = pd.to_datetime("2025-08-18")
+df = df[df["timestamp_uploaded"] < cutoff_date]
 performance_data = calculate_pnl_and_performance(df)
 
 # Create Gradio interface

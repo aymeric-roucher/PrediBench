@@ -32,7 +32,7 @@ MODEL_MAP = {
 def main(
     model_name: str = typer.Argument(..., help="Name of the model to run"),
     max_events: int = typer.Option(10, help="Maximum number of events to analyze"),
-    days_ahead: int = typer.Option(7*6, help="Days until event ending"),
+    days_ahead: int = typer.Option(7 * 6, help="Days until event ending"),
 ):
     """Main script to run investment analysis with a single model."""
 
@@ -64,7 +64,7 @@ def main(
     logger.info(f"Starting investment analysis with model: {model_name}")
 
     results = run_investments_for_today(
-        time_until_ending=timedelta(days=days_ahead),
+        event_selection_window=timedelta(days=days_ahead),
         max_n_events=max_events,
         models=models,
         output_path=DATA_PATH,
