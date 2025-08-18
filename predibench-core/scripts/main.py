@@ -16,14 +16,8 @@ MODEL_MAP = {
     "huggingface/Qwen/Qwen3-30B-A3B-Instruct-2507": InferenceClientModelWithRetry(model_id="Qwen/Qwen3-30B-A3B-Instruct-2507"),
     "huggingface/deepseek-ai/DeepSeek-R1-0528": InferenceClientModelWithRetry(model_id="deepseek-ai/DeepSeek-R1-0528"),
     "huggingface/Qwen/Qwen3-4B-Thinking-2507": InferenceClientModelWithRetry(model_id="Qwen/Qwen3-4B-Thinking-2507"),
-    "gpt-4.1": OpenAIModelWithRetry(model_id="gpt-4.1"),
-    "gpt-4o": OpenAIModelWithRetry(model_id="gpt-4o"),
-    "gpt-4.1-mini": OpenAIModelWithRetry(model_id="gpt-4.1-mini"),
-    "o4-mini": OpenAIModelWithRetry(model_id="o4-mini"),
-    "gpt-5": OpenAIModelWithRetry(model_id="gpt-5"),
-    "gpt-5-mini": OpenAIModelWithRetry(model_id="gpt-5-mini"),
-    "o3-deep-research": OpenAIModelWithRetry(model_id="o3-deep-research"),
-    "test_random": "test_random",
+    "openai/gpt-5": OpenAIModelWithRetry(model_id="gpt-5"),
+    "openai/gpt-5-mini": OpenAIModelWithRetry(model_id="gpt-5-mini"),
 }
 
 @app.command()
@@ -35,9 +29,16 @@ def main(
     """Main script to run investment analysis with a single model."""
     
     if model_name not in MODEL_MAP:
-        available_models = ", ".join(MODEL_MAP.keys())
-        typer.echo(f"Error: Model '{model_name}' not found. Available models: {available_models}")
-        raise typer.Exit(1)
+        if model_name == "all":
+            models = list(MODEL_MAP.values())
+        elif model_name == "huggingface":
+            models = [model for model in MODEL_MAP.values() if model.model_id.startswith("huggingface")]
+        elif model_name == "openai":
+            models = [model for model in MODEL_MAP.values() if model.model_id.startswith("openai")]
+        else:
+            available_models = ", ".join(MODEL_MAP.keys())
+            typer.echo(f"Error: Model '{model_name}' not found. Available models: {available_models}")
+            raise typer.Exit(1)
     
     model = MODEL_MAP[model_name]
     models = [model]
