@@ -121,7 +121,7 @@ def run_investments_for_today(
     )
     
     # Upload results to Hugging Face dataset
-    upload_results_to_hf_dataset(results_per_model, base_date)
+    upload_results_to_hf_dataset(results_per_model=results_per_model, base_date=base_date)
     
     logger.info("Event-based investment analysis complete!")
     return results_per_model

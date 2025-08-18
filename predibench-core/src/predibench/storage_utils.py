@@ -12,7 +12,7 @@ import os
 import uuid
 from functools import cache
 from pathlib import Path
-from predibench.common import DATA_PATH
+from predibench.common import DATA_PATH, ENV_VAR_HF_TOKEN
 from predibench.agent import ModelInvestmentResult
 from datasets import load_dataset, Dataset
 from datetime import date, datetime
@@ -213,7 +213,7 @@ def upload_results_to_hf_dataset(results_per_model: list[ModelInvestmentResult],
         combined_dataset.push_to_hub(
             "m-ric/predibench-agent-choices", 
             split="train",
-            token=os.getenv("HF_TOKEN_PREDIBENCH")
+            token=os.getenv(ENV_VAR_HF_TOKEN)
         )
         
         logger.info(f"Successfully uploaded {len(new_rows)} new rows to HF dataset")
