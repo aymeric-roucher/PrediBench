@@ -41,7 +41,7 @@ class PnlCalculator:
         self.portfolio_daily_pnl = self.pnl.sum(
             axis=1
         )  # NOTE: this assumes all positions equal, it's false ofc
-        self.portfolio_cumulative_pnl = self.portfolio_daily_pnl.cumsum()
+        self.portfolio_cumulative_pnl = self.portfolio_daily_pnl.cumsum(axis="columns")
         self.portfolio_mean_pnl = self.portfolio_daily_pnl.mean()
         self.portfolio_std_pnl = self.portfolio_daily_pnl.std()
         self.portfolio_sum_pnl = self.portfolio_daily_pnl.sum()
@@ -84,7 +84,7 @@ class PnlCalculator:
                     * self.returns[col]
                     for col in self.new_positions
                 ],
-                axis=1,
+                axis="columns",
             )
             return pnls
         else:
@@ -99,7 +99,7 @@ class PnlCalculator:
                     * self.returns[col]
                     for col in self.positions
                 ],
-                axis=1,
+                axis="columns",
             )
             return pnls
 
@@ -130,7 +130,7 @@ class PnlCalculator:
             columns = list(self.pnl.columns)
             for i, market_id in enumerate(columns):
                 col_color = colors[i % len(colors)]
-                cumulative_pnl = self.pnl[market_id].cumsum()
+                cumulative_pnl_market = self.pnl[market_id].cumsum(axis="index")
 
                 # Add price evolution trace to subplot 1 (top)
                 if market_id in self.prices.columns:
@@ -152,6 +152,11 @@ class PnlCalculator:
                     positions_to_plot = self.positions[market_id][
                         self.positions[market_id].notna()
                     ]
+                    print("MARKET ID", market_id, ":::")
+                    print(positions_to_plot)
+                    print(cumulative_pnl_market)
+                    print(self.pnl[market_id])
+
                     if len(positions_to_plot) > 0:
                         # Get price values at position change dates
                         prices_at_position_changes = price_data.loc[
@@ -162,7 +167,7 @@ class PnlCalculator:
                                 x=prices_at_position_changes.index,
                                 y=prices_at_position_changes.values,
                                 text=positions_to_plot.values,
-                                hovertemplate="Position: %{text:.2f}<br>Price: %{y:.3f}<extra></extra>",
+                                hovertemplate="Date: %{x}<br>Position: %{text:.2f}<br>Price: %{y:.3f}<extra></extra>",
                                 mode="markers",
                                 marker=dict(
                                     symbol=[
@@ -188,8 +193,8 @@ class PnlCalculator:
                 # Add PnL trace to subplot 2 (bottom)
                 fig.add_trace(
                     go.Scatter(
-                        x=cumulative_pnl.index,
-                        y=cumulative_pnl.values,
+                        x=cumulative_pnl_market.index,
+                        y=cumulative_pnl_market.values,
                         mode="markers+lines",
                         line=dict(color=col_color),
                         showlegend=False,
@@ -203,7 +208,7 @@ class PnlCalculator:
             fig.update_xaxes(title_text="Date", row=2, col=1)
             fig.update_yaxes(title_text="Price", row=1, col=1)
             fig.update_yaxes(
-                title_text="Cumulative PnL", tickformat=".0%", row=2, col=1
+                title_text="Cumulative PnL", tickformat=".0f", row=2, col=1
             )
             fig.update_layout(
                 legend_title="Stock",
