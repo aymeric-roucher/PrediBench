@@ -152,7 +152,6 @@ class PnlCalculator:
                     positions_to_plot = self.positions[market_id][
                         self.positions[market_id].notna()
                     ]
-
                     print("MARKET ID", market_id, ":::")
                     print(positions_to_plot.head(30))
                     print(cumulative_pnl_market.head(30))
@@ -346,6 +345,7 @@ def get_pnls(
 
     pnl_calculators = {}
     for agent_name in positions_df["agent_name"].unique():
+        print("AGENT NAME", agent_name)
         positions_agent_df = positions_df[
             positions_df["agent_name"] == agent_name
         ].drop(columns=["agent_name"])
