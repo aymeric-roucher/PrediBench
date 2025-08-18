@@ -156,7 +156,7 @@ class PnlCalculator:
                     print("MARKET ID", market_id, ":::")
                     print(positions_to_plot.head(30))
                     print(cumulative_pnl_market.head(30))
-                    print(self.pnl[market_id].head(30)))
+                    print(self.pnl[market_id].head(30))
 
                     if len(positions_to_plot) > 0:
                         # Get price values at position change dates
