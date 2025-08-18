@@ -1,17 +1,13 @@
-import json
-import textwrap
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
-from smolagents import ChatMessage, LiteLLMModel
 
 from predibench.polymarket_api import (
-    MAX_INTERVAL_TIMESERIES,
-    Market,
     Event,
-    MarketsRequestParameters,
     EventsRequestParameters,
 )
 from predibench.logger_config import get_logger
+from predibench.polymarket_data import save_events_to_file
 
 logger = get_logger(__name__)
 
@@ -135,6 +131,7 @@ def choose_events(
     min_volume: float = 1000,
     backward_mode: bool = False,
     filter_crypto_events: bool = True,
+    save_path: Path | None = None,
 ) -> list[Event]:
     """Pick top events by volume for investment for the current week
 
@@ -169,6 +166,11 @@ def choose_events(
 
     events_with_selected_markets = _select_markets_for_events(
         events=filtered_events, base_date=today_date, backward_mode=backward_mode
+    )
+
+    save_events_to_file(
+        events=events_with_selected_markets,
+        file_path=save_path
     )
 
     return events_with_selected_markets

@@ -10,7 +10,7 @@ from predibench.agent.runner import ModelInvestmentResult, run_agent_investments
 from predibench.common import DATA_PATH, ENV_VAR_HF_TOKEN
 from predibench.logger_config import get_logger
 from predibench.market_selection import choose_events
-from predibench.polymarket_data import load_events_from_file, save_events_to_file
+from predibench.polymarket_data import load_events_from_file
 from predibench.retry_models import InferenceClientModelWithRetry
 from predibench.utils import get_timestamp_string
 
@@ -54,8 +54,8 @@ def run_investments_for_today(
             n_events=max_n_events,
             backward_mode=backward_mode,
             filter_crypto_events=filter_crypto_events,
+            save_path=cache_file,
         )
-        save_events_to_file(selected_events, cache_file)
 
     logger.info(f"Selected {len(selected_events)} events:")
     for event in selected_events:
