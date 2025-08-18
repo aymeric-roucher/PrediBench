@@ -87,6 +87,7 @@ def choose_events(
         limit=500,
         order="volume1wk" if not backward_mode else "volume",
         ascending=False,
+        end_date_min=today_date if backward_mode else None,
         end_date_max=end_date,
     )
     events = request_parameters.get_events()
