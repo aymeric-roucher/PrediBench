@@ -21,6 +21,7 @@ from tenacity import (
     wait_exponential,
     retry_if_exception_type,
 )
+from datasets import load_dataset, concatenate_datasets, Dataset
 
 from predibench.polymarket_api import Market, Event
 from predibench.common import DATA_PATH
@@ -28,6 +29,7 @@ from predibench.logger_config import get_logger
 from predibench.storage_utils import write_to_storage
 from pydantic import BaseModel
 from predibench.utils import get_timestamp_string
+from predibench.common import ENV_VAR_HF_TOKEN
 
 load_dotenv()
 
@@ -259,12 +261,54 @@ def run_deep_research(
     )
 
 
+def upload_results_to_hf_dataset(
+    results_per_model: list[ModelInvestmentResult], 
+    base_date: date, 
+    dataset_name: str = "m-ric/predibench-agent-choices",
+    split: str = "train"
+) -> None:
+    """Upload investment results to the Hugging Face dataset."""
+    choice_mapping = {"BUY": 1, "SELL": 0, "NOTHING": -1}
+    timestamp = datetime.now()
+    
+    new_rows = [
+        {
+            "agent_name": model_result.model_id,
+            "date": base_date,
+            "question": event_result.market_decision.market_question,
+            "choice": choice_mapping.get(event_result.market_decision.decision, -1),
+            "choice_raw": event_result.market_decision.decision.lower(),
+            "market_id": event_result.market_decision.market_id,
+            "messages_count": 0,
+            "has_reasoning": event_result.market_decision.rationale is not None,
+            "timestamp_uploaded": timestamp,
+            "rationale": event_result.market_decision.rationale or "",
+        }
+        for model_result in results_per_model
+        for event_result in model_result.event_results
+    ]
+    
+    if not new_rows:
+        logger.warning("No data to upload to HF dataset")
+        return
+        
+    ds = load_dataset(dataset_name)
+    existing_data = ds.get(split, Dataset.from_list([]))
+    
+    combined_dataset = concatenate_datasets([existing_data, Dataset.from_list(new_rows)])
+    combined_dataset.push_to_hub(dataset_name, split=split, token=os.getenv(ENV_VAR_HF_TOKEN))
+    
+    logger.info(f"Successfully uploaded {len(new_rows)} new rows to HF dataset")
+
+
 def launch_agent_investments(
     models: list[ApiModel | str],
     events: list[Event],
     target_date: date | None = None,
     backward_mode: bool = False,
     date_output_path: Path | None = None,
+    dataset_name: str = "m-ric/predibench-agent-choices",
+    split: str = "train",
 ) -> list[ModelInvestmentResult]:
     """
     Launch agent investments for events on a specific date.
@@ -294,6 +338,8 @@ def launch_agent_investments(
             date_output_path=date_output_path,
         )
         results.append(model_result)
+        
+    upload_results_to_hf_dataset(results_per_model=results, target_date=target_date, dataset_name=dataset_name, split=split)
 
     return results
 
