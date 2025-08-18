@@ -75,16 +75,16 @@ def run_deep_research(
     )
 
 
-def upload_results_to_hf_dataset(
+def _upload_results_to_hf_dataset(
     results_per_model: list[ModelInvestmentResult], 
     target_date: date, 
     dataset_name: str,
     split: str,
-    hf_token: str
+    hf_token: str,
+    timestamp_for_saving: str,
 ) -> None:
     """Upload investment results to Hugging Face dataset."""
     choice_mapping = {"BUY": 1, "SELL": 0, "NOTHING": -1}
-    timestamp = datetime.now()
     
     new_rows = [
         {
@@ -96,7 +96,7 @@ def upload_results_to_hf_dataset(
             "market_id": event_result.market_decision.market_id,
             "messages_count": 0,
             "has_reasoning": event_result.market_decision.rationale is not None,
-            "timestamp_uploaded": timestamp,
+            "timestamp_uploaded": timestamp_for_saving,
             "rationale": event_result.market_decision.rationale or "",
         }
         for model_result in results_per_model
@@ -119,11 +119,11 @@ def upload_results_to_hf_dataset(
 def save_model_result(
     model_result: ModelInvestmentResult, 
     date_output_path: Path,
-    timestamp: str
+    timestamp_for_saving: str
 ) -> None:
     """Save model result to file."""
 
-    filename = f"{model_result.model_id.replace('/', '--')}_{timestamp}.json"
+    filename = f"{model_result.model_id.replace('/', '--')}_{timestamp_for_saving}.json"
     filepath = date_output_path / filename
 
     content = model_result.model_dump_json(indent=2)
@@ -141,7 +141,7 @@ def process_event_investment(
     date_output_path: Path | None,
     main_market_price_history_limit: int,
     other_markets_price_history_limit: int,
-    timestamp: str
+    timestamp_for_saving: str
 ) -> EventInvestmentResult:
     """Process investment decision for selected market."""
     logger.info(f"Processing event: {event.title} with selected market")
@@ -270,7 +270,7 @@ Provide your decision and rationale for the TARGET MARKET only.
         prompt_file = (
             date_output_path
             / model_id.replace("/", "--")
-            / f"prompt_event_{event.id}_{timestamp}.txt"
+            / f"prompt_event_{event.id}_{timestamp_for_saving}.txt"
         )
 
         write_to_storage(prompt_file, full_question)
@@ -305,7 +305,7 @@ Provide your decision and rationale for the TARGET MARKET only.
     )
 
 
-def process_single_model(
+def _process_single_model(
     model: ApiModel | str,
     events: list[Event],
     target_date: date,
@@ -313,7 +313,7 @@ def process_single_model(
     date_output_path: Path | None,
     main_market_price_history_limit: int,
     other_markets_price_history_limit: int,
-    timestamp: str
+    timestamp_for_saving: str
 ) -> ModelInvestmentResult:
     """Process investments for all events for a model."""
     event_results = []
@@ -328,7 +328,7 @@ def process_single_model(
             date_output_path=date_output_path,
             main_market_price_history_limit=main_market_price_history_limit,
             other_markets_price_history_limit=other_markets_price_history_limit,
-            timestamp=timestamp,
+            timestamp_for_saving=timestamp_for_saving,
         )
         event_results.append(event_result)
 
@@ -338,7 +338,7 @@ def process_single_model(
     )
 
     if date_output_path:
-        save_model_result(model_result=model_result, date_output_path=date_output_path, timestamp=timestamp)
+        save_model_result(model_result=model_result, date_output_path=date_output_path, timestamp_for_saving=timestamp_for_saving)
     return model_result
 
 
@@ -352,18 +352,18 @@ def run_agent_investments(
     split: str,
     main_market_price_history_limit: int,
     other_markets_price_history_limit: int,
-    hf_token: str | None
+    hf_token_for_dataset: str | None
 ) -> list[ModelInvestmentResult]:
     """Launch agent investments for events on a specific date."""
     logger.info(f"Running agent investments for {len(models)} models on {target_date}")
     logger.info(f"Processing {len(events)} events")
 
-    timestamp = get_timestamp_string()
+    timestamp_for_saving = get_timestamp_string()
     results = []
     for model in models:
         model_name = model.model_id if isinstance(model, ApiModel) else model
         logger.info(f"Processing model: {model_name}")
-        model_result = process_single_model(
+        model_result = _process_single_model(
             model=model,
             events=events,
             target_date=target_date,
@@ -371,17 +371,17 @@ def run_agent_investments(
             date_output_path=date_output_path,
             main_market_price_history_limit=main_market_price_history_limit,
             other_markets_price_history_limit=other_markets_price_history_limit,
-            timestamp=timestamp,
+            timestamp_for_saving=timestamp_for_saving,
         )
         results.append(model_result)
         
-    if hf_token:
-        upload_results_to_hf_dataset(
+    if hf_token_for_dataset:
+        _upload_results_to_hf_dataset(
             results_per_model=results, 
             target_date=target_date, 
             dataset_name=dataset_name, 
             split=split,
-            hf_token=hf_token
+            hf_token=hf_token_for_dataset
         )
 
     return results
