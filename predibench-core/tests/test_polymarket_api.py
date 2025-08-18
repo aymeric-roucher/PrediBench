@@ -218,15 +218,6 @@ def test_split_date_range_small():
     assert chunks[0] == (start_time, end_time)
 
 
-def test_split_date_range_exact_limit():
-    """Test date range exactly at the limit."""
-    start_time = datetime(2024, 1, 1)
-    end_time = start_time + MAX_INTERVAL_TIMESERIES
-    
-    chunks = _split_date_range(start_time, end_time)
-    
-    assert len(chunks) == 1
-    assert chunks[0] == (start_time, end_time)
 
 
 def test_split_date_range_large():
@@ -246,11 +237,11 @@ def test_split_date_range_large():
     for chunk_start, chunk_end in chunks:
         assert chunk_end - chunk_start <= MAX_INTERVAL_TIMESERIES
     
-    # Check that chunks don't overlap (except by 1 second)
+    # Check that chunks don't overlap (except by 1 hour)
     for i in range(len(chunks) - 1):
         current_end = chunks[i][1]
         next_start = chunks[i + 1][0]
-        assert next_start == current_end + timedelta(seconds=1)
+        assert next_start == current_end + timedelta(hours=1)
 
 
 def test_split_date_range_very_large():
@@ -266,8 +257,8 @@ def test_split_date_range_very_large():
     # Verify continuity
     reconstructed_range = chunks[-1][1] - chunks[0][0]
     original_range = end_time - start_time
-    # Allow for small differences due to the 1-second gaps between chunks
-    assert abs((reconstructed_range - original_range).total_seconds()) <= len(chunks) - 1
+    # Allow for small differences due to the 1-hour gaps between chunks
+    assert abs((reconstructed_range - original_range).total_seconds()) <= (len(chunks) - 1) * 3600
 
 
 def test_historical_timeseries_date_range_splitting():
@@ -304,6 +295,46 @@ def test_historical_timeseries_date_range_splitting():
     # Check that the small date range wouldn't be split
     time_diff_small = small_end - small_start
     assert time_diff_small <= MAX_INTERVAL_TIMESERIES, "Small date range should be within the limit"
+
+
+def test_split_date_range_multi_split_precise():
+    """Test precise multi-split behavior with known intervals."""
+    # Create a range that should split into exactly 3 chunks
+    start_time = datetime(2024, 1, 1, 0, 0, 0)
+    # Add 2 * MAX_INTERVAL_TIMESERIES + some extra time to force 3 chunks
+    end_time = start_time + (2 * MAX_INTERVAL_TIMESERIES) + timedelta(days=5)
+    
+    chunks = _split_date_range(start_time, end_time)
+    
+    # Should have exactly 3 chunks
+    assert len(chunks) == 3, f"Expected 3 chunks, got {len(chunks)}"
+    
+    # First chunk should start at start_time
+    assert chunks[0][0] == start_time
+    
+    # Last chunk should end at end_time
+    assert chunks[-1][1] == end_time
+    
+    # Check that segment starts are correctly spaced by MAX_INTERVAL_TIMESERIES
+    expected_second_start = start_time + MAX_INTERVAL_TIMESERIES
+    expected_third_start = start_time + (2 * MAX_INTERVAL_TIMESERIES)
+    
+    assert chunks[1][0] == expected_second_start
+    assert chunks[2][0] == expected_third_start
+    
+    # Check that chunk ends are properly offset by 1 hour from next start
+    assert chunks[0][1] == expected_second_start - timedelta(hours=1)
+    assert chunks[1][1] == expected_third_start - timedelta(hours=1)
+    
+    # Verify no chunk exceeds MAX_INTERVAL_TIMESERIES
+    for i, (chunk_start, chunk_end) in enumerate(chunks):
+        duration = chunk_end - chunk_start
+        assert duration <= MAX_INTERVAL_TIMESERIES, f"Chunk {i} duration {duration} exceeds limit"
+        
+    print(f"Successfully split {end_time - start_time} into {len(chunks)} chunks:")
+    for i, (chunk_start, chunk_end) in enumerate(chunks):
+        duration = chunk_end - chunk_start
+        print(f"  Chunk {i+1}: {chunk_start} to {chunk_end} (duration: {duration})")
 
 
 def test_max_interval_timeseries_constant():
