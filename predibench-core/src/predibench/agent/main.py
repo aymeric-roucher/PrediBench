@@ -1,5 +1,7 @@
 from datetime import date, datetime
 from pathlib import Path
+import json
+import textwrap
 
 import numpy as np
 from dotenv import load_dotenv
@@ -9,10 +11,8 @@ from predibench.polymarket_api import Event
 from predibench.logger_config import get_logger
 from predibench.storage_utils import write_to_storage
 from predibench.agent.dataclasses import MarketInvestmentResult, EventInvestmentResult, ModelInvestmentResult
-from predibench.agent.smolagents_utils import run_smolagents, EventDecisions
+from predibench.agent.smolagents_utils import run_smolagents, EventDecisions, run_deep_research
 from smolagents import (
-    RunResult,
-    Timing,
     ApiModel,
 )
 
@@ -46,32 +46,6 @@ def _create_market_investment_decision(
             is_closed=False,
         )
 
-
-def run_deep_research(
-    model_id: str,
-    question: str,
-) -> RunResult:
-    from openai import OpenAI
-
-    client = OpenAI(timeout=3600)
-
-    response = client.responses.create(
-        model=model_id,
-        input=question + "Preface your answer with 'ANSWER: '",
-        tools=[
-            {"type": "web_search_preview"},
-            {"type": "code_interpreter", "container": {"type": "auto"}},
-        ],
-    )
-    output_text = response.output_text
-    choice = output_text.split("ANSWER: ")[1].strip()
-    return RunResult(
-        output=choice,
-        steps=[],
-        state={},
-        token_usage=None,
-        timing=Timing(0.0),
-    )
 
 
 def _upload_results_to_hf_dataset(
@@ -281,6 +255,12 @@ Provide your decision and rationale for the TARGET MARKET only.
         event_decision = EventDecisions(
             decision=choice,
             rationale=f"Random decision for testing market {event.selected_market_id}",
+        )
+    elif isinstance(model, str) and model == "o3-deep-research":
+        event_decision = run_deep_research(
+            model_id="o3-deep-research",
+            question=full_question,
+            structured_output_model_id="gpt-5",
         )
     else:
         if backward_mode:

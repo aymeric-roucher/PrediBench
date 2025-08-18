@@ -15,7 +15,9 @@ from datetime import datetime
 from pydantic import BaseModel
 from predibench.logger_config import get_logger
 from typing import Literal
-
+import json
+import textwrap
+from smolagents import LiteLLMModel, ChatMessage
 
 class EventDecisions(BaseModel):
     rationale: str
@@ -145,3 +147,59 @@ The final_answer tool must contain the arguments rationale and decision.
     result = agent.run(prompt)
 
     return result.output
+
+
+def run_deep_research(
+    model_id: str,
+    question: str,
+    structured_output_model_id: str,
+) -> EventDecisions:
+    from openai import OpenAI
+
+    client = OpenAI(timeout=3600)
+
+    response = client.responses.create(
+        model=model_id,
+        input=question + "\n\nProvide your detailed analysis and reasoning, then clearly state your final decision.",
+        tools=[
+            {"type": "web_search_preview"},
+            {"type": "code_interpreter", "container": {"type": "auto"}},
+        ],
+    )
+    research_output = response.output_text
+    
+    # Use structured output to get EventDecisions
+    structured_model = LiteLLMModel(
+        model_id=structured_output_model_id,
+    )
+    
+    structured_prompt = textwrap.dedent(f"""
+        Based on the following research output, extract the investment decision and rationale:
+        
+        {research_output}
+        
+        You must provide:
+        1. A clear rationale summarizing the key points from the research
+        2. A decision that must be exactly one of: BUY, SELL, or NOTHING
+        
+        BUY means you think the outcome is undervalued (more likely than current price suggests)
+        SELL means you think the outcome is overvalued (less likely than current price suggests)  
+        NOTHING means fairly priced or too uncertain to bet
+    """)
+    
+    structured_output = structured_model.generate(
+        [ChatMessage(role="user", content=structured_prompt)],
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "response",
+                "schema": EventDecisions.model_json_schema(),
+            },
+        },
+    )
+    
+    parsed_output = json.loads(structured_output.content)
+    return EventDecisions(
+        rationale=parsed_output["rationale"],
+        decision=parsed_output["decision"]
+    )
