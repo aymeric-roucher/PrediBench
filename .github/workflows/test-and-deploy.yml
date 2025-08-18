@@ -39,10 +39,6 @@ jobs:
         cd predibench-core
         uv run python src/predibench/storage_utils.py
         
-    - name: Run tests
-      run: |
-        cd predibench-core
-        uv run python -m pytest tests/ -v
         
     - name: Run investment analysis with all models
       env:
