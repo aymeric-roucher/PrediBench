@@ -15,6 +15,7 @@ from smolagents import (
     tool,
     ApiModel,
 )
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from predibench.polymarket_api import Market, Event
 from predibench.common import DATA_PATH
@@ -79,6 +80,11 @@ class GoogleSearchTool(Tool):
             )
         self.cutoff_date = cutoff_date
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=10, max=60),
+        retry=retry_if_exception_type((Exception,))
+    )
     def forward(self, query: str) -> str:
         import requests
 
