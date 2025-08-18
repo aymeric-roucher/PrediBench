@@ -111,7 +111,18 @@ class GoogleSearchTool(Tool):
 def final_answer(
     rationale: str, decision: Literal["BUY", "SELL", "NOTHING"]
 ) -> EventDecisions:
-    """Validate and return the final event decision."""
+    """
+    This tool is used to validate and return the final event decision.
+
+    This tool must be used only once. The rationale and decision must be provided in the same call.
+
+    Args:
+        rationale (str): The rationale for the decision.
+        decision (Literal["BUY", "SELL", "NOTHING"]): The decision to make.
+
+    Returns:
+        EventDecisions: The validated EventDecisions object, raises error if invalid.
+    """
     assert decision in ["BUY", "SELL", "NOTHING"], (
         "Invalid decision, must be BUY, SELL or NOTHING"
     )
