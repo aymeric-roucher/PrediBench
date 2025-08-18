@@ -31,8 +31,8 @@ MODEL_MAP = {
 @app.command()
 def main(
     model_name: str = typer.Argument(..., help="Name of the model to run"),
-    max_events: int = typer.Option(5, help="Maximum number of events to analyze"),
-    days_ahead: int = typer.Option(21, help="Days until event ending"),
+    max_events: int = typer.Option(10, help="Maximum number of events to analyze"),
+    days_ahead: int = typer.Option(7*6, help="Days until event ending"),
 ):
     """Main script to run investment analysis with a single model."""
 
