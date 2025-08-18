@@ -9,6 +9,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import requests
 from predibench.utils import convert_polymarket_time_to_datetime
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 # TODO: respect rate limits:
 # **API Rate Limits**
@@ -158,6 +159,11 @@ class _RequestParameters(BaseModel):
 
 class MarketsRequestParameters(_RequestParameters):
     
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=10, max=60),
+        retry=retry_if_exception_type((requests.exceptions.RequestException, requests.exceptions.Timeout, requests.exceptions.ConnectionError))
+    )
     def get_markets(
         self, start_time: datetime | None = None, end_time: datetime | None = None
     ) -> list[Market]:
@@ -206,6 +212,11 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
     start_time: datetime | None = None
     end_time: datetime | None = None
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=10, max=60),
+        retry=retry_if_exception_type((requests.exceptions.RequestException, requests.exceptions.Timeout, requests.exceptions.ConnectionError))
+    )
     def get_token_daily_timeseries(self) -> pd.Series | None:
         """Get token timeseries data using this request configuration.
         
@@ -254,6 +265,11 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
 
 class EventsRequestParameters(_RequestParameters):
     
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=10, max=60),
+        retry=retry_if_exception_type((requests.exceptions.RequestException, requests.exceptions.Timeout, requests.exceptions.ConnectionError))
+    )
     def get_events(self) -> list[Event]:
         """Get events from Polymarket API using this request configuration."""
         url = f"{BASE_URL_POLYMARKET}/events"
@@ -358,6 +374,11 @@ class OrderBook(BaseModel):
     asks: list[OrderLevel]
 
     @staticmethod
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=10, max=60),
+        retry=retry_if_exception_type((requests.exceptions.RequestException, requests.exceptions.Timeout, requests.exceptions.ConnectionError))
+    )
     def get_order_book(token_id: str) -> OrderBook:
         """Get order book for a specific token ID from Polymarket CLOB API.
 
