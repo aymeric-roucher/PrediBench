@@ -10,16 +10,6 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal"
-        },
-        {
-            "name": "justmycode false",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${file}",
-            "stopOnEntry": true,
-            "console": "integratedTerminal",
-            "purpose": ["debug-in-terminal"],
-            "justMyCode": false
         }
     ]
 }

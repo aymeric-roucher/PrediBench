@@ -126,7 +126,7 @@ def _select_markets_for_events(
 
 def choose_events(
     today_date: datetime,
-    time_until_ending: timedelta,
+    event_selection_window: timedelta,
     n_events: int,
     min_volume: float = 1000,
     backward_mode: bool = False,
@@ -137,7 +137,7 @@ def choose_events(
 
     backward_mode: if True, then events ending around this date will be selected, but those events are probably closed, we can't use the volume24hr to filter out the events that are open.
     """
-    end_date = today_date + time_until_ending
+    end_date = today_date + event_selection_window
     request_parameters = EventsRequestParameters(
         limit=500,
         order="volume1wk" if not backward_mode else "volume",

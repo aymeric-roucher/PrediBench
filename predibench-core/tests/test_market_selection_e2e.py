@@ -27,7 +27,7 @@ def test_choose_events_event_caching_e2e():
 
     # Test parameters (same as used in invest.py)
     today_date = datetime.now(timezone.utc)
-    time_until_ending = timedelta(days=21)
+    event_selection_window = timedelta(days=21)
     max_n_events = 3
 
     logger.info("Starting e2e event caching test...")
@@ -36,7 +36,7 @@ def test_choose_events_event_caching_e2e():
     logger.info("Step 1: Fetching events from API...")
     selected_events = choose_events(
         today_date=today_date,
-        time_until_ending=time_until_ending,
+        event_selection_window=event_selection_window,
         n_events=max_n_events,
     )
 
@@ -51,9 +51,9 @@ def test_choose_events_event_caching_e2e():
         assert event.volume24hr is not None, f"Event {event.title} has no volume24hr"
         assert event.volume24hr > 0, f"Event {event.title} has no volume24hr"
         assert (
-            event.end_date.astimezone(timezone.utc) <= today_date + time_until_ending
+            event.end_date.astimezone(timezone.utc) <= today_date + event_selection_window
         ), (
-            f"Event {event.title} has end_date {event.end_date} which is after {today_date + time_until_ending}"
+            f"Event {event.title} has end_date {event.end_date} which is after {today_date + event_selection_window}"
         )
 
         for market in event.markets:
@@ -189,7 +189,7 @@ def test_choose_events_backward_compatibility():
 
     # Test parameters
     base_date = datetime(2025, 7, 15, tzinfo=timezone.utc)  # Fixed date for testing
-    time_until_ending = timedelta(days=7)
+    event_selection_window = timedelta(days=7)
     max_n_events = 3
 
     # Test 1: Normal mode (backward_mode=False)
@@ -197,7 +197,7 @@ def test_choose_events_backward_compatibility():
 
     selected_events = choose_events(
         today_date=base_date,
-        time_until_ending=time_until_ending,
+        event_selection_window=event_selection_window,
         n_events=max_n_events,
         backward_mode=True,
     )
@@ -211,9 +211,9 @@ def test_choose_events_backward_compatibility():
     for event in selected_events:
         assert len(event.markets) > 0, f"Event {event.title} has no markets"
         assert (
-            event.end_date.astimezone(timezone.utc) <= base_date + time_until_ending
+            event.end_date.astimezone(timezone.utc) <= base_date + event_selection_window
         ), (
-            f"Event {event.title} has end_date {event.end_date} which is after {base_date + time_until_ending}"
+            f"Event {event.title} has end_date {event.end_date} which is after {base_date + event_selection_window}"
         )
 
         for market in event.markets:

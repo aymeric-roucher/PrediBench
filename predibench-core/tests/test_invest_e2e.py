@@ -13,7 +13,7 @@ def test_invest_e2e():
     ]
 
     run_investments_for_today(
-        time_until_ending=timedelta(days=21),
+        event_selection_window=timedelta(days=21),
         max_n_events=3,
         models=models,
         output_path=DATA_PATH,
@@ -26,7 +26,7 @@ def test_invest_e2e_backward():
     ]
 
     run_investments_for_today(
-        time_until_ending=timedelta(days=21),
+        event_selection_window=timedelta(days=21),
         max_n_events=3,
         models=models,
         output_path=DATA_PATH,

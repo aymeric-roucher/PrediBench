@@ -20,7 +20,7 @@ logger = get_logger(__name__)
 
 
 def run_investments_for_today(
-    time_until_ending: timedelta,
+    event_selection_window: timedelta,
     max_n_events: int,
     models: list[ApiModel | str],
     output_path: Path,
@@ -50,7 +50,7 @@ def run_investments_for_today(
         logger.info("Fetching events from API")
         selected_events = choose_events(
             today_date=base_date,
-            time_until_ending=time_until_ending,
+            event_selection_window=event_selection_window,
             n_events=max_n_events,
             backward_mode=backward_mode,
             filter_crypto_events=filter_crypto_events,
@@ -88,7 +88,7 @@ if __name__ == "__main__":
     ]
 
     run_investments_for_today(
-        time_until_ending=timedelta(days=7 * 6),
+        event_selection_window=timedelta(days=7 * 6),
         max_n_events=20,
         models=models,
         output_path=DATA_PATH,

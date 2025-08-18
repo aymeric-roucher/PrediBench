@@ -64,7 +64,7 @@ def main(
     logger.info(f"Starting investment analysis with model: {model_name}")
 
     results = run_investments_for_today(
-        time_until_ending=timedelta(days=days_ahead),
+        event_selection_window=timedelta(days=days_ahead),
         max_n_events=max_events,
         models=models,
         output_path=DATA_PATH,

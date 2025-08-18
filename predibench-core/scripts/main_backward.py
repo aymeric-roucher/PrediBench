@@ -63,7 +63,7 @@ def main(
         )
 
         run_investments_for_today(
-            time_until_ending=timedelta(days=days_ahead),
+            event_selection_window=timedelta(days=days_ahead),
             max_n_events=max_events,
             models=list(MODEL_MAP.values()),  # Run one model at a time
             output_path=DATA_PATH,
