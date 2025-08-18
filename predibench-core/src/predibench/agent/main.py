@@ -8,9 +8,8 @@ from datasets import load_dataset, concatenate_datasets, Dataset
 from predibench.polymarket_api import Event
 from predibench.logger_config import get_logger
 from predibench.storage_utils import write_to_storage
-from predibench.utils import get_timestamp_string
-from predibench.agent.dataclasses import EventDecisions, MarketInvestmentDecision, EventInvestmentResult, ModelInvestmentResult
-from predibench.agent.smolagents_utils import run_smolagents
+from predibench.agent.dataclasses import MarketInvestmentResult, EventInvestmentResult, ModelInvestmentResult
+from predibench.agent.smolagents_utils import run_smolagents, EventDecisions
 from smolagents import (
     RunResult,
     Timing,
@@ -24,12 +23,12 @@ logger = get_logger(__name__)
 
 
 
-def create_market_investment_decision(
+def _create_market_investment_decision(
     event_decision: EventDecisions, selected_market_info: dict
-) -> MarketInvestmentDecision:
+) -> MarketInvestmentResult:
     """Convert EventDecision to MarketInvestmentDecision."""
     if selected_market_info["is_closed"]:
-        return MarketInvestmentDecision(
+        return MarketInvestmentResult(
             market_id=selected_market_info["id"],
             market_question=selected_market_info["question"],
             decision="NOTHING",
@@ -38,7 +37,7 @@ def create_market_investment_decision(
             is_closed=True,
         )
     else:
-        return MarketInvestmentDecision(
+        return MarketInvestmentResult(
             market_id=selected_market_info["id"],
             market_question=selected_market_info["question"],
             decision=event_decision.decision,
@@ -133,7 +132,7 @@ def save_model_result(
 
 
 
-def process_event_investment(
+def _process_event_investment(
     model: ApiModel | str,
     event: Event,
     target_date: date,
@@ -293,8 +292,8 @@ Provide your decision and rationale for the TARGET MARKET only.
         )
 
     # Convert to MarketInvestmentDecision for selected market
-    market_decision = create_market_investment_decision(
-        event_decision, selected_market_info
+    market_decision = _create_market_investment_decision(
+        event_decision=event_decision, selected_market_info=selected_market_info
     )
 
     return EventInvestmentResult(
@@ -320,7 +319,7 @@ def _process_single_model(
 
     for event in events:
         logger.info(f"Processing event: {event.title}")
-        event_result = process_event_investment(
+        event_result = _process_event_investment(
             model=model,
             event=event,
             target_date=target_date,
@@ -352,13 +351,13 @@ def run_agent_investments(
     split: str,
     main_market_price_history_limit: int,
     other_markets_price_history_limit: int,
-    hf_token_for_dataset: str | None
+    hf_token_for_dataset: str | None,
+    timestamp_for_saving: str
 ) -> list[ModelInvestmentResult]:
     """Launch agent investments for events on a specific date."""
     logger.info(f"Running agent investments for {len(models)} models on {target_date}")
     logger.info(f"Processing {len(events)} events")
 
-    timestamp_for_saving = get_timestamp_string()
     results = []
     for model in models:
         model_name = model.model_id if isinstance(model, ApiModel) else model

@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Literal
 from datetime import date
 
-class MarketInvestmentDecision(BaseModel):
+class MarketInvestmentResult(BaseModel):
     market_id: str
     market_question: str
     decision: Literal["BUY", "SELL", "NOTHING"]
@@ -15,7 +15,7 @@ class EventInvestmentResult(BaseModel):
     event_id: str
     event_title: str
     event_description: str | None = None
-    market_decision: MarketInvestmentDecision
+    market_decision: MarketInvestmentResult
 
 
 class ModelInvestmentResult(BaseModel):
@@ -23,7 +23,3 @@ class ModelInvestmentResult(BaseModel):
     target_date: date
     event_results: list[EventInvestmentResult]
 
-
-class EventDecisions(BaseModel):
-    rationale: str
-    decision: Literal["BUY", "SELL", "NOTHING"]

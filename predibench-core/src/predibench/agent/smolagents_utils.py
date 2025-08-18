@@ -1,7 +1,5 @@
 import os
 from smolagents import (
-    RunResult,
-    Timing,
     Tool,
     ToolCallingAgent,
     VisitWebpageTool,
@@ -14,10 +12,16 @@ from tenacity import (
     wait_exponential,
     retry_if_exception_type,
 )
-from predibench.agent.dataclasses import EventDecisions
 from datetime import datetime
+from pydantic import BaseModel
 from predibench.logger_config import get_logger
 from typing import Literal
+
+
+class EventDecisions(BaseModel):
+    rationale: str
+    decision: Literal["BUY", "SELL", "NOTHING"]
+
 
 logger = get_logger(__name__)
 
