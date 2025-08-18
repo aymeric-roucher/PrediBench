@@ -10,7 +10,6 @@ from predibench.agent import ModelInvestmentResult, launch_agent_investments
 from predibench.common import DATA_PATH, ENV_VAR_HF_TOKEN
 from predibench.logger_config import get_logger
 from predibench.market_selection import choose_events
-from predibench.polymarket_api import Event
 from predibench.polymarket_data import load_events_from_file, save_events_to_file
 from predibench.retry_models import InferenceClientModelWithRetry
 from predibench.utils import get_timestamp_string
@@ -21,59 +20,43 @@ logger = get_logger(__name__)
 
 
 def upload_results_to_hf_dataset(
-    results_per_model: list[ModelInvestmentResult], base_date: date, dataset_name: str = "m-ric/predibench-agent-choices", split: str = "train"
+    results_per_model: list[ModelInvestmentResult], 
+    base_date: date, 
+    dataset_name: str = "m-ric/predibench-agent-choices",
+    split: str = "train"
 ) -> None:
     """Upload investment results to the Hugging Face dataset."""
-    # Load the existing dataset
-    ds = load_dataset(dataset_name)
-
-    # Prepare new data rows
-    new_rows = []
-    current_timestamp = datetime.now()
-
-    for model_result in results_per_model:
-        for event_result in model_result.event_results:
-            # Map decision to choice value
-            choice_mapping = {"BUY": 1, "SELL": 0, "NOTHING": -1}
-            choice = choice_mapping.get(event_result.market_decision.decision, -1)
-
-            row = {
-                "agent_name": model_result.model_id,
-                "date": base_date,
-                "question": event_result.market_decision.market_question,
-                "choice": choice,
-                "choice_raw": event_result.market_decision.decision.lower(),
-                "market_id": event_result.market_decision.market_id,
-                "messages_count": 0,  # This would need to be tracked during agent execution
-                "has_reasoning": event_result.market_decision.rationale is not None,
-                "timestamp_uploaded": current_timestamp,
-                "rationale": event_result.market_decision.rationale or "",
-            }
-            new_rows.append(row)
-
-    if new_rows:
-        # Create a new dataset with the new rows
-        new_dataset = Dataset.from_list(new_rows)
-        # Concatenate with existing dataset using datasets.concatenate_datasets
-
-        # Check if split exists, if not use empty dataset
-        try:
-            existing_data = ds[split]
-        except KeyError:
-            existing_data = Dataset.from_list([])
-        
-        combined_dataset = concatenate_datasets([existing_data, new_dataset])
-
-        # Push back to hub as a pull request (safer approach)
-        combined_dataset.push_to_hub(
-            dataset_name,
-            split=split,
-            token=os.getenv(ENV_VAR_HF_TOKEN),
-        )
-
-        logger.info(f"Successfully uploaded {len(new_rows)} new rows to HF dataset")
-    else:
+    choice_mapping = {"BUY": 1, "SELL": 0, "NOTHING": -1}
+    timestamp = datetime.now()
+    
+    new_rows = [
+        {
+            "agent_name": model_result.model_id,
+            "date": base_date,
+            "question": event_result.market_decision.market_question,
+            "choice": choice_mapping.get(event_result.market_decision.decision, -1),
+            "choice_raw": event_result.market_decision.decision.lower(),
+            "market_id": event_result.market_decision.market_id,
+            "messages_count": 0,
+            "has_reasoning": event_result.market_decision.rationale is not None,
+            "timestamp_uploaded": timestamp,
+            "rationale": event_result.market_decision.rationale or "",
+        }
+        for model_result in results_per_model
+        for event_result in model_result.event_results
+    ]
+    
+    if not new_rows:
         logger.warning("No data to upload to HF dataset")
+        return
+        
+    ds = load_dataset(dataset_name)
+    existing_data = ds.get(split, Dataset.from_list([]))
+    
+    combined_dataset = concatenate_datasets([existing_data, Dataset.from_list(new_rows)])
+    combined_dataset.push_to_hub(dataset_name, split=split, token=os.getenv(ENV_VAR_HF_TOKEN))
+    
+    logger.info(f"Successfully uploaded {len(new_rows)} new rows to HF dataset")
 
 
 def run_investments_for_today(
@@ -88,29 +71,19 @@ def run_investments_for_today(
     split: str = "train",
 ) -> list[ModelInvestmentResult]:
     """Run event-based investment simulation with multiple AI models."""
-
-    if backward_date is None:
-        base_date = datetime.now(timezone.utc).date()
-        backward_mode = False
-    else:
-        base_date = backward_date
-        backward_mode = True
-
-    logger.info("Using event-based investment approach")
-    logger.info(f"Base date: {base_date}")
-    logger.info(f"Backward mode: {backward_mode}")
-
-    # Create output directory structure: output_path/date
+    base_date = backward_date or datetime.now(timezone.utc).date()
+    backward_mode = backward_date is not None
+    
+    logger.info(f"Running investment analysis for {base_date} (backward_mode: {backward_mode})")
+    
     date_output_path = output_path / base_date.strftime("%Y-%m-%d")
     date_output_path.mkdir(parents=True, exist_ok=True)
-
-    # Define cache file path within the date-specific output directory
-    timestamp = get_timestamp_string()
-    cache_file = date_output_path / f"events_cache_{timestamp}.json"
-
+    
+    cache_file = date_output_path / f"events_cache_{get_timestamp_string()}.json"
+    
     if cache_file.exists() and load_from_cache:
         logger.info("Loading events from cache")
-        selected_events = load_events_from_file(file_path=cache_file)
+        selected_events = load_events_from_file(cache_file)
     else:
         logger.info("Fetching events from API")
         selected_events = choose_events(
@@ -120,27 +93,24 @@ def run_investments_for_today(
             backward_mode=backward_mode,
             filter_crypto_events=filter_crypto_events,
         )
-        save_events_to_file(events=selected_events, file_path=cache_file)
-
-    logger.info(f"Selected {len(selected_events)} events for analysis")
+        save_events_to_file(selected_events, cache_file)
+    
+    logger.info(f"Selected {len(selected_events)} events:")
     for event in selected_events:
-        logger.info(f"- {event.title} (Volume: ${event.volume:,.0f})")
-
-    results_per_model = launch_agent_investments(
+        logger.info(f"  - {event.title} (Volume: ${event.volume:,.0f})")
+    
+    results = launch_agent_investments(
         models=models,
         events=selected_events,
         target_date=base_date,
         backward_mode=backward_mode,
         date_output_path=date_output_path,
     )
-
-    # Upload results to Hugging Face dataset
-    upload_results_to_hf_dataset(
-        results_per_model=results_per_model, base_date=base_date, dataset_name=dataset_name, split=split
-    )
-
-    logger.info("Event-based investment analysis complete!")
-    return results_per_model
+    
+    upload_results_to_hf_dataset(results, base_date, dataset_name, split)
+    logger.info("Investment analysis complete!")
+    
+    return results
 
 
 if __name__ == "__main__":
