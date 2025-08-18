@@ -1,0 +1,63 @@
+name: Test and Deploy
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+    
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      
+    - name: Install dependencies
+      run: |
+        cd predibench-core
+        uv install
+        
+    - name: Test GCP bucket write access
+      env:
+        BUCKET_PREDIBENCH: ${{ secrets.BUCKET_PREDIBENCH }}
+      run: |
+        cd predibench-core
+        uv run python -c "
+        from predibench.storage_utils import has_bucket_access
+        
+        print('Testing GCP bucket write access...')
+        if has_bucket_access():
+            print('✅ Bucket write access confirmed')
+        else:
+            print('❌ Bucket write access failed')
+            exit(1)
+        "
+        
+    - name: Run tests
+      run: |
+        cd predibench-core
+        uv run python -m pytest tests/ -v
+        
+    - name: Run component tests
+      run: |
+        cd predibench-core
+        uv run python test_components.py
+
+  
