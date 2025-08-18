@@ -6,7 +6,7 @@ from datasets import Dataset, concatenate_datasets, load_dataset
 from dotenv import load_dotenv
 from smolagents.models import ApiModel
 
-from predibench.agent import ModelInvestmentResult, run_agent_investments
+from predibench.agent.main import ModelInvestmentResult, run_agent_investments
 from predibench.common import DATA_PATH, ENV_VAR_HF_TOKEN
 from predibench.logger_config import get_logger
 from predibench.market_selection import choose_events
@@ -69,7 +69,6 @@ def run_investments_for_today(
         date_output_path=date_output_path,
     )
 
-    upload_results_to_hf_dataset(results, base_date, dataset_name, split)
     logger.info("Investment analysis complete!")
 
     return results

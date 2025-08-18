@@ -1,7 +1,5 @@
-import os
 from datetime import date, datetime
 from pathlib import Path
-from typing import Literal
 
 import numpy as np
 from dotenv import load_dotenv
@@ -10,9 +8,7 @@ from datasets import load_dataset, concatenate_datasets, Dataset
 from predibench.polymarket_api import Event
 from predibench.logger_config import get_logger
 from predibench.storage_utils import write_to_storage
-from pydantic import BaseModel
 from predibench.utils import get_timestamp_string
-from predibench.common import ENV_VAR_HF_TOKEN
 from predibench.agent.dataclasses import EventDecisions, MarketInvestmentDecision, EventInvestmentResult, ModelInvestmentResult
 from predibench.agent.smolagents_utils import run_smolagents
 from smolagents import (
@@ -31,8 +27,7 @@ logger = get_logger(__name__)
 def create_market_investment_decision(
     event_decision: EventDecisions, selected_market_info: dict
 ) -> MarketInvestmentDecision:
-    """Convert single EventDecision to MarketInvestmentDecision object for the selected market."""
-    # Force NOTHING for closed markets
+    """Convert EventDecision to MarketInvestmentDecision."""
     if selected_market_info["is_closed"]:
         return MarketInvestmentDecision(
             market_id=selected_market_info["id"],
@@ -56,7 +51,6 @@ def create_market_investment_decision(
 def run_deep_research(
     model_id: str,
     question: str,
-    cutoff_date: date,
 ) -> RunResult:
     from openai import OpenAI
 
@@ -83,18 +77,19 @@ def run_deep_research(
 
 def upload_results_to_hf_dataset(
     results_per_model: list[ModelInvestmentResult], 
-    base_date: date, 
-    dataset_name: str = "m-ric/predibench-agent-choices",
-    split: str = "train"
+    target_date: date, 
+    dataset_name: str,
+    split: str,
+    hf_token: str
 ) -> None:
-    """Upload investment results to the Hugging Face dataset."""
+    """Upload investment results to Hugging Face dataset."""
     choice_mapping = {"BUY": 1, "SELL": 0, "NOTHING": -1}
     timestamp = datetime.now()
     
     new_rows = [
         {
             "agent_name": model_result.model_id,
-            "date": base_date,
+            "date": target_date,
             "question": event_result.market_decision.market_question,
             "choice": choice_mapping.get(event_result.market_decision.decision, -1),
             "choice_raw": event_result.market_decision.decision.lower(),
@@ -116,17 +111,18 @@ def upload_results_to_hf_dataset(
     existing_data = ds.get(split, Dataset.from_list([]))
     
     combined_dataset = concatenate_datasets([existing_data, Dataset.from_list(new_rows)])
-    combined_dataset.push_to_hub(dataset_name, split=split, token=os.getenv(ENV_VAR_HF_TOKEN))
+    combined_dataset.push_to_hub(dataset_name, split=split, token=hf_token)
     
     logger.info(f"Successfully uploaded {len(new_rows)} new rows to HF dataset")
 
 
 def save_model_result(
-    model_result: ModelInvestmentResult, date_output_path: Path
+    model_result: ModelInvestmentResult, 
+    date_output_path: Path,
+    timestamp: str
 ) -> None:
-    """Save model investment result to file."""
+    """Save model result to file."""
 
-    timestamp = get_timestamp_string()
     filename = f"{model_result.model_id.replace('/', '--')}_{timestamp}.json"
     filepath = date_output_path / filename
 
@@ -142,11 +138,12 @@ def process_event_investment(
     event: Event,
     target_date: date,
     backward_mode: bool,
-    date_output_path: Path | None = None,
-    main_market_price_history_limit: int = 200,
-    other_markets_price_history_limit: int = 20,
+    date_output_path: Path | None,
+    main_market_price_history_limit: int,
+    other_markets_price_history_limit: int,
+    timestamp: str
 ) -> EventInvestmentResult:
-    """Process investment decision for the selected market in an event."""
+    """Process investment decision for selected market."""
     logger.info(f"Processing event: {event.title} with selected market")
 
     if not event.selected_market_id:
@@ -270,7 +267,6 @@ Provide your decision and rationale for the TARGET MARKET only.
     # Save prompt to file if date_output_path is provided
     if date_output_path:
         model_id = model.model_id if isinstance(model, ApiModel) else model
-        timestamp = get_timestamp_string()
         prompt_file = (
             date_output_path
             / model_id.replace("/", "--")
@@ -282,7 +278,6 @@ Provide your decision and rationale for the TARGET MARKET only.
 
     # Get agent decisions using smolagents
     if isinstance(model, str) and model == "test_random":
-        # Generate random decision for testing
         choice = np.random.choice(["BUY", "SELL", "NOTHING"], p=[0.3, 0.3, 0.4])
         event_decision = EventDecisions(
             decision=choice,
@@ -297,7 +292,7 @@ Provide your decision and rationale for the TARGET MARKET only.
             model, full_question, cutoff_date=cutoff_datetime
         )
 
-    # Convert to MarketInvestmentDecision object for the selected market only
+    # Convert to MarketInvestmentDecision for selected market
     market_decision = create_market_investment_decision(
         event_decision, selected_market_info
     )
@@ -315,9 +310,12 @@ def process_single_model(
     events: list[Event],
     target_date: date,
     backward_mode: bool,
-    date_output_path: Path | None = None,
+    date_output_path: Path | None,
+    main_market_price_history_limit: int,
+    other_markets_price_history_limit: int,
+    timestamp: str
 ) -> ModelInvestmentResult:
-    """Process investments for all events for a specific model and save results."""
+    """Process investments for all events for a model."""
     event_results = []
 
     for event in events:
@@ -328,6 +326,9 @@ def process_single_model(
             target_date=target_date,
             backward_mode=backward_mode,
             date_output_path=date_output_path,
+            main_market_price_history_limit=main_market_price_history_limit,
+            other_markets_price_history_limit=other_markets_price_history_limit,
+            timestamp=timestamp,
         )
         event_results.append(event_result)
 
@@ -336,35 +337,28 @@ def process_single_model(
         model_id=model_id, target_date=target_date, event_results=event_results
     )
 
-    save_model_result(model_result=model_result, date_output_path=date_output_path)
+    if date_output_path:
+        save_model_result(model_result=model_result, date_output_path=date_output_path, timestamp=timestamp)
     return model_result
 
 
 def run_agent_investments(
     models: list[ApiModel | str],
     events: list[Event],
-    target_date: date | None = None,
-    backward_mode: bool = False,
-    date_output_path: Path | None = None,
-    dataset_name: str = "m-ric/predibench-agent-choices",
-    split: str = "train",
+    target_date: date,
+    backward_mode: bool,
+    date_output_path: Path | None,
+    dataset_name: str,
+    split: str,
+    main_market_price_history_limit: int,
+    other_markets_price_history_limit: int,
+    hf_token: str | None
 ) -> list[ModelInvestmentResult]:
-    """
-    Launch agent investments for events on a specific date.
-    Runs each model sequentially (will be parallelized later).
-
-    Args:
-        models: List of ApiModel objects or "test_random" string to run investments with
-        events: List of events to analyze
-        target_date: Date for backward compatibility (defaults to today)
-        backward_mode: Whether running in backward compatibility mode
-    """
-    if target_date is None:
-        target_date = date.today()
-
+    """Launch agent investments for events on a specific date."""
     logger.info(f"Running agent investments for {len(models)} models on {target_date}")
     logger.info(f"Processing {len(events)} events")
 
+    timestamp = get_timestamp_string()
     results = []
     for model in models:
         model_name = model.model_id if isinstance(model, ApiModel) else model
@@ -375,9 +369,19 @@ def run_agent_investments(
             target_date=target_date,
             backward_mode=backward_mode,
             date_output_path=date_output_path,
+            main_market_price_history_limit=main_market_price_history_limit,
+            other_markets_price_history_limit=other_markets_price_history_limit,
+            timestamp=timestamp,
         )
         results.append(model_result)
         
-    upload_results_to_hf_dataset(results_per_model=results, target_date=target_date, dataset_name=dataset_name, split=split)
+    if hf_token:
+        upload_results_to_hf_dataset(
+            results_per_model=results, 
+            target_date=target_date, 
+            dataset_name=dataset_name, 
+            split=split,
+            hf_token=hf_token
+        )
 
     return results
