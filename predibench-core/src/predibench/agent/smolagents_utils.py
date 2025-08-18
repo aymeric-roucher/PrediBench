@@ -1,4 +1,3 @@
-import os
 from smolagents import (
     Tool,
     ToolCallingAgent,
@@ -27,27 +26,17 @@ logger = get_logger(__name__)
 
 class GoogleSearchTool(Tool):
     name = "web_search"
-    description = """Performs a google web search for your query then returns a string of the top search results."""
+    description = """Performs Google web search and returns top results."""
     inputs = {
         "query": {"type": "string", "description": "The search query to perform."},
     }
     output_type = "string"
 
-    def __init__(self, provider: str = "serpapi", cutoff_date: datetime | None = None):
+    def __init__(self, provider: str, cutoff_date: datetime | None, api_key: str):
         super().__init__()
-
         self.provider = provider
-        if provider == "serpapi":
-            self.organic_key = "organic_results"
-            api_key_env_name = "SERPAPI_API_KEY"
-        else:
-            self.organic_key = "organic"
-            api_key_env_name = "SERPER_API_KEY"
-        self.api_key = os.getenv(api_key_env_name)
-        if self.api_key is None:
-            raise ValueError(
-                f"Missing API key. Make sure you have '{api_key_env_name}' in your env variables."
-            )
+        self.organic_key = "organic_results" if provider == "serpapi" else "organic"
+        self.api_key = api_key
         self.cutoff_date = cutoff_date
 
     @retry(
@@ -120,18 +109,7 @@ class GoogleSearchTool(Tool):
 def final_answer(
     rationale: str, decision: Literal["BUY", "SELL", "NOTHING"]
 ) -> EventDecisions:
-    """
-    This tool is used to validate and return the final event decision.
-
-    This tool must be used only once. The rationale and decision must be provided in the same call.
-
-    Args:
-        rationale (str): The rationale for the decision.
-        decision (Literal["BUY", "SELL", "NOTHING"]): The decision to make.
-
-    Returns:
-        EventDecisions: The validated EventDecisions object, raises error if invalid.
-    """
+    """Validate and return the final event decision."""
     assert decision in ["BUY", "SELL", "NOTHING"], (
         "Invalid decision, must be BUY, SELL or NOTHING"
     )
@@ -140,31 +118,30 @@ def final_answer(
 
 
 def run_smolagents(
-    model: ApiModel, question: str, cutoff_date: datetime
+    model: ApiModel, 
+    question: str, 
+    cutoff_date: datetime,
+    search_provider: str,
+    search_api_key: str,
+    max_steps: int
 ) -> EventDecisions:
-    """Run smolagent for event-level analysis with single market decision using structured output."""
+    """Run smolagent for event-level analysis with structured output."""
 
-    # Create the parser and prompt template
-    template = """
-{question}
+    prompt = f"""{question}
         
 Use the final_answer tool to validate your output before providing the final answer.
 The final_answer tool must contain the arguments rationale and decision.
 """
 
-    # Format the prompt
-    prompt = template.format(question=question)
-
     tools = [
-        GoogleSearchTool(provider="serper", cutoff_date=cutoff_date),
+        GoogleSearchTool(provider=search_provider, cutoff_date=cutoff_date, api_key=search_api_key),
         VisitWebpageTool(),
         final_answer,
     ]
     agent = ToolCallingAgent(
-        tools=tools, model=model, max_steps=40, return_full_result=True
+        tools=tools, model=model, max_steps=max_steps, return_full_result=True
     )
 
     result = agent.run(prompt)
 
-    # Parse and return the structured output
     return result.output
