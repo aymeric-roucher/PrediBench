@@ -28,7 +28,7 @@ def _remove_markets_without_prices_in_events(events: list[Event]) -> list[Event]
 
 def _filter_crypto_events(events: list[Event]) -> list[Event]:
     """Filter out events related to crypto by checking if 'bitcoin' or 'ethereum' is in the slug."""
-    crypto_keywords = ["bitcoin", "ethereum"]
+    crypto_keywords = ["bitcoin", "ethereum", "xrp", "solana", "eth", "btc"]
     filtered_events = []
     
     for event in events:
