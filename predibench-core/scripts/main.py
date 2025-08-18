@@ -11,13 +11,12 @@ logger = get_logger(__name__)
 app = typer.Typer()
 
 MODEL_MAP = {
-    "huggingface/openai/gpt-oss-120b": InferenceClientModelWithRetry(model_id="openai/gpt-oss-120b", token=os.getenv(ENV_VAR_HF_TOKEN)),
-    "huggingface/openai/gpt-oss-20b": InferenceClientModelWithRetry(model_id="openai/gpt-oss-20b", token=os.getenv(ENV_VAR_HF_TOKEN)),
-    "huggingface/Qwen/Qwen3-30B-A3B-Instruct-2507": InferenceClientModelWithRetry(model_id="Qwen/Qwen3-30B-A3B-Instruct-2507", token=os.getenv(ENV_VAR_HF_TOKEN)),
-    "huggingface/deepseek-ai/DeepSeek-R1-0528": InferenceClientModelWithRetry(model_id="deepseek-ai/DeepSeek-R1-0528", token=os.getenv(ENV_VAR_HF_TOKEN)),
-    "huggingface/Qwen/Qwen3-4B-Thinking-2507": InferenceClientModelWithRetry(model_id="Qwen/Qwen3-4B-Thinking-2507", token=os.getenv(ENV_VAR_HF_TOKEN)),
     "openai/gpt-5": OpenAIModelWithRetry(model_id="gpt-5"),
     "openai/gpt-5-mini": OpenAIModelWithRetry(model_id="gpt-5-mini"),
+    "huggingface/openai/gpt-oss-120b": InferenceClientModelWithRetry(model_id="openai/gpt-oss-120b", token=os.getenv(ENV_VAR_HF_TOKEN)),
+    "huggingface/openai/gpt-oss-20b": InferenceClientModelWithRetry(model_id="openai/gpt-oss-20b", token=os.getenv(ENV_VAR_HF_TOKEN)),
+    "huggingface/Qwen/Qwen3-235B-A22B-Thinking-2507": InferenceClientModelWithRetry(model_id="Qwen/Qwen3-235B-A22B-Thinking-2507", token=os.getenv(ENV_VAR_HF_TOKEN)),
+    "huggingface/deepseek-ai/DeepSeek-R1-0528": InferenceClientModelWithRetry(model_id="deepseek-ai/DeepSeek-R1-0528", token=os.getenv(ENV_VAR_HF_TOKEN)),
 }
 
 @app.command()
