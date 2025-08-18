@@ -13,8 +13,8 @@ from predibench.storage_utils import write_to_storage
 from pydantic import BaseModel
 from predibench.utils import get_timestamp_string
 from predibench.common import ENV_VAR_HF_TOKEN
-from predibench.agent_dataclasses import EventDecisions, MarketInvestmentDecision, EventInvestmentResult, ModelInvestmentResult
-from predibench.agent_smolagents_utils import run_smolagents
+from predibench.agent.dataclasses import EventDecisions, MarketInvestmentDecision, EventInvestmentResult, ModelInvestmentResult
+from predibench.agent.smolagents_utils import run_smolagents
 from smolagents import (
     RunResult,
     Timing,

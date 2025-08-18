@@ -14,7 +14,7 @@ from tenacity import (
     wait_exponential,
     retry_if_exception_type,
 )
-from predibench.agent_dataclasses import EventDecisions
+from predibench.agent.dataclasses import EventDecisions
 from datetime import datetime
 from predibench.logger_config import get_logger
 from typing import Literal
