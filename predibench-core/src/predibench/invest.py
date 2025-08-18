@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 
 from predibench.agent import launch_agent_investments, ModelInvestmentResult
+from predibench.utils import get_timestamp_string
 from predibench.market_selection import choose_events
 from predibench.polymarket_data import save_events_to_file, load_events_from_file
 from predibench.logger_config import get_logger
@@ -17,8 +18,6 @@ from smolagents.models import ApiModel
 load_dotenv()
 
 logger = get_logger(__name__)
-
-
 
 
 def upload_results_to_hf_dataset(results_per_model: list[ModelInvestmentResult], base_date: date) -> None:
@@ -143,7 +142,8 @@ def run_investments_for_today(
     date_output_path.mkdir(parents=True, exist_ok=True)
     
     # Define cache file path within the date-specific output directory
-    cache_file = date_output_path / "events_cache.json"
+    timestamp = get_timestamp_string()
+    cache_file = date_output_path / f"events_cache_{timestamp}.json"
     
     if cache_file.exists() and load_from_cache:
         logger.info("Loading events from cache")
@@ -186,8 +186,7 @@ if __name__ == "__main__":
 
     run_investments_for_today(
         time_until_ending=timedelta(days=21), 
-        max_n_events=3, 
+        max_n_events=10, 
         models=models, 
         output_path=DATA_PATH,
-        backward_date=date(2025, 7, 16),
     )

@@ -22,11 +22,11 @@ from predibench.common import DATA_PATH
 from predibench.logger_config import get_logger
 from predibench.storage_utils import write_to_storage
 from pydantic import BaseModel
+from predibench.utils import get_timestamp_string
 
 load_dotenv()
 
 logger = get_logger(__name__)
-
 
 class MarketInvestmentDecision(BaseModel):
     market_id: str
@@ -437,7 +437,8 @@ Provide your decision and rationale for the TARGET MARKET only.
     # Save prompt to file if date_output_path is provided
     if date_output_path:
         model_id = model.model_id if isinstance(model, ApiModel) else model
-        prompt_file = date_output_path / model_id.replace('/', '--') / f"prompt_event_{event.id}.txt"
+        timestamp = get_timestamp_string()
+        prompt_file = date_output_path / model_id.replace('/', '--') / f"prompt_event_{event.id}_{timestamp}.txt"
         
         write_to_storage(prompt_file, full_question)
         logger.info(f"Saved prompt to {prompt_file}")
@@ -471,7 +472,8 @@ Provide your decision and rationale for the TARGET MARKET only.
 def save_model_result(model_result: ModelInvestmentResult, date_output_path: Path) -> None:
     """Save model investment result to file."""
     
-    filename = f"{model_result.model_id.replace('/', '--')}.json"
+    timestamp = get_timestamp_string()
+    filename = f"{model_result.model_id.replace('/', '--')}_{timestamp}.json"
     filepath = date_output_path / filename
     
     content = model_result.model_dump_json(indent=2)
