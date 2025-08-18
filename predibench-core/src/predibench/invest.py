@@ -12,6 +12,7 @@ from predibench.polymarket_api import Event
 from predibench.retry_models import InferenceClientModelWithRetry
 from predibench.common import DATA_PATH, ENV_VAR_HF_TOKEN
 from datasets import load_dataset, Dataset
+from smolagents.models import ApiModel
 
 load_dotenv()
 
