@@ -3,6 +3,10 @@ name: Test and Deploy
 on:
   workflow_dispatch:
 
+concurrency:
+  group: investment-analysis
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
