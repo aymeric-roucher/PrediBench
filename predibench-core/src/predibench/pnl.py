@@ -39,9 +39,9 @@ class PnlCalculator:
         self.vol_targeting_window = vol_targeting_window
         self.pnl = self.calculate_pnl()
         self.portfolio_daily_pnl = self.pnl.sum(
-            axis=1
+            axis="columns"
         )  # NOTE: this assumes all positions equal, it's false ofc
-        self.portfolio_cumulative_pnl = self.portfolio_daily_pnl.cumsum(axis="columns")
+        self.portfolio_cumulative_pnl = self.portfolio_daily_pnl.cumsum()
         self.portfolio_mean_pnl = self.portfolio_daily_pnl.mean()
         self.portfolio_std_pnl = self.portfolio_daily_pnl.std()
         self.portfolio_sum_pnl = self.portfolio_daily_pnl.sum()
@@ -152,10 +152,11 @@ class PnlCalculator:
                     positions_to_plot = self.positions[market_id][
                         self.positions[market_id].notna()
                     ]
+
                     print("MARKET ID", market_id, ":::")
-                    print(positions_to_plot)
-                    print(cumulative_pnl_market)
-                    print(self.pnl[market_id])
+                    print(positions_to_plot.head(30))
+                    print(cumulative_pnl_market.head(30))
+                    print(self.pnl[market_id].head(30)))
 
                     if len(positions_to_plot) > 0:
                         # Get price values at position change dates
