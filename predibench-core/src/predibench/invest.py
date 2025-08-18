@@ -6,7 +6,7 @@ from datasets import Dataset, concatenate_datasets, load_dataset
 from dotenv import load_dotenv
 from smolagents.models import ApiModel
 
-from predibench.agent import ModelInvestmentResult, launch_agent_investments
+from predibench.agent import ModelInvestmentResult, run_agent_investments
 from predibench.common import DATA_PATH, ENV_VAR_HF_TOKEN
 from predibench.logger_config import get_logger
 from predibench.market_selection import choose_events
@@ -61,7 +61,7 @@ def run_investments_for_today(
     for event in selected_events:
         logger.info(f"  - {event.title} (Volume: ${event.volume:,.0f})")
 
-    results = launch_agent_investments(
+    results = run_agent_investments(
         models=models,
         events=selected_events,
         target_date=base_date,

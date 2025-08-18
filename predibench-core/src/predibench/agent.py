@@ -301,77 +301,20 @@ def upload_results_to_hf_dataset(
     logger.info(f"Successfully uploaded {len(new_rows)} new rows to HF dataset")
 
 
-def launch_agent_investments(
-    models: list[ApiModel | str],
-    events: list[Event],
-    target_date: date | None = None,
-    backward_mode: bool = False,
-    date_output_path: Path | None = None,
-    dataset_name: str = "m-ric/predibench-agent-choices",
-    split: str = "train",
-) -> list[ModelInvestmentResult]:
-    """
-    Launch agent investments for events on a specific date.
-    Runs each model sequentially (will be parallelized later).
+def save_model_result(
+    model_result: ModelInvestmentResult, date_output_path: Path
+) -> None:
+    """Save model investment result to file."""
 
-    Args:
-        models: List of ApiModel objects or "test_random" string to run investments with
-        events: List of events to analyze
-        target_date: Date for backward compatibility (defaults to today)
-        backward_mode: Whether running in backward compatibility mode
-    """
-    if target_date is None:
-        target_date = date.today()
+    timestamp = get_timestamp_string()
+    filename = f"{model_result.model_id.replace('/', '--')}_{timestamp}.json"
+    filepath = date_output_path / filename
 
-    logger.info(f"Running agent investments for {len(models)} models on {target_date}")
-    logger.info(f"Processing {len(events)} events")
+    content = model_result.model_dump_json(indent=2)
+    write_to_storage(filepath, content)
 
-    results = []
-    for model in models:
-        model_name = model.model_id if isinstance(model, ApiModel) else model
-        logger.info(f"Processing model: {model_name}")
-        model_result = process_single_model(
-            model=model,
-            events=events,
-            target_date=target_date,
-            backward_mode=backward_mode,
-            date_output_path=date_output_path,
-        )
-        results.append(model_result)
-        
-    upload_results_to_hf_dataset(results_per_model=results, target_date=target_date, dataset_name=dataset_name, split=split)
+    logger.info(f"Saved model result to {filepath}")
 
-    return results
-
-
-def process_single_model(
-    model: ApiModel | str,
-    events: list[Event],
-    target_date: date,
-    backward_mode: bool,
-    date_output_path: Path | None = None,
-) -> ModelInvestmentResult:
-    """Process investments for all events for a specific model and save results."""
-    event_results = []
-
-    for event in events:
-        logger.info(f"Processing event: {event.title}")
-        event_result = process_event_investment(
-            model=model,
-            event=event,
-            target_date=target_date,
-            backward_mode=backward_mode,
-            date_output_path=date_output_path,
-        )
-        event_results.append(event_result)
-
-    model_id = model.model_id if isinstance(model, ApiModel) else model
-    model_result = ModelInvestmentResult(
-        model_id=model_id, target_date=target_date, event_results=event_results
-    )
-
-    save_model_result(model_result=model_result, date_output_path=date_output_path)
-    return model_result
 
 
 def process_event_investment(
@@ -547,16 +490,74 @@ Provide your decision and rationale for the TARGET MARKET only.
     )
 
 
-def save_model_result(
-    model_result: ModelInvestmentResult, date_output_path: Path
-) -> None:
-    """Save model investment result to file."""
+def process_single_model(
+    model: ApiModel | str,
+    events: list[Event],
+    target_date: date,
+    backward_mode: bool,
+    date_output_path: Path | None = None,
+) -> ModelInvestmentResult:
+    """Process investments for all events for a specific model and save results."""
+    event_results = []
 
-    timestamp = get_timestamp_string()
-    filename = f"{model_result.model_id.replace('/', '--')}_{timestamp}.json"
-    filepath = date_output_path / filename
+    for event in events:
+        logger.info(f"Processing event: {event.title}")
+        event_result = process_event_investment(
+            model=model,
+            event=event,
+            target_date=target_date,
+            backward_mode=backward_mode,
+            date_output_path=date_output_path,
+        )
+        event_results.append(event_result)
 
-    content = model_result.model_dump_json(indent=2)
-    write_to_storage(filepath, content)
+    model_id = model.model_id if isinstance(model, ApiModel) else model
+    model_result = ModelInvestmentResult(
+        model_id=model_id, target_date=target_date, event_results=event_results
+    )
 
-    logger.info(f"Saved model result to {filepath}")
+    save_model_result(model_result=model_result, date_output_path=date_output_path)
+    return model_result
+
+
+def run_agent_investments(
+    models: list[ApiModel | str],
+    events: list[Event],
+    target_date: date | None = None,
+    backward_mode: bool = False,
+    date_output_path: Path | None = None,
+    dataset_name: str = "m-ric/predibench-agent-choices",
+    split: str = "train",
+) -> list[ModelInvestmentResult]:
+    """
+    Launch agent investments for events on a specific date.
+    Runs each model sequentially (will be parallelized later).
+
+    Args:
+        models: List of ApiModel objects or "test_random" string to run investments with
+        events: List of events to analyze
+        target_date: Date for backward compatibility (defaults to today)
+        backward_mode: Whether running in backward compatibility mode
+    """
+    if target_date is None:
+        target_date = date.today()
+
+    logger.info(f"Running agent investments for {len(models)} models on {target_date}")
+    logger.info(f"Processing {len(events)} events")
+
+    results = []
+    for model in models:
+        model_name = model.model_id if isinstance(model, ApiModel) else model
+        logger.info(f"Processing model: {model_name}")
+        model_result = process_single_model(
+            model=model,
+            events=events,
+            target_date=target_date,
+            backward_mode=backward_mode,
+            date_output_path=date_output_path,
+        )
+        results.append(model_result)
+        
+    upload_results_to_hf_dataset(results_per_model=results, target_date=target_date, dataset_name=dataset_name, split=split)
+
+    return results
