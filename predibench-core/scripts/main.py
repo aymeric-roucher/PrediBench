@@ -1,9 +1,9 @@
 from datetime import timedelta
-
+import os
 import typer
 from predibench.invest import run_investments_for_today
 from predibench.retry_models import InferenceClientModelWithRetry, OpenAIModelWithRetry
-from predibench.common import DATA_PATH
+from predibench.common import DATA_PATH, ENV_VAR_HF_TOKEN
 from predibench.logger_config import get_logger
 
 logger = get_logger(__name__)
@@ -11,11 +11,11 @@ logger = get_logger(__name__)
 app = typer.Typer()
 
 MODEL_MAP = {
-    "huggingface/openai/gpt-oss-120b": InferenceClientModelWithRetry(model_id="openai/gpt-oss-120b"),
-    "huggingface/openai/gpt-oss-20b": InferenceClientModelWithRetry(model_id="openai/gpt-oss-20b"),
-    "huggingface/Qwen/Qwen3-30B-A3B-Instruct-2507": InferenceClientModelWithRetry(model_id="Qwen/Qwen3-30B-A3B-Instruct-2507"),
-    "huggingface/deepseek-ai/DeepSeek-R1-0528": InferenceClientModelWithRetry(model_id="deepseek-ai/DeepSeek-R1-0528"),
-    "huggingface/Qwen/Qwen3-4B-Thinking-2507": InferenceClientModelWithRetry(model_id="Qwen/Qwen3-4B-Thinking-2507"),
+    "huggingface/openai/gpt-oss-120b": InferenceClientModelWithRetry(model_id="openai/gpt-oss-120b", token=os.getenv(ENV_VAR_HF_TOKEN)),
+    "huggingface/openai/gpt-oss-20b": InferenceClientModelWithRetry(model_id="openai/gpt-oss-20b", token=os.getenv(ENV_VAR_HF_TOKEN)),
+    "huggingface/Qwen/Qwen3-30B-A3B-Instruct-2507": InferenceClientModelWithRetry(model_id="Qwen/Qwen3-30B-A3B-Instruct-2507", token=os.getenv(ENV_VAR_HF_TOKEN)),
+    "huggingface/deepseek-ai/DeepSeek-R1-0528": InferenceClientModelWithRetry(model_id="deepseek-ai/DeepSeek-R1-0528", token=os.getenv(ENV_VAR_HF_TOKEN)),
+    "huggingface/Qwen/Qwen3-4B-Thinking-2507": InferenceClientModelWithRetry(model_id="Qwen/Qwen3-4B-Thinking-2507", token=os.getenv(ENV_VAR_HF_TOKEN)),
     "openai/gpt-5": OpenAIModelWithRetry(model_id="gpt-5"),
     "openai/gpt-5-mini": OpenAIModelWithRetry(model_id="gpt-5-mini"),
 }
