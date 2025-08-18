@@ -6,7 +6,7 @@ from datasets import Dataset, concatenate_datasets, load_dataset
 from dotenv import load_dotenv
 from smolagents.models import ApiModel
 
-from predibench.agent.main import ModelInvestmentResult, run_agent_investments
+from predibench.agent.runner import ModelInvestmentResult, run_agent_investments
 from predibench.common import DATA_PATH, ENV_VAR_HF_TOKEN
 from predibench.logger_config import get_logger
 from predibench.market_selection import choose_events
