@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 
 from predibench.agent import launch_agent_investments, ModelInvestmentResult
+from predibench.utils import get_timestamp_string
 from predibench.market_selection import choose_events
 from predibench.polymarket_data import save_events_to_file, load_events_from_file
 from predibench.logger_config import get_logger
@@ -17,12 +18,6 @@ from smolagents.models import ApiModel
 load_dotenv()
 
 logger = get_logger(__name__)
-
-
-def get_timestamp_string() -> str:
-    """Generate a timestamp string for filenames to avoid overwriting."""
-    return datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
-
 
 
 def upload_results_to_hf_dataset(results_per_model: list[ModelInvestmentResult], base_date: date) -> None:

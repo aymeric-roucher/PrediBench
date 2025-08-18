@@ -22,16 +22,11 @@ from predibench.common import DATA_PATH
 from predibench.logger_config import get_logger
 from predibench.storage_utils import write_to_storage
 from pydantic import BaseModel
+from predibench.utils import get_timestamp_string
 
 load_dotenv()
 
 logger = get_logger(__name__)
-
-
-def get_timestamp_string() -> str:
-    """Generate a timestamp string for filenames to avoid overwriting."""
-    return datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
-
 
 class MarketInvestmentDecision(BaseModel):
     market_id: str
