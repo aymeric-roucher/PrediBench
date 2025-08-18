@@ -118,7 +118,7 @@ def _process_event_investment(
     logger.info(f"Processing event: {event.title} with selected market")
 
     if not event.selected_market_id:
-        raise ValueError(f"Event '{event.title}' has no selected market for prediction")
+        raise ValueError(f"""Event '{event.title}' has no selected market for prediction, the current strategy is to select one market based on deterministic criteria""")
 
     # Find the selected market
     selected_market = next(
