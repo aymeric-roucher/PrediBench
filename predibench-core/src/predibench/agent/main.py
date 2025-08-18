@@ -138,9 +138,9 @@ def _process_event_investment(
     target_date: date,
     backward_mode: bool,
     date_output_path: Path | None,
-    main_market_price_history_limit: int,
-    other_markets_price_history_limit: int,
-    timestamp_for_saving: str
+    timestamp_for_saving: str,
+    main_market_price_history_limit: int = 200,
+    other_markets_price_history_limit: int = 20,
 ) -> EventInvestmentResult:
     """Process investment decision for selected market."""
     logger.info(f"Processing event: {event.title} with selected market")
@@ -310,8 +310,6 @@ def _process_single_model(
     target_date: date,
     backward_mode: bool,
     date_output_path: Path | None,
-    main_market_price_history_limit: int,
-    other_markets_price_history_limit: int,
     timestamp_for_saving: str
 ) -> ModelInvestmentResult:
     """Process investments for all events for a model."""
@@ -325,8 +323,6 @@ def _process_single_model(
             target_date=target_date,
             backward_mode=backward_mode,
             date_output_path=date_output_path,
-            main_market_price_history_limit=main_market_price_history_limit,
-            other_markets_price_history_limit=other_markets_price_history_limit,
             timestamp_for_saving=timestamp_for_saving,
         )
         event_results.append(event_result)
@@ -349,8 +345,6 @@ def run_agent_investments(
     date_output_path: Path | None,
     dataset_name: str,
     split: str,
-    main_market_price_history_limit: int,
-    other_markets_price_history_limit: int,
     hf_token_for_dataset: str | None,
     timestamp_for_saving: str
 ) -> list[ModelInvestmentResult]:
@@ -368,8 +362,6 @@ def run_agent_investments(
             target_date=target_date,
             backward_mode=backward_mode,
             date_output_path=date_output_path,
-            main_market_price_history_limit=main_market_price_history_limit,
-            other_markets_price_history_limit=other_markets_price_history_limit,
             timestamp_for_saving=timestamp_for_saving,
         )
         results.append(model_result)
@@ -380,7 +372,8 @@ def run_agent_investments(
             target_date=target_date, 
             dataset_name=dataset_name, 
             split=split,
-            hf_token=hf_token_for_dataset
+            hf_token=hf_token_for_dataset,
+            timestamp_for_saving=timestamp_for_saving,
         )
 
     return results
