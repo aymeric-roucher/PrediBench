@@ -74,7 +74,6 @@ def choose_events(
     today_date: datetime,
     time_until_ending: timedelta,
     n_events: int,
-    key_for_filtering: str = "volume",
     min_volume: float = 1000,
     backward_mode: bool = False,
     filter_crypto_events: bool = True,
@@ -86,9 +85,8 @@ def choose_events(
     end_date = today_date + time_until_ending
     request_parameters = EventsRequestParameters(
         limit=500,
-        order=key_for_filtering,
+        order="volume1wk" if not backward_mode else "volume",
         ascending=False,
-        end_date_min=today_date,
         end_date_max=end_date,
     )
     events = request_parameters.get_events()

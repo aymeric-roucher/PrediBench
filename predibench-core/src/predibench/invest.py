@@ -206,8 +206,8 @@ if __name__ == "__main__":
     ]
 
     run_investments_for_today(
-        time_until_ending=timedelta(days=21),
-        max_n_events=10,
+        time_until_ending=timedelta(days=7*6),
+        max_n_events=20,
         models=models,
         output_path=DATA_PATH,
     )
