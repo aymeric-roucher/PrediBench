@@ -18,7 +18,6 @@ class PnlCalculator:
     def __init__(
         self,
         positions: pd.DataFrame,
-        returns: pd.DataFrame = None,
         prices: pd.DataFrame = None,
         to_vol_target: bool = False,
         vol_targeting_window: str = "30D",
@@ -31,8 +30,8 @@ class PnlCalculator:
         vol_targeting_window: str, window for volatility targeting
         """
         self.positions = positions
+        self.returns = positions.pct_change()
         self._assert_index_is_date(self.positions)
-        self.returns = returns
         self._assert_index_is_date(self.returns)
         self.prices = prices
         self._assert_index_is_date(self.prices)
@@ -289,8 +288,8 @@ class PnlCalculator:
         )
 
 
-def validate_continuous_returns(
-    returns_df: pd.DataFrame, start_date: date, end_date: date
+def validate_continuous_prices(
+    prices_df: pd.DataFrame, start_date: date, end_date: date
 ) -> None:
     """Validate that returns data is continuous for the given date range.
 
@@ -303,7 +302,7 @@ def validate_continuous_returns(
         ValueError: If any dates are missing from the range
     """
     expected_date_range = pd.date_range(start=start_date, end=end_date, freq="D").date
-    actual_dates = set(returns_df.index)
+    actual_dates = set(prices_df.index)
     expected_dates = set(expected_date_range)
 
     missing_dates = expected_dates - actual_dates
@@ -335,9 +334,9 @@ def get_pnls(
             end_time=expected_end,  # 15 days back is the maximum allowed by the API
         )[0]
         markets[market_id] = market
-    returns_df, prices_df = get_historical_returns(markets)
+    prices_df = get_historical_returns(markets)
 
-    validate_continuous_returns(returns_df, expected_start, expected_end)
+    validate_continuous_prices(prices_df, expected_start, expected_end)
 
     pnl_calculators = {}
     for agent_name in positions_df["agent_name"].unique():
@@ -348,14 +347,14 @@ def get_pnls(
             positions_agent_df["date"].isin(positions_df["date"].unique())
         ]
         positions_agent_df = positions_agent_df.loc[
-            positions_df["market_id"].isin(returns_df.columns)
+            positions_df["market_id"].isin(prices_df.columns)
         ]  # TODO: This should be removed when we can save
         assert len(positions_agent_df) > 0, (
             "A this stage, dataframe should not be empty!"
         )
 
         pnl_calculator = get_pnl_calculator(
-            positions_agent_df, returns_df, prices_df, positions_df["date"].unique()
+            positions_agent_df, prices_df, positions_df["date"].unique()
         )
         pnl_calculators[agent_name] = pnl_calculator
 
@@ -364,7 +363,6 @@ def get_pnls(
 
 def get_pnl_calculator(
     positions_agent_df: pd.DataFrame,
-    returns_df: pd.DataFrame,
     prices_df: pd.DataFrame,
     investment_dates: list,
 ) -> PnlCalculator:
@@ -374,14 +372,14 @@ def get_pnl_calculator(
     )
 
     # Forward-fill positions to all daily dates in the returns range
-    daily_index = returns_df.index[returns_df.index >= investment_dates[0]]
+    daily_index = prices_df.index[prices_df.index >= investment_dates[0]]
     positions_agent_df = positions_agent_df.reindex(daily_index, method="ffill").fillna(
         0
     )  # fillna(0) to avoid NaN at the beginning of the investment period
     positions_agent_df = positions_agent_df.loc[
         positions_agent_df.index >= investment_dates[0]
     ]
-    returns_df = returns_df.loc[returns_df.index >= investment_dates[0]]
+    prices_df = prices_df.loc[prices_df.index >= investment_dates[0]]
 
     logger.info("Analyzing portfolio performance with PnlCalculator...")
 
@@ -390,33 +388,19 @@ def get_pnl_calculator(
     logger.info(f"Positions shape: {positions_agent_df.shape}")
 
     logger.info("Returns Table (first 15 rows):")
-    logger.info(f"\n{returns_df.head(15)}")
-    logger.info(f"Returns shape: {returns_df.shape}")
 
     logger.info("Data summary:")
     logger.info(
         f"  Investment positions: {(positions_agent_df != 0.0).sum().sum()} out of {positions_agent_df.size} possible"
     )
-    logger.info(
-        f"  Non-zero returns: {(returns_df != 0).sum().sum()} out of {returns_df.notna().sum().sum()} non-NaN"
-    )
-    logger.info(
-        f"  Returns range: {returns_df.min().min():.4f} to {returns_df.max().max():.4f}"
-    )
 
-    return PnlCalculator(positions_agent_df, returns_df, prices_df)
+    return PnlCalculator(positions_agent_df, prices_df)
 
 
 def get_historical_returns(
     markets: dict[str, Market],
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Get historical returns directly from timeseries data. Columns are market ids"""
-
-    returns_df = pd.DataFrame(
-        np.nan,
-        index=markets[list(markets.keys())[0]].prices.index,
-        columns=list(markets.keys()),
-    )
+    """Get historical prices directly from timeseries data. Columns are market ids"""
     prices_df = pd.DataFrame(
         np.nan,
         index=markets[list(markets.keys())[0]].prices.index,
@@ -425,8 +409,4 @@ def get_historical_returns(
 
     for market in markets.values():
         prices_df[market.id] = market.prices
-
-        token_returns = market.prices.pct_change(periods=1)
-        returns_df[market.id] = token_returns
-
-    return returns_df, prices_df
+    return prices_df

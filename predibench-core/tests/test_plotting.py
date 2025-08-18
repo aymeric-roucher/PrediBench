@@ -20,14 +20,6 @@ def test_plotting():
         {"Question A": [1, 1, 0, 1, 1], "Question B": [0, 1, 1, 0, 1]}, index=date_range
     )
 
-    returns = pd.DataFrame(
-        {
-            "Question A": [0.1, -0.05, 0.02, 0.03, -0.01],
-            "Question B": [0.05, 0.02, -0.03, 0.01, 0.04],
-        },
-        index=date_range,
-    )
-
     prices = pd.DataFrame(
         {
             "Question A": [0.5, 0.55, 0.52, 0.54, 0.53],
@@ -37,7 +29,7 @@ def test_plotting():
     )
 
     # Create PnlCalculator with prices
-    engine = PnlCalculator(positions, returns, prices)
+    engine = PnlCalculator(positions, prices)
 
     # Generate plot
     fig = engine.plot_pnl(stock_details=True)
