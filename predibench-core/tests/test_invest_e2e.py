@@ -13,11 +13,12 @@ def test_invest_e2e():
     ]
 
     run_investments_for_today(
-        time_until_ending=timedelta(days=21), 
-        max_n_events=3, 
-        models=models, 
+        time_until_ending=timedelta(days=21),
+        max_n_events=3,
+        models=models,
         output_path=DATA_PATH,
     )
+
 
 def test_invest_e2e_backward():
     models = [
@@ -25,9 +26,9 @@ def test_invest_e2e_backward():
     ]
 
     run_investments_for_today(
-        time_until_ending=timedelta(days=21), 
-        max_n_events=3, 
-        models=models, 
+        time_until_ending=timedelta(days=21),
+        max_n_events=3,
+        models=models,
         output_path=DATA_PATH,
         backward_date=date(2025, 7, 16),
     )
