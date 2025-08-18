@@ -76,66 +76,6 @@ def upload_results_to_hf_dataset(
         logger.warning("No data to upload to HF dataset")
 
 
-def select_markets_for_events(
-    events: list[Event], base_date: date, backward_mode: bool = False
-) -> list[Event]:
-    """Select the market with highest volume1wk that has outcomes[0] price between 0.05 and 0.95."""
-
-    if backward_mode:
-        # In backward mode: filter events by end_date > base_date (if end_date exists) and select markets by volume
-        events_with_selected_markets = []
-        for event in events:
-            # Filter events where end_date is after base_date, or keep if end_date doesn't exist
-            if event.end_date is None or event.end_date.date() > base_date:
-                if event.selected_market_id is not None:
-                    raise ValueError(
-                        f"Event '{event.title}' already has a selected market"
-                    )
-
-                # Select market with highest volume1wk (no price constraints in backward mode)
-                eligible_markets = [
-                    market
-                    for market in event.markets
-                    if market.end_date is None or market.end_date.date() > base_date
-                ]
-
-                if eligible_markets:
-                    best_market = max(eligible_markets, key=lambda m: m.volumeNum)
-                    event.selected_market_id = best_market.id
-                    events_with_selected_markets.append(event)
-
-                    end_date_str = (
-                        event.end_date.date() if event.end_date else "no end date"
-                    )
-                    logger.info(
-                        f"Backward mode: Selected event '{event.title}' ending {end_date_str}"
-                    )
-
-        return events_with_selected_markets
-
-    events_with_selected_markets = []
-    for event in events:
-        if event.selected_market_id is not None:
-            raise ValueError(f"Event '{event.title}' already has a selected market")
-
-        eligible_markets = []
-        for market in event.markets:
-            if (
-                market.volume1wk is not None
-                and market.outcomes
-                and len(market.outcomes) > 0
-                and 0.05 < market.outcomes[0].price < 0.95
-            ):
-                eligible_markets.append(market)
-
-        if eligible_markets:
-            best_market = max(eligible_markets, key=lambda m: m.volume1wk)
-            event.selected_market_id = best_market.id
-            events_with_selected_markets.append(event)
-
-    return events_with_selected_markets
-
-
 def run_investments_for_today(
     time_until_ending: timedelta,
     max_n_events: int,
@@ -186,13 +126,9 @@ def run_investments_for_today(
     for event in selected_events:
         logger.info(f"- {event.title} (Volume: ${event.volume:,.0f})")
 
-    events_with_selected_markets = select_markets_for_events(
-        events=selected_events, base_date=base_date, backward_mode=backward_mode
-    )
-
     results_per_model = launch_agent_investments(
         models=models,
-        events=events_with_selected_markets,
+        events=selected_events,
         target_date=base_date,
         backward_mode=backward_mode,
         date_output_path=date_output_path,
