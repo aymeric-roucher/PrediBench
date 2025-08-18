@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -11,10 +10,12 @@ from predibench.logger_config import get_logger
 from smolagents.models import ApiModel, InferenceClientModel, OpenAIModel
 from predibench.polymarket_api import Event
 from predibench.common import DATA_PATH
+from predibench.storage_utils import upload_results_to_hf_dataset
 
 load_dotenv()
 
 logger = get_logger(__name__)
+
 
 
 def select_markets_for_events(events: list[Event], base_date: date, backward_mode: bool = False) -> list[Event]:
@@ -118,6 +119,10 @@ def run_investments_for_today(
         backward_mode=backward_mode,
         date_output_path=date_output_path
     )
+    
+    # Upload results to Hugging Face dataset
+    upload_results_to_hf_dataset(results_per_model=results_per_model, base_date=base_date)
+    
     logger.info("Event-based investment analysis complete!")
     return results_per_model
 

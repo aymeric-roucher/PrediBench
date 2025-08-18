@@ -12,7 +12,14 @@ import os
 import uuid
 from functools import cache
 from pathlib import Path
-from predibench.common import DATA_PATH
+from predibench.common import DATA_PATH, ENV_VAR_HF_TOKEN
+from predibench.agent import ModelInvestmentResult
+from datasets import load_dataset, Dataset
+from datetime import date, datetime
+from predibench.logger_config import get_logger
+
+
+logger = get_logger(__name__)
 
 BUCKET_ENV_VAR = 'BUCKET_PREDIBENCH'
 
@@ -164,6 +171,56 @@ def read_from_storage(file_path: Path) -> str:
     
     relative_path = file_path.relative_to(DATA_PATH)
     return _read_file_from_bucket_or_data_dir(str(relative_path))
+
+
+def upload_results_to_hf_dataset(results_per_model: list[ModelInvestmentResult], base_date: date) -> None:
+    """Upload investment results to the Hugging Face dataset."""
+    # Load the existing dataset
+    ds = load_dataset("m-ric/predibench-agent-choices")
+    
+    # Prepare new data rows
+    new_rows = []
+    current_timestamp = datetime.now()
+    
+    for model_result in results_per_model:
+        for event_result in model_result.event_results:
+            # Map decision to choice value
+            choice_mapping = {"BUY": 1, "SELL": 0, "NOTHING": -1}
+            choice = choice_mapping.get(event_result.market_decision.decision, -1)
+            
+            row = {
+                "agent_name": model_result.model_id,
+                "date": base_date,
+                "question": event_result.market_decision.market_question,
+                "choice": choice,
+                "choice_raw": event_result.market_decision.decision.lower(),
+                "market_id": event_result.market_decision.market_id,
+                "messages_count": 0,  # This would need to be tracked during agent execution
+                "has_reasoning": event_result.market_decision.rationale is not None,
+                "timestamp_uploaded": current_timestamp,
+                "rationale": event_result.market_decision.rationale or ""
+            }
+            new_rows.append(row)
+    
+    if new_rows:
+        # Create a new dataset with the new rows
+        new_dataset = Dataset.from_list(new_rows)
+        # Concatenate with existing dataset using datasets.concatenate_datasets
+        from datasets import concatenate_datasets
+        combined_dataset = concatenate_datasets([ds["train"], new_dataset])
+        
+        # Push back to hub as a pull request (safer approach)
+        combined_dataset.push_to_hub(
+            "m-ric/predibench-agent-choices", 
+            split="train",
+            token=os.getenv(ENV_VAR_HF_TOKEN)
+        )
+        
+        logger.info(f"Successfully uploaded {len(new_rows)} new rows to HF dataset")
+    else:
+        logger.warning("No data to upload to HF dataset")
+            
+
 
 if __name__ == "__main__":
     print(has_bucket_access())

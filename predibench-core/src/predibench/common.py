@@ -9,3 +9,4 @@ DATA_PATH.mkdir(parents=True, exist_ok=True)
 
 BASE_URL_POLYMARKET = "https://gamma-api.polymarket.com"
     
+ENV_VAR_HF_TOKEN = "HF_TOKEN_PREDIBENCH"
