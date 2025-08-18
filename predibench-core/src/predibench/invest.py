@@ -1,19 +1,19 @@
+import os
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-import os
 
+from datasets import Dataset, concatenate_datasets, load_dataset
 from dotenv import load_dotenv
-
-from predibench.agent import launch_agent_investments, ModelInvestmentResult
-from predibench.utils import get_timestamp_string
-from predibench.market_selection import choose_events
-from predibench.polymarket_data import save_events_to_file, load_events_from_file
-from predibench.logger_config import get_logger
-from predibench.polymarket_api import Event
-from predibench.retry_models import InferenceClientModelWithRetry
-from predibench.common import DATA_PATH, ENV_VAR_HF_TOKEN
-from datasets import load_dataset, Dataset
 from smolagents.models import ApiModel
+
+from predibench.agent import ModelInvestmentResult, launch_agent_investments
+from predibench.common import DATA_PATH, ENV_VAR_HF_TOKEN
+from predibench.logger_config import get_logger
+from predibench.market_selection import choose_events
+from predibench.polymarket_api import Event
+from predibench.polymarket_data import load_events_from_file, save_events_to_file
+from predibench.retry_models import InferenceClientModelWithRetry
+from predibench.utils import get_timestamp_string
 
 load_dotenv()
 
@@ -55,7 +55,6 @@ def upload_results_to_hf_dataset(
         # Create a new dataset with the new rows
         new_dataset = Dataset.from_list(new_rows)
         # Concatenate with existing dataset using datasets.concatenate_datasets
-        from datasets import concatenate_datasets
 
         combined_dataset = concatenate_datasets([ds["train"], new_dataset])
 
@@ -203,10 +202,11 @@ def run_investments_for_today(
 if __name__ == "__main__":
     models = [
         InferenceClientModelWithRetry(model_id="openai/gpt-oss-120b"),
+        "o3-deep-research",
     ]
 
     run_investments_for_today(
-        time_until_ending=timedelta(days=7*6),
+        time_until_ending=timedelta(days=7 * 6),
         max_n_events=20,
         models=models,
         output_path=DATA_PATH,

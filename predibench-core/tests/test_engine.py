@@ -20,7 +20,7 @@ def test_returns():
         index=date_range,
     )
 
-    engine = PnlCalculator(positions, returns, prices)
+    engine = PnlCalculator(positions, prices)
 
     engine.calculate_pnl()
     pnl_sum = engine.pnl.sum(axis=1).cumsum()
@@ -54,7 +54,7 @@ def test_lewis_hamilton_use_case():
     prices.iloc[3, 0] = 0.5
     prices.iloc[4, 0] = 0.5
 
-    engine = PnlCalculator(positions, returns, prices)
+    engine = PnlCalculator(positions, prices)
 
     pnl_result = engine.calculate_pnl()
 
@@ -88,7 +88,7 @@ def test_complex_positions_and_price_changes():
     price_changes = prices.pct_change()
     returns = price_changes.copy()
 
-    engine = PnlCalculator(positions, returns, prices)
+    engine = PnlCalculator(positions, prices)
     pnl_result = engine.calculate_pnl()
 
     # Manual calculation for expected PnL:

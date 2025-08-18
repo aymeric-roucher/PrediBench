@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 import gradio as gr
 import numpy as np
@@ -19,7 +19,8 @@ AGENT_CHOICES_REPO = "m-ric/predibench-agent-choices"
 def load_agent_choices():
     """Load agent choices from HuggingFace dataset"""
     dataset = load_dataset(AGENT_CHOICES_REPO, split="train")
-    return dataset.to_pandas()
+    dataset = dataset.to_pandas()
+    return dataset.sort_values("date")
 
 
 def add_rationale_markers(
@@ -64,6 +65,7 @@ def add_rationale_markers(
 
 def calculate_pnl_and_performance(positions_df: pd.DataFrame):
     """Calculate real PnL and performance metrics for each agent using historical market data"""
+    positions_df = positions_df.loc[positions_df["date"] > date(2025, 7, 19)]
     pnl_calculators = get_pnls(
         positions_df, write_plots=False, end_date=datetime.today()
     )
@@ -74,7 +76,6 @@ def calculate_pnl_and_performance(positions_df: pd.DataFrame):
         pnl_calculator = pnl_calculators[agent]
         agent_data = positions_df[positions_df["agent_name"] == agent].copy()
         daily_pnl = pnl_calculator.portfolio_daily_pnl
-        cumulative_pnl = pnl_calculator.portfolio_cumulative_pnl
         prices = pnl_calculator.prices
 
         # Enhance the figure with rationale markers
@@ -86,11 +87,11 @@ def calculate_pnl_and_performance(positions_df: pd.DataFrame):
             "long_positions": len(agent_data[agent_data["choice"] == 1]),
             "short_positions": len(agent_data[agent_data["choice"] == -1]),
             "no_positions": len(agent_data[agent_data["choice"] == 0]),
-            "cumulative_pnl": pnl_calculator.portfolio_cumulative_pnl.iloc[-1],
+            "final_cumulative_pnl": pnl_calculator.portfolio_cumulative_pnl.iloc[-1],
             "annualized_sharpe_ratio": (daily_pnl.mean() / daily_pnl.std())
             * np.sqrt(252),
-            "daily_cumulative_pnl": cumulative_pnl.tolist(),
-            "dates": cumulative_pnl.index.tolist(),
+            "daily_cumulative_pnl": pnl_calculator.portfolio_cumulative_pnl.tolist(),
+            "dates": pnl_calculator.portfolio_cumulative_pnl.index.tolist(),
             "figure": enhanced_figure,
         }
 
@@ -105,7 +106,7 @@ def create_leaderboard(performance_data):
         leaderboard_data.append(
             {
                 "Agent": agent.replace("smolagent_", "").replace("--", "/"),
-                "Cumulative PnL": f"{metrics['cumulative_pnl']:.3f}",
+                "Final cumulative PnL": f"{metrics['final_cumulative_pnl']:.3f}",
                 "Annualized Sharpe Ratio": f"{metrics['annualized_sharpe_ratio']:.3f}",
                 "Long Positions": metrics["long_positions"],
                 "Short Positions": metrics["short_positions"],
@@ -115,7 +116,7 @@ def create_leaderboard(performance_data):
 
     # Sort by cumulative PnL
     leaderboard_df = pd.DataFrame(leaderboard_data)
-    leaderboard_df["PnL_numeric"] = leaderboard_df["Cumulative PnL"].astype(float)
+    leaderboard_df["PnL_numeric"] = leaderboard_df["Final cumulative PnL"].astype(float)
     leaderboard_df = leaderboard_df.sort_values("PnL_numeric", ascending=False)
     leaderboard_df = leaderboard_df.drop("PnL_numeric", axis=1)
 
@@ -131,7 +132,7 @@ def create_pnl_plot(performance_data):
     # Sort agents by descending final PnL
     sorted_agents = sorted(
         performance_data.keys(),
-        key=lambda agent: performance_data[agent]["cumulative_pnl"],
+        key=lambda agent: performance_data[agent]["final_cumulative_pnl"],
         reverse=True,
     )
 
