@@ -29,7 +29,7 @@ def run_investments_for_today(
     load_from_cache: bool = False,
     filter_crypto_events: bool = True,
     dataset_name: str = "m-ric/predibench-agent-choices",
-    split: str = "train",
+    split: str = "test",
 ) -> list[ModelInvestmentResult]:
     """Run event-based investment simulation with multiple AI models."""
     base_date = backward_date or datetime.now(timezone.utc).date()
