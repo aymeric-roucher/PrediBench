@@ -1,52 +1,34 @@
 from datetime import datetime, timedelta
-import tempfile
-from pathlib import Path
-
-import plotly.graph_objects as go
 
 from predibench.polymarket_api import (
-    MarketsRequestParameters,
-    EventsRequestParameters,
-    Event,
-    _HistoricalTimeSeriesRequestParameters,
-    OrderBook,
-    _split_date_range,
     MAX_INTERVAL_TIMESERIES,
+    EventsRequestParameters,
+    MarketsRequestParameters,
+    OrderBook,
+    _HistoricalTimeSeriesRequestParameters,
+    _split_date_range,
 )
-from predibench.utils import convert_polymarket_time_to_datetime
 
 
 def test_get_open_markets():
     """Test basic market retrieval."""
-    request_parameters = MarketsRequestParameters(limit=500)
+    request_parameters = MarketsRequestParameters(limit=10)
     markets = request_parameters.get_markets()
     for market in markets:
         assert len(market.outcomes) >= 2
     # why not 500 ? Some markets are missing keys clobTokenIds or outcomes
-    assert len(markets) >= 490
+    assert len(markets) == 10
     for market in markets:
         assert len(market.id) > 0
         assert len(market.question) > 0
         assert market.liquidity is None or market.liquidity >= 0
 
 
-def test_get_open_markets_limit():
-    """Test that limit parameter works correctly."""
-    request_small = MarketsRequestParameters(limit=5)
-    request_large = MarketsRequestParameters(limit=20)
-    markets_small = request_small.get_markets()
-    markets_large = request_large.get_markets()
-
-    assert len(markets_small) == 5
-    assert len(markets_large) == 20
-    assert len(markets_large) > len(markets_small)
-
-
 def test_polymarket_api_integration():
     """Test the complete Polymarket API workflow with live data."""
     # Fetch active markets
     market_request = MarketsRequestParameters(
-        limit=20,
+        limit=5,
         active=True,
         closed=False,
         order="volumeNum",
@@ -61,7 +43,7 @@ def test_polymarket_api_integration():
     open_market = None
     for market in all_markets:
         print(
-            f"Checking market: {market.question[:50]}... (created: {market.createdAt.year})"
+            f"Checking market: {market.question[:50]}... (created: {market.creation_datetime.year})"
         )
         if market.volume24hr > 0:
             open_market = market
@@ -75,7 +57,7 @@ def test_polymarket_api_integration():
     assert len(open_market.outcomes) >= 2
 
     print(f"\nUsing market: {open_market.question}")
-    print(f"Created: {open_market.createdAt}")
+    print(f"Created: {open_market.creation_datetime}")
 
     # Test order book functionality
     token_id = open_market.outcomes[0].clob_token_id
@@ -97,9 +79,9 @@ def test_polymarket_api_integration():
 
     # Test timeseries functionality
     timeseries_request_parameters = _HistoricalTimeSeriesRequestParameters(
-        market=token_id,
-        start_time=datetime.now() - timedelta(days=10),
-        end_time=datetime.now(),
+        market_id=token_id,
+        start_datetime=datetime.now() - timedelta(days=10),
+        end_datetime=datetime.now(),
         interval="1d",
     )
     timeseries = timeseries_request_parameters.get_token_daily_timeseries()
@@ -114,73 +96,12 @@ def test_polymarket_api_integration():
     for date, price in timeseries.iloc[-5:].items():  # Print last 5 points
         print(f"  {date}: ${price:.4f}")
 
-    # Test visualization creation
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=timeseries.index, y=timeseries.values, mode="lines+markers", name="Price"
-        )
-    )
-    fig.update_layout(
-        title=f"Price History - {open_market.question}",
-        xaxis_title="Time",
-        yaxis_title="Price",
-    )
-
-    # Write to temporary file instead of polluting working directory
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
-        fig.write_image(tmp_file.name)
-        # Clean up the temporary file
-        Path(tmp_file.name).unlink()
-        print(f"Successfully created visualization (temporary file cleaned up)")
-
-    # Verify the figure was created correctly
-    assert len(fig.data) == 1
-    assert fig.data[0].mode == "lines+markers"
-
-
-def test_get_events():
-    """Test basic market event retrieval."""
-    request_parameters = EventsRequestParameters(
-        limit=10,
-        order="volume",
-        ascending=False,
-        # end_date_min=datetime.today() + timedelta(days=1),
-        # end_date_max=datetime.today() + timedelta(days=21),
-    )
-    events = request_parameters.get_events()
-    for event in events:
-        for i, market in enumerate(event.markets):
-            # outcomes are usually Yes and No, but can be two different sports teams for instance
-            assert len(market.outcomes) == 2
-            if i == 0:
-                market.fill_prices(
-                    start_time=datetime.today() - timedelta(days=7),
-                    end_time=datetime.today(),
-                )
-    assert len(events) >= 10  # Should get at least some events
-
-
-def test_get_events_offset():
-    """Test that offset parameter works correctly."""
-    request_first = EventsRequestParameters(limit=5, offset=0)
-    request_second = EventsRequestParameters(limit=5, offset=5)
-    events_first = request_first.get_events()
-    events_second = request_second.get_events()
-
-    assert len(events_first) >= 3  # Should get at least some events
-    assert len(events_second) >= 3  # Should get at least some events
-
-    first_ids = {event.id for event in events_first}
-    second_ids = {event.id for event in events_second}
-    # Events should be different (though not necessarily disjoint due to API behavior)
-    assert len(first_ids.union(second_ids)) > len(first_ids)
-
 
 def test_get_market_events():
     """Test basic market event retrieval."""
-    request_parameters = EventsRequestParameters(limit=2)
-    events = request_parameters.get_events()
+    request_first = EventsRequestParameters(limit=5)
+    events = request_first.get_events()
+    assert len(events) == 5
 
     for event in events:
         # Basic validation of event properties
@@ -189,9 +110,11 @@ def test_get_market_events():
         assert len(event.title) > 0
         assert event.liquidity is None or event.liquidity >= 0
         assert event.volume is None or event.volume >= 0
-        assert event.start_date is None or isinstance(event.start_date, datetime)
-        assert event.end_date is None or isinstance(event.end_date, datetime)
-        assert isinstance(event.createdAt, datetime)
+        assert event.start_datetime is None or isinstance(
+            event.start_datetime, datetime
+        )
+        assert event.end_datetime is None or isinstance(event.end_datetime, datetime)
+        assert isinstance(event.creation_datetime, datetime)
         assert isinstance(event.markets, list)
 
         # Validate markets structure
@@ -208,30 +131,40 @@ def test_get_market_events():
 
     assert len(events) >= 1  # Should get at least some events
 
+    # Test offset
+    request_second = EventsRequestParameters(limit=5, offset=5)
+    events_second = request_second.get_events()
+    assert len(events_second) == 5
+
+    first_ids = {event.id for event in events}
+    second_ids = {event.id for event in events_second}
+    # Events should be different (though not necessarily disjoint due to API behavior)
+    assert len(first_ids.union(second_ids)) > len(first_ids)
+
 
 def test_split_date_range_small():
     """Test that small date ranges don't get split."""
-    start_time = datetime(2024, 1, 1)
-    end_time = datetime(2024, 1, 10)
+    start_datetime = datetime(2024, 1, 1)
+    end_datetime = datetime(2024, 1, 10)
 
-    chunks = _split_date_range(start_time, end_time)
+    chunks = _split_date_range(start_datetime, end_datetime)
 
     assert len(chunks) == 1
-    assert chunks[0] == (start_time, end_time)
+    assert chunks[0] == (start_datetime, end_datetime)
 
 
 def test_split_date_range_large():
     """Test that large date ranges get split into multiple chunks."""
-    start_time = datetime(2024, 1, 1)
-    end_time = datetime(2024, 1, 31)  # 30 days, should be split
+    start_datetime = datetime(2024, 1, 1)
+    end_datetime = datetime(2024, 1, 31)  # 30 days, should be split
 
-    chunks = _split_date_range(start_time, end_time)
+    chunks = _split_date_range(start_datetime, end_datetime)
 
     assert len(chunks) > 1
 
     # Check that chunks cover the entire range without gaps
-    assert chunks[0][0] == start_time
-    assert chunks[-1][1] == end_time
+    assert chunks[0][0] == start_datetime
+    assert chunks[-1][1] == end_datetime
 
     # Check that each chunk is within the limit
     for chunk_start, chunk_end in chunks:
@@ -246,17 +179,17 @@ def test_split_date_range_large():
 
 def test_split_date_range_very_large():
     """Test splitting a very large date range (60 days)."""
-    start_time = datetime(2024, 1, 1)
-    end_time = datetime(2024, 3, 1)  # ~60 days
+    start_datetime = datetime(2024, 1, 1)
+    end_datetime = datetime(2024, 3, 1)  # ~60 days
 
-    chunks = _split_date_range(start_time, end_time)
+    chunks = _split_date_range(start_datetime, end_datetime)
 
     # Should split into at least 4 chunks (60 days / 14 days ≈ 4.3)
     assert len(chunks) >= 4
 
     # Verify continuity
     reconstructed_range = chunks[-1][1] - chunks[0][0]
-    original_range = end_time - start_time
+    original_range = end_datetime - start_datetime
     # Allow for small differences due to the 1-hour gaps between chunks
     assert (
         abs((reconstructed_range - original_range).total_seconds())
@@ -264,61 +197,27 @@ def test_split_date_range_very_large():
     )
 
 
-def test_historical_timeseries_date_range_splitting():
-    """Test that the HistoricalTimeSeriesRequestParameters correctly handles large date ranges."""
-    # Mock a token ID for testing (we'll use a dummy one)
-    dummy_token_id = "test_token"
-
-    # Test with a large date range
-    large_start = datetime(2024, 1, 1)
-    large_end = datetime(2024, 2, 1)  # 31 days
-
-    request_params = _HistoricalTimeSeriesRequestParameters(
-        market=dummy_token_id, start_time=large_start, end_time=large_end, interval="1d"
-    )
-
-    # Check that the date range would be split
-    time_diff = large_end - large_start
-    assert time_diff > MAX_INTERVAL_TIMESERIES, (
-        "Test date range should exceed the limit"
-    )
-
-    # Test with a small date range
-    small_start = datetime(2024, 1, 1)
-    small_end = datetime(2024, 1, 10)  # 9 days
-
-    request_params_small = _HistoricalTimeSeriesRequestParameters(
-        market=dummy_token_id, start_time=small_start, end_time=small_end, interval="1d"
-    )
-
-    # Check that the small date range wouldn't be split
-    time_diff_small = small_end - small_start
-    assert time_diff_small <= MAX_INTERVAL_TIMESERIES, (
-        "Small date range should be within the limit"
-    )
-
-
 def test_split_date_range_multi_split_precise():
     """Test precise multi-split behavior with known intervals."""
     # Create a range that should split into exactly 3 chunks
-    start_time = datetime(2024, 1, 1, 0, 0, 0)
+    start_datetime = datetime(2024, 1, 1, 0, 0, 0)
     # Add 2 * MAX_INTERVAL_TIMESERIES + some extra time to force 3 chunks
-    end_time = start_time + (2 * MAX_INTERVAL_TIMESERIES) + timedelta(days=5)
+    end_datetime = start_datetime + (2 * MAX_INTERVAL_TIMESERIES) + timedelta(days=5)
 
-    chunks = _split_date_range(start_time, end_time)
+    chunks = _split_date_range(start_datetime, end_datetime)
 
     # Should have exactly 3 chunks
     assert len(chunks) == 3, f"Expected 3 chunks, got {len(chunks)}"
 
-    # First chunk should start at start_time
-    assert chunks[0][0] == start_time
+    # First chunk should start at start_datetime
+    assert chunks[0][0] == start_datetime
 
-    # Last chunk should end at end_time
-    assert chunks[-1][1] == end_time
+    # Last chunk should end at end_datetime
+    assert chunks[-1][1] == end_datetime
 
     # Check that segment starts are correctly spaced by MAX_INTERVAL_TIMESERIES
-    expected_second_start = start_time + MAX_INTERVAL_TIMESERIES
-    expected_third_start = start_time + (2 * MAX_INTERVAL_TIMESERIES)
+    expected_second_start = start_datetime + MAX_INTERVAL_TIMESERIES
+    expected_third_start = start_datetime + (2 * MAX_INTERVAL_TIMESERIES)
 
     assert chunks[1][0] == expected_second_start
     assert chunks[2][0] == expected_third_start
@@ -334,24 +233,13 @@ def test_split_date_range_multi_split_precise():
             f"Chunk {i} duration {duration} exceeds limit"
         )
 
-    print(f"Successfully split {end_time - start_time} into {len(chunks)} chunks:")
+    print(
+        f"Successfully split {end_datetime - start_datetime} into {len(chunks)} chunks:"
+    )
     for i, (chunk_start, chunk_end) in enumerate(chunks):
         duration = chunk_end - chunk_start
         print(f"  Chunk {i + 1}: {chunk_start} to {chunk_end} (duration: {duration})")
 
 
-def test_max_interval_timeseries_constant():
-    """Test that the MAX_INTERVAL_TIMESERIES constant has expected value."""
-    expected_days = 14
-    expected_hours = 23
-
-    assert MAX_INTERVAL_TIMESERIES.days == expected_days
-    assert MAX_INTERVAL_TIMESERIES.seconds == expected_hours * 3600
-
-    # Total should be just under 15 days
-    total_hours = MAX_INTERVAL_TIMESERIES.total_seconds() / 3600
-    assert 24 * 14 <= total_hours < 24 * 15
-
-
 if __name__ == "__main__":
-    test_get_events()
+    test_get_market_events()

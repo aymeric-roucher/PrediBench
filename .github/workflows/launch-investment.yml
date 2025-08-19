@@ -42,7 +42,7 @@ jobs:
       run: |
         cd predibench-core
         uv run python src/predibench/storage_utils.py
-        
+
         
     - name: Run investment analysis with all models
       env:

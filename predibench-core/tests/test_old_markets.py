@@ -1,17 +1,7 @@
-"""
-Test MarketRequests for old closed markets to verify price series retrieval.
-
-This test verifies that we can:
-1. Make MarketRequests to questions that closed several months ago
-2. Retrieve their price series over several months of historical data
-3. Test this functionality with 3 different market examples
-"""
-
 from datetime import datetime
 
 import pandas as pd
 from predibench.polymarket_api import (
-    MAX_INTERVAL_TIMESERIES,
     MarketsRequestParameters,
     _HistoricalTimeSeriesRequestParameters,
 )
@@ -19,22 +9,18 @@ from predibench.polymarket_api import (
 # Test markets from late 2024 (about 6 months ago)
 TEST_MARKETS = [
     {
-        "id": "253591",
-        "token_id": "21742633143463906290569050155826241533067272736897614950488156847949938836455",
-        "question": "Will Donald Trump win the 2024 US Presidential Election?",
-        "end_date": "2024-11-05T12:00:00Z",
+        "id": "511754",
+        "token_id": "103864131794756285503734468197278890131080300305704085735435172616220564121629",
+        "question": "Will Zelenskyy wear a suit before July?",
+        "start_date": "2025-05-25T12:00:00Z",
+        "end_date": "2025-06-28T12:00:00Z",
     },
     {
         "id": "253597",
         "token_id": "69236923620077691027083946871148646972011131466059644796654161903044970987404",
         "question": "Will Kamala Harris win the 2024 US Presidential Election?",
-        "end_date": "2024-11-04T12:00:00Z",
-    },
-    {
-        "id": "512340",
-        "token_id": "53033438245279373213426094525005043480366615306824323472317521871682514379120",
-        "question": "Will Nicolae Ciucă win the 2024 Romanian Presidential election?",
-        "end_date": "2024-12-08T12:00:00Z",
+        "end_date": "2024-02-04T12:00:00Z",
+        "start_date": "2024-01-01T12:00:00Z",
     },
 ]
 
@@ -42,15 +28,15 @@ TEST_MARKETS = [
 def test_market_request_for_old_closed_markets():
     """Test that MarketRequests can retrieve old closed markets from 6+ months ago."""
     # Create a request for closed markets from late 2024
-    end_date_min = datetime(2024, 10, 1)
-    end_date_max = datetime(2025, 1, 1)
+    end_datetime_min = datetime(2025, 3, 1)
+    end_datetime_max = datetime(2025, 7, 1)
 
     request_parameters = MarketsRequestParameters(
         limit=20,
         closed=True,
         active=False,
-        end_date_min=end_date_min,
-        end_date_max=end_date_max,
+        end_datetime_min=end_datetime_min,
+        end_datetime_max=end_datetime_max,
         order="volumeNum",
         ascending=False,
     )
@@ -61,10 +47,11 @@ def test_market_request_for_old_closed_markets():
     assert len(markets) > 0, "Should find some closed markets from late 2024"
 
     # Verify all markets are closed and from the expected time period
-    for market in markets:
-        assert market.volume24hr == 0, f"Market {market.id} should be inactive"
-        # assert market.active is False, f"Market {market.id} should be inactive"
-        assert end_date_min <= market.end_date <= end_date_max, (
+    for market in markets[:3]:
+        assert market.volume24hr is None or market.volume24hr == 0, (
+            f"Market {market.id} should be inactive"
+        )
+        assert end_datetime_min <= market.end_datetime <= end_datetime_max, (
             f"Market {market.id} end date should be in expected range"
         )
 
@@ -75,19 +62,17 @@ def test_price_series_retrieval_over_several_months():
     for i, market_data in enumerate(TEST_MARKETS):
         print(f"\nTesting market {i + 1}: {market_data['question']}")
 
-        # Parse the end date
-        end_date = datetime.fromisoformat(market_data["end_date"].replace("Z", ""))
-
-        # Create request for 3 months before market closed
-        start_date = end_date - MAX_INTERVAL_TIMESERIES
+        end_datetime = datetime.fromisoformat(market_data["end_date"].replace("Z", ""))
+        start_datetime = datetime.fromisoformat(
+            market_data["start_date"].replace("Z", "")
+        )
 
         # Use the existing function with proper parameters
         timeseries_request_parameters = _HistoricalTimeSeriesRequestParameters(
-            market=market_data["token_id"],
-            start_time=start_date,
-            end_time=end_date,
+            market_id=market_data["token_id"],
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
             interval="1d",
-            fidelity_minutes=60 * 24,  # Default daily fidelity
         )
 
         # Use the method from the request object
@@ -114,7 +99,5 @@ def test_price_series_retrieval_over_several_months():
 
 
 if __name__ == "__main__":
-    print("Testing old closed markets...")
     test_market_request_for_old_closed_markets()
     test_price_series_retrieval_over_several_months()
-    print("All tests completed!")

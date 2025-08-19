@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing import Literal
 from datetime import date
 
+
 class MarketInvestmentResult(BaseModel):
     market_id: str
     market_question: str
@@ -22,4 +23,3 @@ class ModelInvestmentResult(BaseModel):
     model_id: str
     target_date: date
     event_results: list[EventInvestmentResult]
-

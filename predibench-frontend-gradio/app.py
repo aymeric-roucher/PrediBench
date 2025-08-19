@@ -176,15 +176,13 @@ def create_pnl_plot(performance_data):
     return fig
 
 
-# Initialize data
 df = load_agent_choices()
-# Filter data to only include rows where timestamp_uploaded is before 2025-08-18
+
 df["timestamp_uploaded"] = pd.to_datetime(df["timestamp_uploaded"])
 cutoff_date = pd.to_datetime("2025-08-18")
 df = df[df["timestamp_uploaded"] < cutoff_date]
 performance_data = calculate_pnl_and_performance(df)
 
-# Create Gradio interface
 with gr.Blocks(title="PrediBench Leaderboard", theme=gr.themes.Soft()) as demo:
     gr.Markdown("# 🏆 PrediBench - Can LLMs predict the future?")
     gr.Markdown(

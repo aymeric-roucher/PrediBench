@@ -1,8 +1,7 @@
 import os
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 from pathlib import Path
 
-from datasets import Dataset, concatenate_datasets, load_dataset
 from dotenv import load_dotenv
 from smolagents.models import ApiModel
 
@@ -19,12 +18,12 @@ load_dotenv()
 logger = get_logger(__name__)
 
 
-def run_investments_for_today(
+def run_investments_for_specific_date(
     models: list[ApiModel | str],
     max_n_events: int,
     output_path: Path,
-    event_selection_window: timedelta,
-    backward_date: date | None = None,
+    time_until_ending: timedelta,
+    target_date: date,
     cache_file_path: Path | None = None,
     load_from_cache: bool = False,
     filter_crypto_events: bool = True,
@@ -32,17 +31,15 @@ def run_investments_for_today(
     split: str = "test",
 ) -> list[ModelInvestmentResult]:
     """Run event-based investment simulation with multiple AI models."""
-    base_date = backward_date or datetime.now(timezone.utc).date()
-    backward_mode = backward_date is not None
+    logger.info(f"Running investment analysis for {target_date}")
 
-    logger.info(
-        f"Running investment analysis for {base_date} (backward_mode: {backward_mode})"
-    )
-
-    date_output_path = output_path / base_date.strftime("%Y-%m-%d")
+    date_output_path = output_path / target_date.strftime("%Y-%m-%d")
     date_output_path.mkdir(parents=True, exist_ok=True)
 
-    cache_file_path = cache_file_path or date_output_path / f"events_cache_{get_timestamp_string()}.json"
+    cache_file_path = (
+        cache_file_path
+        or date_output_path / f"events_cache_{get_timestamp_string()}.json"
+    )
 
     if cache_file_path.exists() and load_from_cache:
         logger.info("Loading events from cache")
@@ -50,10 +47,9 @@ def run_investments_for_today(
     else:
         logger.info("Fetching events from API")
         selected_events = choose_events(
-            today_date=base_date,
-            event_selection_window=event_selection_window,
+            target_date=target_date,
+            time_until_ending=time_until_ending,
             n_events=max_n_events,
-            backward_mode=backward_mode,
             filter_crypto_events=filter_crypto_events,
             save_path=cache_file_path,
         )
@@ -64,12 +60,11 @@ def run_investments_for_today(
 
     timestamp = get_timestamp_string()
     hf_token = os.getenv(ENV_VAR_HF_TOKEN)
-    
+
     results = run_agent_investments(
         models=models,
         events=selected_events,
-        target_date=base_date,
-        backward_mode=backward_mode,
+        target_date=target_date,
         date_output_path=date_output_path,
         dataset_name=dataset_name,
         split=split,
@@ -87,9 +82,10 @@ if __name__ == "__main__":
         InferenceClientModelWithRetry(model_id="openai/gpt-oss-120b"),
     ]
 
-    run_investments_for_today(
-        event_selection_window=timedelta(days=7 * 6),
+    run_investments_for_specific_date(
+        time_until_ending=timedelta(days=7 * 6),
         max_n_events=5,
         models=models,
         output_path=DATA_PATH,
+        target_date=date(2025, 8, 19),
     )

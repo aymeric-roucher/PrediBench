@@ -1,6 +1,5 @@
 from predibench.storage_utils import write_to_storage, read_from_storage
 
-from pathlib import Path
 from predibench.common import DATA_PATH
 
 

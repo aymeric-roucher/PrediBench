@@ -152,10 +152,6 @@ class PnlCalculator:
                     positions_to_plot = self.positions[market_id][
                         self.positions[market_id].notna()
                     ]
-                    print("MARKET ID", market_id, ":::")
-                    print(positions_to_plot.head(30))
-                    print(cumulative_pnl_market.head(30))
-                    print(self.pnl[market_id].head(30))
 
                     if len(positions_to_plot) > 0:
                         # Get price values at position change dates
@@ -337,8 +333,8 @@ def get_pnls(
             id=market_id,
         )
         market = request_parameters.get_markets(
-            start_time=expected_start,
-            end_time=expected_end,  # 15 days back is the maximum allowed by the API
+            start_datetime=expected_start,
+            end_datetime=expected_end,  # 15 days back is the maximum allowed by the API
         )[0]
         markets[market_id] = market
     prices_df = get_historical_returns(markets)
