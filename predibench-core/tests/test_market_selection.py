@@ -1,12 +1,3 @@
-"""
-End-to-end tests for market selection functionality.
-
-This test suite covers:
-1. Event caching functionality (save/load cycle)
-2. Backward compatibility testing for choose_events()
-3. API integration and data integrity verification
-"""
-
 from datetime import date, datetime, timedelta, timezone
 from unittest.mock import patch
 
