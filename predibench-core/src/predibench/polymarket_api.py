@@ -280,6 +280,18 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
     start_datetime: datetime
     end_datetime: datetime
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=10, max=60),
+        reraise=True,
+        retry=retry_if_exception_type(
+            (
+                requests.exceptions.RequestException,
+                requests.exceptions.Timeout,
+                requests.exceptions.ConnectionError,
+            )
+        ),
+    )
     def get_token_daily_timeseries(self) -> pd.Series | None:
         """Get token timeseries data using this request configuration.
 
