@@ -21,11 +21,18 @@ logger = get_logger(__name__)
 
 BUCKET_ENV_VAR = "BUCKET_PREDIBENCH"
 
-# STORAGE_CLIENT = storage.Client()
+try:
+    STORAGE_CLIENT = storage.Client()
+except Exception as e:
+    logger.error(f"Error initializing storage client: {e}")
+    STORAGE_CLIENT = None
 
 
 @cache
 def get_bucket() -> storage.Bucket | None:
+    if STORAGE_CLIENT is None:
+        return None
+
     if BUCKET_ENV_VAR not in os.environ:
         print(
             f"To enable bucket access please set the {BUCKET_ENV_VAR} environment variable, defaulting to data directory."
@@ -69,6 +76,9 @@ def has_bucket_access(write_access_only: bool = True) -> bool:
             f"Error while uploading file: {e}, file content is {file_content}, not 'ping'"
         )
         raise e
+    except Exception as e:
+        print(f"Error accessing bucket {bucket.name}: {e}")
+        return False
 
 
 def _write_file_to_bucket_or_data_dir(file_path: Path, blob_name: str) -> bool:

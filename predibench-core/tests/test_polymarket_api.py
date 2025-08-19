@@ -1,19 +1,16 @@
-from datetime import datetime, timedelta
 import tempfile
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import plotly.graph_objects as go
-
 from predibench.polymarket_api import (
-    MarketsRequestParameters,
-    EventsRequestParameters,
-    Event,
-    _HistoricalTimeSeriesRequestParameters,
-    OrderBook,
-    _split_date_range,
     MAX_INTERVAL_TIMESERIES,
+    EventsRequestParameters,
+    MarketsRequestParameters,
+    OrderBook,
+    _HistoricalTimeSeriesRequestParameters,
+    _split_date_range,
 )
-from predibench.utils import convert_polymarket_time_to_datetime
 
 
 def test_get_open_markets():
@@ -97,7 +94,7 @@ def test_polymarket_api_integration():
 
     # Test timeseries functionality
     timeseries_request_parameters = _HistoricalTimeSeriesRequestParameters(
-        market=token_id,
+        market_id=token_id,
         start_time=datetime.now() - timedelta(days=10),
         end_time=datetime.now(),
         interval="1d",
@@ -132,7 +129,7 @@ def test_polymarket_api_integration():
         fig.write_image(tmp_file.name)
         # Clean up the temporary file
         Path(tmp_file.name).unlink()
-        print(f"Successfully created visualization (temporary file cleaned up)")
+        print("Successfully created visualization (temporary file cleaned up)")
 
     # Verify the figure was created correctly
     assert len(fig.data) == 1
@@ -274,7 +271,10 @@ def test_historical_timeseries_date_range_splitting():
     large_end = datetime(2024, 2, 1)  # 31 days
 
     request_params = _HistoricalTimeSeriesRequestParameters(
-        market=dummy_token_id, start_time=large_start, end_time=large_end, interval="1d"
+        market_id=dummy_token_id,
+        start_time=large_start,
+        end_time=large_end,
+        interval="1d",
     )
 
     # Check that the date range would be split
@@ -288,7 +288,10 @@ def test_historical_timeseries_date_range_splitting():
     small_end = datetime(2024, 1, 10)  # 9 days
 
     request_params_small = _HistoricalTimeSeriesRequestParameters(
-        market=dummy_token_id, start_time=small_start, end_time=small_end, interval="1d"
+        market_id=dummy_token_id,
+        start_time=small_start,
+        end_time=small_end,
+        interval="1d",
     )
 
     # Check that the small date range wouldn't be split

@@ -52,6 +52,7 @@ def _split_date_range(
     segment_starts = pd.date_range(
         start=start_time, end=end_time, freq=MAX_INTERVAL_TIMESERIES
     )
+    segment_starts = [start.to_pydatetime() for start in segment_starts]
 
     chunks = []
     for i, segment_start in enumerate(segment_starts):
@@ -62,7 +63,7 @@ def _split_date_range(
             # Regular segment: end at next segment start - 1 second to avoid overlap
             chunk_end = segment_starts[i + 1] - timedelta(hours=1)
 
-        chunks.append((segment_start.to_pydatetime(), chunk_end))
+        chunks.append((segment_start, chunk_end))
 
     return chunks
 
@@ -102,7 +103,7 @@ class Market(BaseModel, arbitrary_types_allowed=True):
         """
         if self.outcomes and len(self.outcomes) == 2 and self.outcomes[0].clob_token_id:
             ts_request = _HistoricalTimeSeriesRequestParameters(
-                market=self.outcomes[0].clob_token_id,
+                market_id=self.outcomes[0].clob_token_id,
                 start_time=start_time,
                 end_time=end_time,
             )
@@ -278,22 +279,11 @@ class MarketsRequestParameters(_RequestParameters):
 
 
 class _HistoricalTimeSeriesRequestParameters(BaseModel):
-    market: str
+    market_id: str
     interval: Literal["1m", "1w", "1d", "6h", "1h", "max"] = "max"
-    start_time: datetime | None = None
-    end_time: datetime | None = None
+    start_time: datetime
+    end_time: datetime
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=10, max=60),
-        retry=retry_if_exception_type(
-            (
-                requests.exceptions.RequestException,
-                requests.exceptions.Timeout,
-                requests.exceptions.ConnectionError,
-            )
-        ),
-    )
     def get_token_daily_timeseries(self) -> pd.Series | None:
         """Get token timeseries data using this request configuration.
 
@@ -314,10 +304,10 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
         ):
             return self._get_single_timeseries_request()
 
-        # Split the date range into chunks
+        # Split the date range into smaller chunks to comply with API duration limits
         date_chunks = _split_date_range(self.start_time, self.end_time)
         logger.info(
-            f"Splitting date range into {len(date_chunks)} chunks for market {self.market}"
+            f"Splitting date range into {len(date_chunks)} chunks for market {self.market_id}"
         )
 
         all_timeseries = []
@@ -325,15 +315,19 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
         for chunk_start, chunk_end in date_chunks:
             # Create a new instance for this chunk to avoid modifying self
             chunk_request = _HistoricalTimeSeriesRequestParameters(
-                market=self.market,
+                market_id=self.market_id,
                 interval=self.interval,
                 start_time=chunk_start,
                 end_time=chunk_end,
             )
 
             chunk_timeseries = chunk_request._get_single_timeseries_request()
-            if chunk_timeseries is not None:
-                all_timeseries.append(chunk_timeseries)
+            if chunk_timeseries is None:
+                logger.warning(
+                    f"No timeseries data found for market {self.market_id} between {chunk_start} and {chunk_end}"
+                )
+                continue
+            all_timeseries.append(chunk_timeseries)
 
         if not all_timeseries:
             return None
@@ -351,9 +345,15 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
     def _get_single_timeseries_request(self) -> pd.Series | None:
         """Make a single API request for timeseries data."""
         url = "https://clob.polymarket.com/prices-history"
+        assert self.market_id is not None
 
-        params = {"market": self.market}
-        params["interval"] = self.interval
+        params = {
+            "market": self.market_id,
+            # "interval": self.interval, # NOTE: interval and startTs are mutually exclusive
+            "startTs": str(int(self.start_time.timestamp())),
+            "endTs": str(int(self.end_time.timestamp())),
+            "fidelity": "60",
+        }
 
         response = requests.get(url, params=params)
         response.raise_for_status()
@@ -376,13 +376,10 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
         timeseries.index = timeseries.index.tz_localize(timezone.utc).date
 
         # Filter timeseries to only include dates between start_time and end_time
-        if self.start_time is not None:
-            start_date = self.start_time.date()
-            timeseries = timeseries[timeseries.index >= start_date]
-
-        if self.end_time is not None:
-            end_date = self.end_time.date()
-            timeseries = timeseries[timeseries.index <= end_date]
+        timeseries = timeseries.loc[
+            (timeseries.index >= self.start_time.date())
+            & (timeseries.index <= self.end_time.date())
+        ]
 
         return timeseries
 

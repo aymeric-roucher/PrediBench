@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import plotly.graph_objs as go
 from predibench.pnl import PnlCalculator
 
 
@@ -38,14 +39,12 @@ def test_pnl_nan_positions():
     """Test with successive positions (2, -1, 0) and changing daily prices"""
     date_range = pd.date_range(start="2024-01-01", periods=7, freq="D")
 
-    # Positions: 2, 2, -1, -1, 0, 0, 0
     positions = pd.DataFrame(
         data=[2, 2, -1, -1, np.nan, np.nan, np.nan],
         index=date_range,
         columns=["TestAsset"],
     )
 
-    # Daily changing prices: starting at 1.0, then varying
     prices = pd.DataFrame(
         data=[1.0, 1.05, 1.10, 0.95, 1.00, 1.02, 0.98],
         index=date_range,
@@ -54,15 +53,6 @@ def test_pnl_nan_positions():
 
     pnl_calculator = PnlCalculator(positions, prices)
     pnl_result = pnl_calculator.calculate_pnl()
-
-    # Manual calculation for expected PnL:
-    # Day 1: position=2, return=NaN (first day) -> PnL = 0
-    # Day 2: position=2, return=0.05 (5% increase) -> PnL = 2 * 0.05 = 0.10
-    # Day 3: position=2, return=0.047619 (1.10/1.05 - 1) -> PnL = 2 * 0.047619 = 0.095238
-    # Day 4: position=-1, return=-0.136364 (0.95/1.10 - 1) -> PnL = -1 * -0.136364 = 0.136364
-    # Day 5: position=-1, return=0.052632 (1.00/0.95 - 1) -> PnL = -1 * 0.052632 = -0.052632
-    # Day 6: position=0, return=0.02 (1.02/1.00 - 1) -> PnL = 0 * 0.02 = 0
-    # Day 7: position=0, return=-0.039216 (0.98/1.02 - 1) -> PnL = 0 * -0.039216 = 0
 
     expected_daily_pnl = [0.0, 0.10, 0.095238, 0.136364, -0.052632, 0.0, 0.0]
     expected_cumulative_pnl = sum(expected_daily_pnl[1:])  # Skip first day (NaN return)
@@ -76,6 +66,59 @@ def test_pnl_nan_positions():
     # Verify shapes
     assert positions.shape == (7, 1)
     assert not pnl_result.empty
+
+
+def test_pnl_plot():
+    date_range = pd.date_range(start="2024-01-01", periods=7, freq="D")
+    positions = pd.DataFrame(
+        data=[2, 2, -1, -1, np.nan, np.nan, np.nan],
+        index=date_range,
+        columns=["TestAsset"],
+    )
+
+    prices = pd.DataFrame(
+        data=[1.0, 1.05, 1.10, 0.95, 1.00, 1.02, 0.98],
+        index=date_range,
+        columns=["TestAsset"],
+    )
+
+    pnl_calculator = PnlCalculator(positions, prices)
+    figure = pnl_calculator.plot_pnl(stock_details=True)
+    assert figure is not None
+
+    # Check that the figure is a plotly Figure
+    assert isinstance(figure, go.Figure)
+
+    # Check that the figure has 2 rows in subplots
+    # plotly.subplots.make_subplots stores layout['grid'] or use layout['xaxis2'] etc.
+    # The number of rows can be inferred from the layout
+    layout = figure.layout
+    # Try to infer number of rows from subplot yaxes
+    yaxes = [k for k in layout if k.startswith("yaxis")]
+    # yaxis, yaxis2, ... (yaxis is always present)
+    # Find the highest yaxis number
+    n_rows = max([1] + [int(k[5:]) for k in yaxes if k != "yaxis"])
+    assert n_rows == 2
+
+    traces = figure.data
+
+    # Map yaxis to row: 'y'->1, 'y2'->2, etc.
+    def yaxis_to_row(trace):
+        yaxis = trace.yaxis
+        if yaxis == "y":
+            return 1
+        elif yaxis.startswith("y"):
+            return int(yaxis[1:])
+
+    # Get traces for each row
+    row_traces = {1: [], 2: []}
+    for trace in traces:
+        row = yaxis_to_row(trace)
+        if row in row_traces:
+            row_traces[row].append(trace)
+
+    assert len(row_traces[1]) == 2
+    assert len(row_traces[2]) == 1
 
 
 if __name__ == "__main__":
