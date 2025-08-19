@@ -1,7 +1,9 @@
-from smolagents.models import ApiModel, InferenceClientModel, OpenAIModel, LiteLLMModel
-from smolagents import ChatMessage, ChatMessageStreamDelta, Tool
-from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 from typing import Generator, Type, TypeVar
+
+from smolagents import ChatMessage, ChatMessageStreamDelta, Tool
+from smolagents.models import ApiModel, InferenceClientModel, LiteLLMModel, OpenAIModel
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
+
 from predibench.logger_config import get_logger
 
 logger = get_logger(__name__)
@@ -52,7 +54,7 @@ def add_retry_logic(base_class: Type[T]) -> Type[T]:
             response_format: dict[str, str] | None = None,
             tools_to_call_from: list[Tool] | None = None,
             **kwargs,
-        ) -> Generator[ChatMessageStreamDelta]:
+        ) -> Generator[ChatMessageStreamDelta, None, None]:
             try:
                 return super().generate_stream(
                     messages=messages,

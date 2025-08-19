@@ -1,10 +1,11 @@
-from datetime import timedelta
 import os
+from datetime import timedelta
+
 import typer
-from predibench.invest import run_investments_for_today
-from predibench.retry_models import InferenceClientModelWithRetry, OpenAIModelWithRetry
 from predibench.common import DATA_PATH, ENV_VAR_HF_TOKEN
+from predibench.invest import run_investments_for_specific_date
 from predibench.logger_config import get_logger
+from predibench.retry_models import InferenceClientModelWithRetry, OpenAIModelWithRetry
 
 logger = get_logger(__name__)
 
@@ -63,8 +64,8 @@ def main(
 
     logger.info(f"Starting investment analysis with model: {model_name}")
 
-    results = run_investments_for_today(
-        event_selection_window=timedelta(days=days_ahead),
+    results = run_investments_for_specific_date(
+        time_until_ending=timedelta(days=days_ahead),
         max_n_events=max_events,
         models=models,
         output_path=DATA_PATH,

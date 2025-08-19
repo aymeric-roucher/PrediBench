@@ -1,10 +1,11 @@
-from datetime import timedelta, date
 import os
+from datetime import date, timedelta
+
 import typer
-from predibench.invest import run_investments_for_today
-from predibench.retry_models import InferenceClientModelWithRetry, OpenAIModelWithRetry
 from predibench.common import DATA_PATH, ENV_VAR_HF_TOKEN
+from predibench.invest import run_investments_for_specific_date
 from predibench.logger_config import get_logger
+from predibench.retry_models import InferenceClientModelWithRetry, OpenAIModelWithRetry
 
 logger = get_logger(__name__)
 
@@ -49,18 +50,18 @@ def main(
     # Run for each date and each model
     for target_date in dates_to_process:
         is_today = target_date == date.today()
-        backward_date = None if is_today else target_date
+        target_date = None if is_today else target_date
 
         logger.info(
             f"Processing date: {target_date} ({'today' if is_today else 'backward mode'})"
         )
 
-        run_investments_for_today(
-            event_selection_window=timedelta(days=days_ahead),
+        run_investments_for_specific_date(
+            time_until_ending=timedelta(days=days_ahead),
             max_n_events=max_events,
             models=list(MODEL_MAP.values()),  # Run one model at a time
             output_path=DATA_PATH,
-            backward_date=backward_date,
+            target_date=target_date,
             dataset_name="m-ric/predibench-agent-choices",
             split="test",
         )

@@ -6,21 +6,22 @@ For local development, the data is stored in the data directory.
 This module contains utility functions for interacting with Google Cloud Storage.
 """
 
-from google.cloud import storage
-from google.api_core.exceptions import ClientError
 import os
 import uuid
 from functools import cache
 from pathlib import Path
+
+from google.api_core.exceptions import ClientError
+from google.cloud import storage
+
 from predibench.common import DATA_PATH
 from predibench.logger_config import get_logger
-
 
 logger = get_logger(__name__)
 
 BUCKET_ENV_VAR = "BUCKET_PREDIBENCH"
 
-STORAGE_CLIENT = storage.Client()
+# STORAGE_CLIENT = storage.Client()
 
 
 @cache

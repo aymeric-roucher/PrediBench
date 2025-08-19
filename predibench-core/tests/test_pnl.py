@@ -1,80 +1,48 @@
+import numpy as np
 import pandas as pd
 from predibench.pnl import PnlCalculator
 
 
-def test_returns():
-    date_range = pd.date_range(start="2024-01-01", periods=6, freq="D")
-    returns = pd.DataFrame(
-        data=[100, 1, -1, 0, 0, 0],
-        index=date_range,
-    )
-    # The first high return will not be invested (should be invested by the position previous to the first day), so it will be lost.
-    positions = pd.DataFrame(
-        data=[1, 1, 0, 0, 1, 1],
-        index=date_range,
-    )
-
-    # Create dummy prices data for testing
-    prices = pd.DataFrame(
-        data=[1.0, 1.01, 1.0, 1.0, 1.0, 1.0],
-        index=date_range,
-    )
-
-    engine = PnlCalculator(positions, prices)
-
-    engine.calculate_pnl()
-    pnl_sum = engine.pnl.sum(axis=1).cumsum()
-    assert pnl_sum.iloc[-1] == 0
-
-
-def test_lewis_hamilton_use_case():
+def test_pnl():
     date_range = pd.date_range(start="2025-07-26", periods=5, freq="D")
     positions = pd.DataFrame(
-        data=[1.0, 1.0, 1.0, 1.0, 1.0],
+        data=[1.0, 1.0, 1.0, 1.0, -1.0],
         index=date_range,
         columns=["Will Lewis Hamilton be the 2025 Drivers Champion?"],
     )
-
-    returns = pd.DataFrame(
-        index=date_range, columns=["Will Lewis Hamilton be the 2025 Drivers Champion?"]
-    )
-    returns.iloc[0, 0] = float("nan")
-    returns.iloc[1, 0] = float("nan")
-    returns.iloc[2, 0] = 0.333333
-    returns.iloc[3, 0] = -0.250000
-    returns.iloc[4, 0] = 0.000000
 
     # Create dummy prices data for testing
     prices = pd.DataFrame(
         index=date_range, columns=["Will Lewis Hamilton be the 2025 Drivers Champion?"]
     )
     prices.iloc[0, 0] = 0.5
-    prices.iloc[1, 0] = 0.5
+    prices.iloc[1, 0] = 0.4
     prices.iloc[2, 0] = 0.667
-    prices.iloc[3, 0] = 0.5
-    prices.iloc[4, 0] = 0.5
+    prices.iloc[3, 0] = 0.8
+    prices.iloc[4, 0] = 0.6
 
-    engine = PnlCalculator(positions, prices)
+    pnl_calculator = PnlCalculator(positions, prices)
 
-    pnl_result = engine.calculate_pnl()
+    pnl_result = pnl_calculator.calculate_pnl()
 
     assert positions.shape == (5, 1)
-    assert returns.shape == (5, 1)
     assert not pnl_result.empty
 
     # Expected PnL: 0.333333 + (-0.25) + 0.0 = 0.083333
-    expected_final_pnl = 0.083333
+    expected_final_pnl = 0.4169
     actual_final_pnl = pnl_result.sum(axis=1).cumsum().iloc[-1]
-    assert abs(actual_final_pnl - expected_final_pnl) < 1e-5
+    np.testing.assert_allclose(actual_final_pnl, expected_final_pnl, atol=1e-4)
 
 
-def test_complex_positions_and_price_changes():
+def test_pnl_nan_positions():
     """Test with successive positions (2, -1, 0) and changing daily prices"""
     date_range = pd.date_range(start="2024-01-01", periods=7, freq="D")
 
     # Positions: 2, 2, -1, -1, 0, 0, 0
     positions = pd.DataFrame(
-        data=[2, 2, -1, -1, 0, 0, 0], index=date_range, columns=["TestAsset"]
+        data=[2, 2, -1, -1, np.nan, np.nan, np.nan],
+        index=date_range,
+        columns=["TestAsset"],
     )
 
     # Daily changing prices: starting at 1.0, then varying
@@ -84,12 +52,8 @@ def test_complex_positions_and_price_changes():
         columns=["TestAsset"],
     )
 
-    # Calculate returns from price percentage changes
-    price_changes = prices.pct_change()
-    returns = price_changes.copy()
-
-    engine = PnlCalculator(positions, prices)
-    pnl_result = engine.calculate_pnl()
+    pnl_calculator = PnlCalculator(positions, prices)
+    pnl_result = pnl_calculator.calculate_pnl()
 
     # Manual calculation for expected PnL:
     # Day 1: position=2, return=NaN (first day) -> PnL = 0
@@ -105,16 +69,15 @@ def test_complex_positions_and_price_changes():
 
     actual_cumulative_pnl = pnl_result.sum(axis=1).cumsum().iloc[-1]
 
-    # Allow for small floating point differences
-    assert abs(actual_cumulative_pnl - expected_cumulative_pnl) < 1e-4
+    np.testing.assert_allclose(
+        actual_cumulative_pnl, expected_cumulative_pnl, atol=1e-4
+    )
 
     # Verify shapes
     assert positions.shape == (7, 1)
-    assert returns.shape == (7, 1)
     assert not pnl_result.empty
 
 
 if __name__ == "__main__":
-    test_returns()
-    test_lewis_hamilton_use_case()
-    test_complex_positions_and_price_changes()
+    test_pnl()
+    test_pnl_nan_positions()

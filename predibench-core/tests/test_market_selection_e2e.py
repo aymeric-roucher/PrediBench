@@ -7,17 +7,13 @@ This test suite covers:
 3. API integration and data integrity verification
 """
 
-import os
-import tempfile
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 import pandas as pd
-
-from predibench.market_selection import choose_events
-from predibench.polymarket_data import save_events_to_file, load_events_from_file
-from predibench.logger_config import get_logger
 from predibench.common import DATA_PATH
+from predibench.logger_config import get_logger
+from predibench.market_selection import choose_events
+from predibench.polymarket_data import load_events_from_file, save_events_to_file
 
 logger = get_logger(__name__)
 
@@ -51,7 +47,8 @@ def test_choose_events_event_caching_e2e():
         assert event.volume24hr is not None, f"Event {event.title} has no volume24hr"
         assert event.volume24hr > 0, f"Event {event.title} has no volume24hr"
         assert (
-            event.end_date.astimezone(timezone.utc) <= today_date + event_selection_window
+            event.end_date.astimezone(timezone.utc)
+            <= today_date + event_selection_window
         ), (
             f"Event {event.title} has end_date {event.end_date} which is after {today_date + event_selection_window}"
         )
@@ -196,10 +193,9 @@ def test_choose_events_backward_compatibility():
     logger.info("Test 1: Testing normal mode (backward_mode=False)...")
 
     selected_events = choose_events(
-        today_date=base_date,
-        event_selection_window=event_selection_window,
+        target_date=base_date,
+        time_until_ending=event_selection_window,
         n_events=max_n_events,
-        backward_mode=True,
     )
 
     # checking events
@@ -211,7 +207,8 @@ def test_choose_events_backward_compatibility():
     for event in selected_events:
         assert len(event.markets) > 0, f"Event {event.title} has no markets"
         assert (
-            event.end_date.astimezone(timezone.utc) <= base_date + event_selection_window
+            event.end_date.astimezone(timezone.utc)
+            <= base_date + event_selection_window
         ), (
             f"Event {event.title} has end_date {event.end_date} which is after {base_date + event_selection_window}"
         )

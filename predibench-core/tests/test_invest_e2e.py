@@ -1,10 +1,8 @@
-from pathlib import Path
-from datetime import timedelta, date
+from datetime import date, timedelta
 
-from smolagents.models import InferenceClientModel
-
-from predibench.invest import run_investments_for_today
 from predibench.common import DATA_PATH
+from predibench.invest import run_investments_for_specific_date
+from smolagents.models import InferenceClientModel
 
 
 def test_invest_e2e():
@@ -12,8 +10,8 @@ def test_invest_e2e():
         InferenceClientModel(model_id="openai/gpt-oss-120b"),
     ]
 
-    run_investments_for_today(
-        event_selection_window=timedelta(days=21),
+    run_investments_for_specific_date(
+        time_until_ending=timedelta(days=21),
         max_n_events=3,
         models=models,
         output_path=DATA_PATH,
@@ -25,10 +23,10 @@ def test_invest_e2e_backward():
         InferenceClientModel(model_id="openai/gpt-oss-120b"),
     ]
 
-    run_investments_for_today(
-        event_selection_window=timedelta(days=21),
+    run_investments_for_specific_date(
+        time_until_ending=timedelta(days=21),
         max_n_events=3,
         models=models,
         output_path=DATA_PATH,
-        backward_date=date(2025, 7, 16),
+        target_date=date(2025, 7, 16),
     )

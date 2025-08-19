@@ -1,23 +1,26 @@
+import json
+import textwrap
+from datetime import date
+from typing import Literal
+
+from predibench.logger_config import get_logger
+from pydantic import BaseModel
 from smolagents import (
+    ApiModel,
+    ChatMessage,
+    LiteLLMModel,
     Tool,
     ToolCallingAgent,
     VisitWebpageTool,
     tool,
-    ApiModel,
 )
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
-from datetime import datetime
-from pydantic import BaseModel
-from predibench.logger_config import get_logger
-from typing import Literal
-import json
-import textwrap
-from smolagents import LiteLLMModel, ChatMessage
+
 
 class EventDecisions(BaseModel):
     rationale: str
@@ -25,6 +28,7 @@ class EventDecisions(BaseModel):
 
 
 logger = get_logger(__name__)
+
 
 class GoogleSearchTool(Tool):
     name = "web_search"
@@ -34,7 +38,7 @@ class GoogleSearchTool(Tool):
     }
     output_type = "string"
 
-    def __init__(self, provider: str, cutoff_date: datetime | None, api_key: str):
+    def __init__(self, provider: str, cutoff_date: date | None, api_key: str):
         super().__init__()
         self.provider = provider
         self.organic_key = "organic_results" if provider == "serpapi" else "organic"
@@ -131,12 +135,12 @@ def final_answer(
 
 
 def run_smolagents(
-    model: ApiModel, 
-    question: str, 
-    cutoff_date: datetime,
+    model: ApiModel,
+    question: str,
+    cutoff_date: date | None,
     search_provider: str,
     search_api_key: str,
-    max_steps: int
+    max_steps: int,
 ) -> EventDecisions:
     """Run smolagent for event-level analysis with structured output."""
 
@@ -147,7 +151,9 @@ The final_answer tool must contain the arguments rationale and decision.
 """
 
     tools = [
-        GoogleSearchTool(provider=search_provider, cutoff_date=cutoff_date, api_key=search_api_key),
+        GoogleSearchTool(
+            provider=search_provider, cutoff_date=cutoff_date, api_key=search_api_key
+        ),
         VisitWebpageTool(),
         final_answer,
     ]
@@ -171,19 +177,20 @@ def run_deep_research(
 
     response = client.responses.create(
         model=model_id,
-        input=question + "\n\nProvide your detailed analysis and reasoning, then clearly state your final decision.",
+        input=question
+        + "\n\nProvide your detailed analysis and reasoning, then clearly state your final decision.",
         tools=[
             {"type": "web_search_preview"},
             {"type": "code_interpreter", "container": {"type": "auto"}},
         ],
     )
     research_output = response.output_text
-    
+
     # Use structured output to get EventDecisions
     structured_model = LiteLLMModel(
         model_id=structured_output_model_id,
     )
-    
+
     structured_prompt = textwrap.dedent(f"""
         Based on the following research output, extract the investment decision and rationale:
         
@@ -197,7 +204,7 @@ def run_deep_research(
         SELL means you think the outcome is overvalued (less likely than current price suggests)  
         NOTHING means fairly priced or too uncertain to bet
     """)
-    
+
     structured_output = structured_model.generate(
         [ChatMessage(role="user", content=structured_prompt)],
         response_format={
@@ -208,9 +215,8 @@ def run_deep_research(
             },
         },
     )
-    
+
     parsed_output = json.loads(structured_output.content)
     return EventDecisions(
-        rationale=parsed_output["rationale"],
-        decision=parsed_output["decision"]
+        rationale=parsed_output["rationale"], decision=parsed_output["decision"]
     )

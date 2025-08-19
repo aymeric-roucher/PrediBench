@@ -1,12 +1,11 @@
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-
+from predibench.logger_config import get_logger
 from predibench.polymarket_api import (
     Event,
     EventsRequestParameters,
 )
-from predibench.logger_config import get_logger
 from predibench.polymarket_data import save_events_to_file
 
 logger = get_logger(__name__)
@@ -117,7 +116,9 @@ def _select_markets_for_events(
                 eligible_markets.append(market)
 
         if eligible_markets:
-            best_market = max(eligible_markets, key=lambda m: m.volume1wk)
+            best_market = max(
+                eligible_markets, key=lambda m: m.volume1wk
+            )  # NOTE: Market object has no such attribute
             event.selected_market_id = best_market.id
             events_with_selected_markets.append(event)
 
@@ -125,25 +126,26 @@ def _select_markets_for_events(
 
 
 def choose_events(
-    today_date: datetime,
-    event_selection_window: timedelta,
+    target_date: date,
+    time_until_ending: timedelta,
     n_events: int,
     min_volume: float = 1000,
-    backward_mode: bool = False,
     filter_crypto_events: bool = True,
     save_path: Path | None = None,
 ) -> list[Event]:
-    """Pick top events by volume for investment for the current week
-
-    backward_mode: if True, then events ending around this date will be selected, but those events are probably closed, we can't use the volume24hr to filter out the events that are open.
-    """
-    end_date = today_date + event_selection_window
+    """Pick top events by volume for investment for the current week"""
+    backward_mode = target_date != date.today()
+    end_date = target_date + time_until_ending
+    start_datetime, end_datetime = (
+        datetime.combine(target_date, datetime.min.time()),
+        datetime.combine(end_date, datetime.min.time()),
+    )
     request_parameters = EventsRequestParameters(
         limit=500,
-        order="volume1wk" if not backward_mode else "volume",
+        order="volume" if backward_mode else "volume1wk",
         ascending=False,
-        end_date_min=today_date if backward_mode else None,
-        end_date_max=end_date,
+        end_date_min=start_datetime,
+        end_date_max=end_datetime,
     )
     events = request_parameters.get_events()
 
@@ -158,19 +160,16 @@ def choose_events(
     for event in filtered_events:
         for market in event.markets:
             if backward_mode:
-                market.fill_prices(end_time=end_date)
+                market.fill_prices(start_time=start_datetime, end_time=end_datetime)
             else:
                 market.fill_prices()
 
     filtered_events = _remove_markets_without_prices_in_events(filtered_events)
 
     events_with_selected_markets = _select_markets_for_events(
-        events=filtered_events, base_date=today_date, backward_mode=backward_mode
+        events=filtered_events, base_date=target_date, backward_mode=backward_mode
     )
 
-    save_events_to_file(
-        events=events_with_selected_markets,
-        file_path=save_path
-    )
+    save_events_to_file(events=events_with_selected_markets, file_path=save_path)
 
     return events_with_selected_markets
