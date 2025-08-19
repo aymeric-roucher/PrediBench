@@ -19,15 +19,14 @@ jobs:
         version: "latest"
     
     - name: Set up Python
-      run: uv python install
+      run: cd predibench-core && uv python install
     
     - name: Install dependencies
-      run: uv sync
+      run: cd predibench-core && uv sync
     
     - name: Run tests
       run: |
-        cd predibench-core
-        uv run python -m pytest tests/ \
+        cd predibench-core && uv run python -m pytest tests/ \
           --ignore=tests/test_invest.py \
           -v \
           --tb=short
