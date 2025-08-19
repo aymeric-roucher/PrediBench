@@ -333,8 +333,8 @@ def get_pnls(
             id=market_id,
         )
         market = request_parameters.get_markets(
-            start_time=expected_start,
-            end_time=expected_end,  # 15 days back is the maximum allowed by the API
+            start_datetime=expected_start,
+            end_datetime=expected_end,  # 15 days back is the maximum allowed by the API
         )[0]
         markets[market_id] = market
     prices_df = get_historical_returns(markets)

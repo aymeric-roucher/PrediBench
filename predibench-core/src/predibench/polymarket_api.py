@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
-from typing import Literal
 
 import pandas as pd
 import requests
@@ -37,28 +36,28 @@ logger = get_logger(__name__)
 
 
 def _split_date_range(
-    start_time: datetime, end_time: datetime
+    start_datetime: datetime, end_datetime: datetime
 ) -> list[tuple[datetime, datetime]]:
     """Split a date range into chunks of MAX_INTERVAL_TIMESERIES or smaller.
 
     Args:
-        start_time: Start datetime
-        end_time: End datetime
+        start_datetime: Start datetime
+        end_datetime: End datetime
 
     Returns:
         List of (start, end) datetime tuples, each representing a chunk <= MAX_INTERVAL_TIMESERIES
     """
     # Generate segment start times using pd.date_range
     segment_starts = pd.date_range(
-        start=start_time, end=end_time, freq=MAX_INTERVAL_TIMESERIES
+        start=start_datetime, end=end_datetime, freq=MAX_INTERVAL_TIMESERIES
     )
     segment_starts = [start.to_pydatetime() for start in segment_starts]
 
     chunks = []
     for i, segment_start in enumerate(segment_starts):
         if i == len(segment_starts) - 1:
-            # Last segment: end at the original end_time
-            chunk_end = end_time
+            # Last segment: end at the original end_datetime
+            chunk_end = end_datetime
         else:
             # Regular segment: end at next segment start - 1 second to avoid overlap
             chunk_end = segment_starts[i + 1] - timedelta(hours=1)
@@ -79,8 +78,8 @@ class Market(BaseModel, arbitrary_types_allowed=True):
     question: str
     slug: str
     description: str
-    end_date: datetime | None
-    createdAt: datetime
+    end_datetime: datetime | None
+    creation_datetime: datetime
     volumeNum: float | None
     volume24hr: float | None
     volume1wk: float | None
@@ -91,21 +90,19 @@ class Market(BaseModel, arbitrary_types_allowed=True):
     prices: pd.Series | None = None
     price_outcome_name: str | None = None  # Name of the outcome the prices represent
 
-    def fill_prices(
-        self, start_time: datetime | None = None, end_time: datetime | None = None
-    ) -> None:
+    def fill_prices(self, start_datetime: datetime, end_datetime: datetime) -> None:
         """Fill the prices field with timeseries data.
 
         Args:
-            start_time: Start time for timeseries data
-            end_time: End time for timeseries data
+            start_datetime: Start time for timeseries data
+            end_datetime: End time for timeseries data
             interval: Time interval for data points (default: "1d")
         """
         if self.outcomes and len(self.outcomes) == 2 and self.outcomes[0].clob_token_id:
             ts_request = _HistoricalTimeSeriesRequestParameters(
                 market_id=self.outcomes[0].clob_token_id,
-                start_time=start_time,
-                end_time=end_time,
+                start_datetime=start_datetime,
+                end_datetime=end_datetime,
             )
             self.prices = ts_request.get_token_daily_timeseries()
             self.price_outcome_name = self.outcomes[
@@ -122,23 +119,14 @@ class Market(BaseModel, arbitrary_types_allowed=True):
             self.price_outcome_name = None
 
     @staticmethod
-    def from_json(market_data: dict) -> Market | None:
+    def from_json(market_data: dict) -> Market:
         """Convert a market JSON object to a PolymarketMarket dataclass."""
 
-        if "outcomes" not in market_data:
-            logger.warning(
-                f"Outcomes missing for market:\n{market_data['id']}\n{market_data['question']}"
-            )
-            return None
-
+        assert "outcomes" in market_data
         outcomes = json.loads(market_data["outcomes"])
-        if len(outcomes) < 2:
-            # There should be at least 2
-            # Who will the world's richest person be on February 27, 2021?
-            logger.warning(
-                f"Expected 2 outcomes, got {len(outcomes)} for market:\n{market_data['id']}\n{market_data['question']}"
-            )
-            return None
+        assert len(outcomes) >= 2, (
+            f"Expected at least 2 outcomes, got {len(outcomes)} for market:\n{market_data['id']}\n{market_data['question']}"
+        )
         outcome_names = json.loads(market_data["outcomes"])
 
         # Handle missing price data
@@ -167,10 +155,12 @@ class Market(BaseModel, arbitrary_types_allowed=True):
             ],
             slug=market_data["slug"],
             description=market_data["description"],
-            end_date=convert_polymarket_time_to_datetime(market_data["endDate"])
+            end_datetime=convert_polymarket_time_to_datetime(market_data["endDate"])
             if "endDate" in market_data
             else None,
-            createdAt=convert_polymarket_time_to_datetime(market_data["createdAt"]),
+            creation_datetime=convert_polymarket_time_to_datetime(
+                market_data["createdAt"]
+            ),
             volumeNum=float(market_data["volumeNum"])
             if market_data.get("volumeNum") is not None
             else None,
@@ -211,8 +201,8 @@ class _RequestParameters(BaseModel):
     volume_num_max: float | None = None
     start_date_min: datetime | None = None
     start_date_max: datetime | None = None
-    end_date_min: datetime | None = None
-    end_date_max: datetime | None = None
+    end_datetime_min: datetime | None = None
+    end_datetime_max: datetime | None = None
     tag_id: int | None = None
     related_tags: bool | None = None
 
@@ -230,7 +220,9 @@ class MarketsRequestParameters(_RequestParameters):
         ),
     )
     def get_markets(
-        self, start_time: datetime | None = None, end_time: datetime | None = None
+        self,
+        start_datetime: datetime | None = None,
+        end_datetime: datetime | None = None,
     ) -> list[Market]:
         """Get open markets from Polymarket API using this request configuration."""
         url = f"{BASE_URL_POLYMARKET}/markets"
@@ -252,13 +244,18 @@ class MarketsRequestParameters(_RequestParameters):
         response.raise_for_status()
         output = response.json()
         markets = [Market.from_json(market) for market in output]
-        markets = [market for market in markets if market is not None]
-        if self.end_date_min:
+        if self.end_datetime_min and self.end_datetime_max:
             filtered_markets = []
             excluded_count = 0
             for market in markets:
-                if market.end_date is None or not (
-                    self.end_date_min <= market.end_date <= self.end_date_max
+                assert market is not None
+                if (
+                    not (
+                        self.end_datetime_min
+                        <= market.end_datetime
+                        <= self.end_datetime_max
+                    )
+                    and market.end_datetime is not None
                 ):
                     excluded_count += 1
                     logger.warning(
@@ -272,17 +269,16 @@ class MarketsRequestParameters(_RequestParameters):
                 )
             markets = filtered_markets
 
-        if start_time and end_time:
+        if start_datetime and end_datetime:
             for market in markets:
-                market.fill_prices(start_time, end_time)
+                market.fill_prices(start_datetime, end_datetime)
         return markets
 
 
 class _HistoricalTimeSeriesRequestParameters(BaseModel):
     market_id: str
-    interval: Literal["1m", "1w", "1d", "6h", "1h", "max"] = "max"
-    start_time: datetime
-    end_time: datetime
+    start_datetime: datetime
+    end_datetime: datetime
 
     def get_token_daily_timeseries(self) -> pd.Series | None:
         """Get token timeseries data using this request configuration.
@@ -298,14 +294,14 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
         """
         # If no date range specified or range is within limit, use original logic
         if (
-            self.start_time is None
-            or self.end_time is None
-            or (self.end_time - self.start_time) <= MAX_INTERVAL_TIMESERIES
+            self.start_datetime is None
+            or self.end_datetime is None
+            or (self.end_datetime - self.start_datetime) <= MAX_INTERVAL_TIMESERIES
         ):
             return self._get_single_timeseries_request()
 
         # Split the date range into smaller chunks to comply with API duration limits
-        date_chunks = _split_date_range(self.start_time, self.end_time)
+        date_chunks = _split_date_range(self.start_datetime, self.end_datetime)
         logger.info(
             f"Splitting date range into {len(date_chunks)} chunks for market {self.market_id}"
         )
@@ -316,15 +312,14 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
             # Create a new instance for this chunk to avoid modifying self
             chunk_request = _HistoricalTimeSeriesRequestParameters(
                 market_id=self.market_id,
-                interval=self.interval,
-                start_time=chunk_start,
-                end_time=chunk_end,
+                start_datetime=chunk_start,
+                end_datetime=chunk_end,
             )
 
             chunk_timeseries = chunk_request._get_single_timeseries_request()
             if chunk_timeseries is None:
                 logger.warning(
-                    f"No timeseries data found for market {self.market_id} between {chunk_start} and {chunk_end}"
+                    f"No timeseries data found for market {self.market_id} between {chunk_start.date()} and {chunk_end.date()}"
                 )
                 continue
             all_timeseries.append(chunk_timeseries)
@@ -350,8 +345,8 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
         params = {
             "market": self.market_id,
             # "interval": self.interval, # NOTE: interval and startTs are mutually exclusive
-            "startTs": str(int(self.start_time.timestamp())),
-            "endTs": str(int(self.end_time.timestamp())),
+            "startTs": str(int(self.start_datetime.timestamp())),
+            "endTs": str(int(self.end_datetime.timestamp())),
             "fidelity": "60",
         }
 
@@ -375,10 +370,10 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
         )
         timeseries.index = timeseries.index.tz_localize(timezone.utc).date
 
-        # Filter timeseries to only include dates between start_time and end_time
+        # Filter timeseries to only include dates between start_datetime and end_datetime
         timeseries = timeseries.loc[
-            (timeseries.index >= self.start_time.date())
-            & (timeseries.index <= self.end_time.date())
+            (timeseries.index >= self.start_datetime.date())
+            & (timeseries.index <= self.end_datetime.date())
         ]
 
         return timeseries
@@ -430,9 +425,9 @@ class Event(BaseModel, arbitrary_types_allowed=True):
     slug: str
     title: str
     description: str | None = None
-    start_date: datetime | None = None
-    end_date: datetime | None = None
-    createdAt: datetime
+    start_datetime: datetime | None = None
+    end_datetime: datetime | None = None
+    creation_datetime: datetime
     volume: float | None = None
     volume24hr: float | None = None
     volume1wk: float | None = None
@@ -456,13 +451,15 @@ class Event(BaseModel, arbitrary_types_allowed=True):
             slug=event_data["slug"],
             title=event_data["title"],
             description=event_data.get("description"),
-            start_date=convert_polymarket_time_to_datetime(event_data["startDate"])
+            start_datetime=convert_polymarket_time_to_datetime(event_data["startDate"])
             if "startDate" in event_data
             else None,
-            end_date=convert_polymarket_time_to_datetime(event_data["endDate"])
+            end_datetime=convert_polymarket_time_to_datetime(event_data["endDate"])
             if "endDate" in event_data
             else None,
-            createdAt=convert_polymarket_time_to_datetime(event_data["createdAt"]),
+            creation_datetime=convert_polymarket_time_to_datetime(
+                event_data["createdAt"]
+            ),
             volume=float(event_data["volume"])
             if event_data.get("volume") is not None
             else None,

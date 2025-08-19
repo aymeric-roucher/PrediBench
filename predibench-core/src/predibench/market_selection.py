@@ -73,7 +73,7 @@ def _select_markets_for_events(
         events_with_selected_markets = []
         for event in events:
             # Filter events where end_date is after base_date, or keep if end_date doesn't exist
-            if event.end_date is None or event.end_date.date() > base_date:
+            if event.end_datetime is None or event.end_datetime.date() > base_date:
                 if event.selected_market_id is not None:
                     raise ValueError(
                         f"Event '{event.title}' already has a selected market"
@@ -83,7 +83,8 @@ def _select_markets_for_events(
                 eligible_markets = [
                     market
                     for market in event.markets
-                    if market.end_date is None or market.end_date.date() > base_date
+                    if market.end_datetime is None
+                    or market.end_datetime.date() > base_date
                 ]
 
                 if eligible_markets:
@@ -92,7 +93,9 @@ def _select_markets_for_events(
                     events_with_selected_markets.append(event)
 
                     end_date_str = (
-                        event.end_date.date() if event.end_date else "no end date"
+                        event.end_datetime.date()
+                        if event.end_datetime
+                        else "no end date"
                     )
                     logger.info(
                         f"Backward mode: Selected event '{event.title}' ending {end_date_str}"
@@ -144,8 +147,8 @@ def choose_events(
         limit=500,
         order="volume" if backward_mode else "volume1wk",
         ascending=False,
-        end_date_min=start_datetime,
-        end_date_max=end_datetime,
+        end_datetime_min=start_datetime,
+        end_datetime_max=end_datetime,
     )
     events = request_parameters.get_events()
 
@@ -155,21 +158,25 @@ def choose_events(
     filtered_events = _filter_events_by_volume_and_markets(
         events=events, min_volume=min_volume, backward_mode=backward_mode
     )
-    filtered_events = filtered_events[:n_events]
 
     for event in filtered_events:
         for market in event.markets:
             if backward_mode:
-                market.fill_prices(start_time=start_datetime, end_time=end_datetime)
+                market.fill_prices(
+                    start_datetime=start_datetime, end_datetime=end_datetime
+                )
             else:
-                market.fill_prices()
+                market.fill_prices(
+                    start_datetime=start_datetime, end_datetime=end_datetime
+                )
 
     filtered_events = _remove_markets_without_prices_in_events(filtered_events)
 
     events_with_selected_markets = _select_markets_for_events(
         events=filtered_events, base_date=target_date, backward_mode=backward_mode
     )
-
-    save_events_to_file(events=events_with_selected_markets, file_path=save_path)
+    events_with_selected_markets = events_with_selected_markets[:n_events]
+    if save_path is not None:
+        save_events_to_file(events=events_with_selected_markets, file_path=save_path)
 
     return events_with_selected_markets

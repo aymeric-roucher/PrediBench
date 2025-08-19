@@ -119,7 +119,7 @@ def save_model_result(
     filename = f"{model_result.model_id.replace('/', '--')}_{timestamp_for_saving}.json"
     filepath = date_output_path / filename
 
-    content = model_result.model_dump_json(indent=2)
+    content = model_result.model_dump_json(indent=2, serialize_datetime=True)
     write_to_storage(filepath, content)
 
     logger.info(f"Saved model result to {filepath}")

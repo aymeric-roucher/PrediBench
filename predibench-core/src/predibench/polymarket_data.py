@@ -5,9 +5,9 @@ from typing import Any
 
 import pandas as pd
 
-from predibench.polymarket_api import Event, Market, MarketOutcome
 from predibench.logger_config import get_logger
-from predibench.storage_utils import write_to_storage, read_from_storage
+from predibench.polymarket_api import Event, Market, MarketOutcome
+from predibench.storage_utils import read_from_storage, write_to_storage
 
 logger = get_logger(__name__)
 
@@ -17,10 +17,9 @@ def market_to_dict(market: Market) -> dict[str, Any]:
     market_dict = market.model_dump()
 
     # Handle datetime serialization
-    if market_dict.get("end_date"):
-        market_dict["end_date"] = market_dict["end_date"].isoformat()
-    if market_dict.get("createdAt"):
-        market_dict["createdAt"] = market_dict["createdAt"].isoformat()
+    if market_dict.get("end_datetime"):
+        market_dict["end_datetime"] = market_dict["end_datetime"].isoformat()
+    market_dict["creation_datetime"] = market_dict["creation_datetime"].isoformat()
 
     # Serialize pandas Series to JSON-compatible format
     if market_dict.get("prices") is not None and isinstance(
@@ -44,10 +43,13 @@ def market_to_dict(market: Market) -> dict[str, Any]:
 def market_from_dict(market_data: dict[str, Any]) -> Market:
     """Convert a dictionary back to a Market object."""
     # Handle datetime deserialization
-    if market_data.get("end_date"):
-        market_data["end_date"] = datetime.fromisoformat(market_data["end_date"])
-    if market_data.get("createdAt"):
-        market_data["createdAt"] = datetime.fromisoformat(market_data["createdAt"])
+    if market_data.get("end_datetime"):
+        market_data["end_datetime"] = datetime.fromisoformat(
+            market_data["end_datetime"]
+        )
+    market_data["creation_datetime"] = datetime.fromisoformat(
+        market_data["creation_datetime"]
+    )
 
     # Convert outcomes
     outcomes = []
@@ -76,12 +78,11 @@ def event_to_dict(event: Event) -> dict[str, Any]:
     event_dict = event.model_dump()
 
     # Handle datetime serialization
-    if event_dict.get("start_date"):
-        event_dict["start_date"] = event_dict["start_date"].isoformat()
-    if event_dict.get("end_date"):
-        event_dict["end_date"] = event_dict["end_date"].isoformat()
-    if event_dict.get("createdAt"):
-        event_dict["createdAt"] = event_dict["createdAt"].isoformat()
+    if event_dict.get("start_datetime"):
+        event_dict["start_datetime"] = event_dict["start_datetime"].isoformat()
+    if event_dict.get("end_datetime"):
+        event_dict["end_datetime"] = event_dict["end_datetime"].isoformat()
+    event_dict["creation_datetime"] = event_dict["creation_datetime"].isoformat()
 
     # Handle markets using the market_to_dict function
     event_dict["markets"] = [market_to_dict(market) for market in event.markets]
@@ -92,12 +93,15 @@ def event_to_dict(event: Event) -> dict[str, Any]:
 def event_from_dict(event_data: dict[str, Any]) -> Event:
     """Convert a dictionary back to an Event object."""
     # Handle datetime deserialization
-    if event_data.get("start_date"):
-        event_data["start_date"] = datetime.fromisoformat(event_data["start_date"])
-    if event_data.get("end_date"):
-        event_data["end_date"] = datetime.fromisoformat(event_data["end_date"])
-    if event_data.get("createdAt"):
-        event_data["createdAt"] = datetime.fromisoformat(event_data["createdAt"])
+    if event_data.get("start_datetime"):
+        event_data["start_datetime"] = datetime.fromisoformat(
+            event_data["start_datetime"]
+        )
+    if event_data.get("end_datetime"):
+        event_data["end_datetime"] = datetime.fromisoformat(event_data["end_datetime"])
+    event_data["creation_datetime"] = datetime.fromisoformat(
+        event_data["creation_datetime"]
+    )
 
     # Handle markets using the market_from_dict function
     markets = []
