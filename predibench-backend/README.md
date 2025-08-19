@@ -1,35 +1,36 @@
----
-title: PrediBench Backend
-emoji: 🤖
-colorFrom: blue
-colorTo: purple
-sdk: gradio
-sdk_version: 5.42.0
-app_file: app.py
-pinned: false
-license: apache-2.0
----
+# Polymarket LLM Benchmark API
 
-# PrediBench Backend
+FastAPI backend for the Polymarket LLM Benchmark application.
 
-Automated system that fetches Polymarket questions weekly and runs AI agent predictions.
+## Setup
 
-## Features
+1. Create a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
 
-- 🔄 Weekly restart every Sunday at 8:00 AM UTC
-- 📊 Fetches top 10 Polymarket questions at 8:30 AM UTC  
-- 🤖 Runs predictions from multiple AI agents
-- 📈 Uploads results to HuggingFace datasets
-- 🖥️ Monitoring interface
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-## Environment Variables
+3. Run the server:
+```bash
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
 
-Set these in your Space settings:
-- `HF_TOKEN`: Your HuggingFace API token
-- Add any model API keys (OpenAI, Anthropic, etc.)
+The API will be available at `http://localhost:8000`
 
-## Datasets
+## API Documentation
 
-Creates and updates:
-- `m-ric/predibench-weekly-markets`
-- `m-ric/predibench-agent-choices`
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+
+## Endpoints
+
+- `GET /api/leaderboard` - Get LLM performance leaderboard
+- `GET /api/events` - Get active Polymarket events
+- `GET /api/stats` - Get overall statistics
+- `GET /api/model/{model_id}` - Get detailed model information
+- `GET /api/health` - Health check endpoint

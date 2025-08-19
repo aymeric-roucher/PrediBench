@@ -1,2 +1,4 @@
 data
 bucket
+__pycache__
+*.pyc
