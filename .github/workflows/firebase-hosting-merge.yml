@@ -18,3 +18,4 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PREDIBENCH }}
           channelId: live
           projectId: predibench
+          entryPoint: predibench-frontend-react/dist
