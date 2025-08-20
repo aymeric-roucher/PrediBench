@@ -10,8 +10,8 @@
       {
         "source": "/api/**",
         "run": {
-          "serviceId": "predibench-fastapi-273710233257",
-          "region": "us-east1"
+          "serviceId": "predibench-fastapi",
+          "region": "europe-west1"
         }
       },
       {
