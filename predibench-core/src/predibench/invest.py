@@ -78,14 +78,34 @@ def run_investments_for_specific_date(
 
 
 if __name__ == "__main__":
+    # Test with random model to verify new output format
     models = [
         InferenceClientModelWithRetry(model_id="openai/gpt-oss-120b"),
     ]
 
-    run_investments_for_specific_date(
+    results = run_investments_for_specific_date(
         time_until_ending=timedelta(days=7 * 6),
-        max_n_events=5,
+        max_n_events=2,  # Smaller number for testing
         models=models,
         output_path=DATA_PATH,
         target_date=date(2025, 8, 19),
     )
+    
+    # Print sample output to verify format
+    if results:
+        sample_result = results[0]
+        print(f"\nSample output for model: {sample_result.model_id}")
+        if sample_result.event_results:
+            sample_event = sample_result.event_results[0]
+            print(f"Event: {sample_event.event_title}")
+            print(f"Number of market decisions: {len(sample_event.market_decisions)}")
+            if sample_event.market_decisions:
+                sample_market = sample_event.market_decisions[0]
+                print(f"Sample market decision:")
+                print(f"  Market: {sample_market.market_question}")
+                print(f"  Probability assessment: {sample_market.probability_assessment}")
+                print(f"  Market odds: {sample_market.market_odds}")
+                print(f"  Confidence: {sample_market.confidence_in_assessment}")
+                print(f"  Betting decision: {sample_market.betting_decision.direction}")
+                print(f"  Amount: {sample_market.betting_decision.amount}")
+                print(f"  Reasoning: {sample_market.betting_decision.reasoning}")

@@ -1,7 +1,6 @@
 import json
 import textwrap
 from datetime import date
-from typing import Literal
 
 from predibench.logger_config import get_logger
 from pydantic import BaseModel
@@ -10,7 +9,7 @@ from smolagents import (
     ChatMessage,
     LiteLLMModel,
     Tool,
-    ToolCallingAgent,
+    CodeAgent,
     VisitWebpageTool,
     tool,
 )
@@ -20,11 +19,23 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+from typing import Literal
+
+
+from predibench.agent.dataclasses import BettingResult
+
+
+class MarketDecision(BaseModel):
+    market_id: str
+    reasoning: str
+    probability_assessment: float # Model's assessment of probability (0.0 to 1.0)
+    confidence_in_assessment: float # Confidence level (0.0 to 1.0)
+    direction: Literal["buy_yes", "buy_no", "nothing"] # Direction of the bet
+    amount: float  # Fraction of allocated capital (0.0 to 1.0)
 
 
 class EventDecisions(BaseModel):
-    rationale: str
-    decision: Literal["BUY", "SELL", "NOTHING"]
+    market_decisions: list[MarketDecision]
 
 
 logger = get_logger(__name__)
@@ -113,26 +124,49 @@ class GoogleSearchTool(Tool):
 
 
 @tool
-def final_answer(
-    rationale: str, decision: Literal["BUY", "SELL", "NOTHING"]
-) -> EventDecisions:
+def final_answer(market_decisions: list[dict]) -> EventDecisions:
     """
-    This tool is used to validate and return the final event decision.
+    This tool is used to validate and return the final event decisions for all relevant markets.
 
-    This tool must be used only once. The rationale and decision must be provided in the same call.
+    This tool must be used only once. Provide decisions for all markets you want to bet on.
 
     Args:
-        rationale (str): The rationale for the decision.
-        decision (Literal["BUY", "SELL", "NOTHING"]): The decision to make.
+        market_decisions (list[dict]): List of market decisions. Each dict should contain:
+            - market_id (str): The market ID
+            - probability_assessment (float): Your probability assessment (0.0 to 1.0)
+            - market_odds (float): Current market odds (0.0 to 1.0)
+            - confidence_in_assessment (float): Your confidence level (0.0 to 1.0)
+            - betting_decision (dict): Contains direction ("buy_yes"/"buy_no"/"nothing"), amount (0.0-1.0), reasoning (str)
 
     Returns:
         EventDecisions: The validated EventDecisions object, raises error if invalid.
     """
-    assert decision in ["BUY", "SELL", "NOTHING"], (
-        "Invalid decision, must be BUY, SELL or NOTHING"
-    )
-    assert len(rationale) > 0, "Rationale must be a non-empty string"
-    return EventDecisions(rationale=rationale, decision=decision)
+    validated_decisions = []
+    for decision_dict in market_decisions:
+        # Validate betting decision
+        betting_dict = decision_dict["betting_decision"]
+        assert betting_dict["direction"] in ["buy_yes", "buy_no", "nothing"], (
+            "Invalid direction, must be buy_yes, buy_no, or nothing"
+        )
+        assert 0.0 <= betting_dict["amount"] <= 1.0, "Amount must be between 0.0 and 1.0"
+        assert len(betting_dict["reasoning"]) > 0, "Reasoning must be non-empty"
+        
+        betting_decision = BettingResult(
+            direction=betting_dict["direction"],
+            amount=betting_dict["amount"],
+            reasoning=betting_dict["reasoning"]
+        )
+        
+        market_decision = MarketDecision(
+            market_id=decision_dict["market_id"],
+            probability_assessment=decision_dict["probability_assessment"],
+            market_odds=decision_dict["market_odds"],
+            confidence_in_assessment=decision_dict["confidence_in_assessment"],
+            betting_decision=betting_decision
+        )
+        validated_decisions.append(market_decision)
+    
+    return EventDecisions(market_decisions=validated_decisions)
 
 
 def run_smolagents(
@@ -158,7 +192,7 @@ The final_answer tool must contain the arguments rationale and decision.
         VisitWebpageTool(),
         final_answer,
     ]
-    agent = ToolCallingAgent(
+    agent = CodeAgent(
         tools=tools, model=model, max_steps=max_steps, return_full_result=True
     )
 
@@ -179,7 +213,7 @@ def run_deep_research(
     response = client.responses.create(
         model=model_id,
         input=question
-        + "\n\nProvide your detailed analysis and reasoning, then clearly state your final decision.",
+        + "\n\nProvide your detailed analysis and reasoning, then clearly state your final decisions for each market you want to bet on.",
         tools=[
             {"type": "web_search_preview"},
             {"type": "code_interpreter", "container": {"type": "auto"}},
@@ -193,17 +227,16 @@ def run_deep_research(
     )
 
     structured_prompt = textwrap.dedent(f"""
-        Based on the following research output, extract the investment decision and rationale:
+        Based on the following research output, extract the investment decisions for each market:
         
         {research_output}
         
-        You must provide:
-        1. A clear rationale summarizing the key points from the research
-        2. A decision that must be exactly one of: BUY, SELL, or NOTHING
-        
-        BUY means you think the outcome is undervalued (more likely than current price suggests)
-        SELL means you think the outcome is overvalued (less likely than current price suggests)  
-        NOTHING means fairly priced or too uncertain to bet
+        You must provide a list of market decisions. Each decision should include:
+        1. market_id: The ID of the market
+        2. probability_assessment: Your probability assessment (0.0 to 1.0)
+        3. market_odds: Current market odds (0.0 to 1.0)
+        4. confidence_in_assessment: Your confidence level (0.0 to 1.0)
+        5. betting_decision with direction ("buy_yes"/"buy_no"/"nothing"), amount (0.0-1.0), and reasoning
     """)
 
     structured_output = structured_model.generate(
@@ -218,6 +251,4 @@ def run_deep_research(
     )
 
     parsed_output = json.loads(structured_output.content)
-    return EventDecisions(
-        rationale=parsed_output["rationale"], decision=parsed_output["decision"]
-    )
+    return EventDecisions(market_decisions=parsed_output["market_decisions"])

@@ -26,28 +26,47 @@ load_dotenv()
 logger = get_logger(__name__)
 
 
-def _create_market_investment_decision(
-    event_decision: EventDecisions, selected_market_info: dict
-) -> MarketInvestmentResult:
-    """Convert EventDecision to MarketInvestmentDecision."""
-    if selected_market_info["is_closed"]:
-        return MarketInvestmentResult(
-            market_id=selected_market_info["id"],
-            market_question=selected_market_info["question"],
-            decision="NOTHING",
-            rationale=f"Market is closed. Original rationale: {event_decision.rationale}",
-            market_price=selected_market_info["current_price"],
-            is_closed=True,
-        )
-    else:
-        return MarketInvestmentResult(
-            market_id=selected_market_info["id"],
-            market_question=selected_market_info["question"],
-            decision=event_decision.decision,
-            rationale=event_decision.rationale,
-            market_price=selected_market_info["current_price"],
-            is_closed=False,
-        )
+def _create_market_investment_decisions(
+    event_decisions: EventDecisions, market_info_dict: dict
+) -> list[MarketInvestmentResult]:
+    """Convert EventDecisions to list of MarketInvestmentResult."""
+    results = []
+    
+    for market_decision in event_decisions.market_decisions:
+        market_info = market_info_dict[market_decision.market_id]
+        
+        if market_info["is_closed"]:
+            # Create a "nothing" decision for closed markets
+            from predibench.agent.dataclasses import BettingResult
+            betting_decision = BettingResult(
+                direction="nothing",
+                amount=0.0,
+                reasoning=f"Market is closed. Original reasoning: {market_decision.betting_decision.reasoning}"
+            )
+            result = MarketInvestmentResult(
+                market_id=market_info["id"],
+                market_question=market_info["question"],
+                probability_assessment=market_decision.probability_assessment,
+                market_odds=market_decision.market_odds,
+                confidence_in_assessment=market_decision.confidence_in_assessment,
+                betting_decision=betting_decision,
+                market_price=market_info["current_price"],
+                is_closed=True,
+            )
+        else:
+            result = MarketInvestmentResult(
+                market_id=market_info["id"],
+                market_question=market_info["question"],
+                probability_assessment=market_decision.probability_assessment,
+                market_odds=market_decision.market_odds,
+                confidence_in_assessment=market_decision.confidence_in_assessment,
+                betting_decision=market_decision.betting_decision,
+                market_price=market_info["current_price"],
+                is_closed=False,
+            )
+        results.append(result)
+    
+    return results
 
 
 def _upload_results_to_hf_dataset(
@@ -67,23 +86,29 @@ def _upload_results_to_hf_dataset(
 
     for model_result in results_per_model:
         for event_result in model_result.event_results:
-            # Map decision to choice value
-            choice_mapping = {"BUY": 1, "SELL": 0, "NOTHING": -1}
-            choice = choice_mapping.get(event_result.market_decision.decision, -1)
+            # Handle multiple market decisions per event
+            for market_decision in event_result.market_decisions:
+                # Map decision to choice value
+                choice_mapping = {"buy_yes": 1, "buy_no": 0, "nothing": -1}
+                choice = choice_mapping.get(market_decision.betting_decision.direction, -1)
 
-            row = {
-                "agent_name": model_result.model_id,
-                "date": target_date,
-                "question": event_result.market_decision.market_question,
-                "choice": choice,
-                "choice_raw": event_result.market_decision.decision.lower(),
-                "market_id": event_result.market_decision.market_id,
-                "messages_count": 0,  # This would need to be tracked during agent execution
-                "has_reasoning": event_result.market_decision.rationale is not None,
-                "timestamp_uploaded": current_timestamp,
-                "rationale": event_result.market_decision.rationale or "",
-            }
-            new_rows.append(row)
+                row = {
+                    "agent_name": model_result.model_id,
+                    "date": target_date,
+                    "question": market_decision.market_question,
+                    "choice": choice,
+                    "choice_raw": market_decision.betting_decision.direction,
+                    "market_id": market_decision.market_id,
+                    "messages_count": 0,  # This would need to be tracked during agent execution
+                    "has_reasoning": market_decision.betting_decision.reasoning is not None,
+                    "timestamp_uploaded": current_timestamp,
+                    "rationale": market_decision.betting_decision.reasoning or "",
+                    "probability_assessment": market_decision.probability_assessment,
+                    "market_odds": market_decision.market_odds,
+                    "confidence_in_assessment": market_decision.confidence_in_assessment,
+                    "betting_amount": market_decision.betting_decision.amount,
+                }
+                new_rows.append(row)
 
     if new_rows:
         # Create a new dataset with the new rows
@@ -135,25 +160,11 @@ def _process_event_investment(
     main_market_price_history_limit: int = 200,
     other_markets_price_history_limit: int = 20,
 ) -> EventInvestmentResult:
-    """Process investment decision for selected market."""
-    logger.info(f"Processing event: {event.title} with selected market")
+    """Process investment decisions for all relevant markets."""
+    logger.info(f"Processing event: {event.title} with {len(event.markets)} markets")
     backward_mode = is_backward_mode(target_date)
 
-    if not event.selected_market_id:
-        raise ValueError(
-            f"""Event '{event.title}' has no selected market for prediction, the current strategy is to select one market based on deterministic criteria"""
-        )
-
-    # Find the selected market
-    selected_market = next(
-        (m for m in event.markets if m.id == event.selected_market_id), None
-    )
-    if not selected_market:
-        raise ValueError(
-            f"Selected market {event.selected_market_id} not found in event {event.title}"
-        )
-
-    # Prepare market data for all markets (for context) but focus on selected one
+    # Prepare market data for all markets
     market_data = {}
 
     for market in event.markets:
@@ -162,12 +173,8 @@ def _process_event_investment(
                 "markets are supposed to be filtered, this should not be possible"
             )
 
-        # Determine price history limit based on whether this is the selected market
-        price_limit = (
-            main_market_price_history_limit
-            if market.id == event.selected_market_id
-            else other_markets_price_history_limit
-        )
+        # Use shorter price history for all markets to keep context manageable
+        price_limit = other_markets_price_history_limit
 
         # Check if market is closed and get price data
         if market.prices is not None and target_date in market.prices.index:
@@ -206,52 +213,43 @@ def _process_event_investment(
         }
         market_data[market.id] = market_info
 
-    selected_market_info = market_data[event.selected_market_id]
-    # Create context summaries for all markets
-    context_summaries = []
-    target_market_summary = ""
+    # Create summaries for all markets
+    market_summaries = []
 
     for market_info in market_data.values():
         outcome_name = market_info["price_outcome_name"]
-        is_target = (
-            "**[TARGET MARKET]**"
-            if market_info["id"] == event.selected_market_id
-            else "*[OTHER MARKET FOR CONTEXT]*"
-        )
 
         summary = f"""
-{is_target}:
+Market ID: {market_info["id"]}
 Question: {market_info["question"]}
-{"Description:" + market_info["description"] if market_info["id"] == event.selected_market_id else ""}
+Description: {market_info["description"] or "No description"}
 Historical prices for the outcome "{outcome_name}":
 {market_info["recent_prices"]}
 Last available price for "{outcome_name}": {market_info["current_price"]}
         """
-
-        if market_info["id"] == event.selected_market_id:
-            target_market_summary = summary
-        else:
-            context_summaries.append(summary)
+        market_summaries.append(summary)
 
     full_question = f"""
 Date: {target_date.strftime("%B %d, %Y")}
 
 Event: {event.title}
 
-IMPORTANT: You must make a decision ONLY on the TARGET MARKET marked below. The other markets are provided for context to help you understand the broader event.
+You have access to {len(market_data)} markets related to this event. For EACH market you want to bet on, you need to provide:
 
-TARGET MARKET FOR DECISION:
-{target_market_summary}
+1. probability_assessment: Your assessment of the true probability (0.0 to 1.0)
+2. market_odds: The current market price/odds (0.0 to 1.0) 
+3. confidence_in_assessment: How confident you are in your assessment (0.0 to 1.0)
+4. betting_decision: 
+   - direction: "buy_yes" (bet outcome happens), "buy_no" (bet outcome doesn't happen), or "nothing" (don't bet)
+   - amount: Fraction of allocated capital to bet (0.0 to 1.0)
+   - reasoning: Explanation for your decision
 
-CONTEXT MARKETS (for information only):
-{"".join(context_summaries)}
+AVAILABLE MARKETS:
+{"".join(market_summaries)}
 
-For the TARGET MARKET ONLY, decide whether to BUY (if the shown outcome is undervalued), SELL (if the shown outcome is overvalued), or do NOTHING (if fairly priced or uncertain).
+Use the final_answer tool to provide your decisions. You can bet on multiple markets or skip markets you're not confident about.
 
-Note: The prices shown are specifically for the given outcome. BUY means you think that outcome is more likely than the current price suggests.
-Consider how the context markets might relate to your target market decision.
-
-Provide your decision and rationale for the TARGET MARKET only.
+Note: The prices shown are for the specific outcome mentioned. "buy_yes" means you think that outcome is more likely than the current price suggests. "buy_no" means you think it's less likely.
     """
 
     # Save prompt to file if date_output_path is provided
@@ -268,19 +266,39 @@ Provide your decision and rationale for the TARGET MARKET only.
 
     # Get agent decisions using smolagents
     if isinstance(model, str) and model == "test_random":
-        choice = np.random.choice(["BUY", "SELL", "NOTHING"], p=[0.3, 0.3, 0.4])
-        event_decision = EventDecisions(
-            decision=choice,
-            rationale=f"Random decision for testing market {event.selected_market_id}",
-        )
+        # Create random decisions for all markets
+        from predibench.agent.smolagents_utils import MarketDecision
+        from predibench.agent.dataclasses import BettingResult
+        
+        market_decisions = []
+        for market_info in market_data.values():
+            direction = np.random.choice(["buy_yes", "buy_no", "nothing"], p=[0.3, 0.3, 0.4])
+            amount = np.random.uniform(0.1, 0.5) if direction != "nothing" else 0.0
+            
+            betting_decision = BettingResult(
+                direction=direction,
+                amount=amount,
+                reasoning=f"Random decision for testing market {market_info['id']}"
+            )
+            
+            market_decision = MarketDecision(
+                market_id=market_info["id"],
+                probability_assessment=np.random.uniform(0.1, 0.9),
+                market_odds=market_info["current_price"] or 0.5,
+                confidence_in_assessment=np.random.uniform(0.3, 0.8),
+                betting_decision=betting_decision
+            )
+            market_decisions.append(market_decision)
+        
+        event_decisions = EventDecisions(market_decisions=market_decisions)
     elif isinstance(model, str) and model == "o3-deep-research":
-        event_decision = run_deep_research(
+        event_decisions = run_deep_research(
             model_id="o3-deep-research",
             question=full_question,
             structured_output_model_id="gpt-5",
         )
     else:
-        event_decision = run_smolagents(
+        event_decisions = run_smolagents(
             model=model,
             question=full_question,
             cutoff_date=target_date if backward_mode else None,
@@ -289,16 +307,16 @@ Provide your decision and rationale for the TARGET MARKET only.
             max_steps=20,
         )
 
-    # Convert to MarketInvestmentDecision for selected market
-    market_decision = _create_market_investment_decision(
-        event_decision=event_decision, selected_market_info=selected_market_info
+    # Convert to MarketInvestmentResults for all markets
+    market_decisions = _create_market_investment_decisions(
+        event_decisions=event_decisions, market_info_dict=market_data
     )
 
     return EventInvestmentResult(
         event_id=event.id,
         event_title=event.title,
         event_description=event.description,
-        market_decision=market_decision,
+        market_decisions=market_decisions,
     )
 
 
