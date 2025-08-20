@@ -49,6 +49,7 @@ class GoogleSearchTool(Tool):
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=10, max=60),
         retry=retry_if_exception_type((Exception,)),
+        reraise=True,
     )
     def forward(self, query: str) -> str:
         import requests

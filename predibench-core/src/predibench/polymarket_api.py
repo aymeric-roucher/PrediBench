@@ -218,6 +218,7 @@ class MarketsRequestParameters(_RequestParameters):
                 requests.exceptions.ConnectionError,
             )
         ),
+        reraise=True,
     )
     def get_markets(
         self,
@@ -283,7 +284,6 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=10, max=60),
-        reraise=True,
         retry=retry_if_exception_type(
             (
                 requests.exceptions.RequestException,
@@ -291,6 +291,7 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
                 requests.exceptions.ConnectionError,
             )
         ),
+        reraise=True,
     )
     def get_token_daily_timeseries(self) -> pd.Series | None:
         """Get token timeseries data using this request configuration.
@@ -402,6 +403,7 @@ class EventsRequestParameters(_RequestParameters):
                 requests.exceptions.ConnectionError,
             )
         ),
+        reraise=True,
     )
     def get_events(self) -> list[Event]:
         """Get events from Polymarket API using this request configuration."""
@@ -536,6 +538,7 @@ class OrderBook(BaseModel):
                 requests.exceptions.ConnectionError,
             )
         ),
+        reraise=True,
     )
     def get_order_book(token_id: str) -> OrderBook:
         """Get order book for a specific token ID from Polymarket CLOB API.

@@ -19,6 +19,7 @@ def add_retry_logic(base_class: Type[T]) -> Type[T]:
             stop=stop_after_attempt(5),
             wait=wait_fixed(61),
             retry=retry_if_exception_type((Exception,)),
+            reraise=True,
         )
         def generate(
             self,
@@ -46,6 +47,7 @@ def add_retry_logic(base_class: Type[T]) -> Type[T]:
             stop=stop_after_attempt(5),
             wait=wait_fixed(61),
             retry=retry_if_exception_type((Exception,)),
+            reraise=True,
         )
         def generate_stream(
             self,
