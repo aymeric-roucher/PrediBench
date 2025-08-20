@@ -19,6 +19,8 @@ import requests
 # DELETE /order	3000 requests / 10 min (5/s)	Throttle requests over the maximum configured rate
 from pydantic import BaseModel
 from tenacity import (
+    after_log,
+    before_sleep_log,
     retry,
     retry_if_exception_type,
     stop_after_attempt,
@@ -33,6 +35,22 @@ MAX_INTERVAL_TIMESERIES = timedelta(days=14, hours=23, minutes=0)
 # NOTE: above is refined by experience: seems independant from the resolution
 
 logger = get_logger(__name__)
+
+# Common retry configuration for all API calls
+polymarket_retry = retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=10, max=60),
+    retry=retry_if_exception_type(
+        (
+            requests.exceptions.RequestException,
+            requests.exceptions.Timeout,
+            requests.exceptions.ConnectionError,
+        )
+    ),
+    before_sleep=before_sleep_log(logger, log_level="WARNING"),
+    after=after_log(logger, log_level="INFO"),
+    reraise=True,
+)
 
 
 def _split_date_range(
@@ -207,18 +225,7 @@ class _RequestParameters(BaseModel):
 
 
 class MarketsRequestParameters(_RequestParameters):
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=10, max=60),
-        retry=retry_if_exception_type(
-            (
-                requests.exceptions.RequestException,
-                requests.exceptions.Timeout,
-                requests.exceptions.ConnectionError,
-            )
-        ),
-        reraise=True,
-    )
+    @polymarket_retry
     def get_markets(
         self,
         start_datetime: datetime | None = None,
@@ -279,18 +286,7 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
     market_id: str
     end_datetime: datetime | None = None
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=10, max=60),
-        retry=retry_if_exception_type(
-            (
-                requests.exceptions.RequestException,
-                requests.exceptions.Timeout,
-                requests.exceptions.ConnectionError,
-            )
-        ),
-        reraise=True,
-    )
+    @polymarket_retry
     def get_token_daily_timeseries(self) -> pd.Series | None:
         """Make a single API request for timeseries data."""
         url = "https://clob.polymarket.com/prices-history"
@@ -336,18 +332,7 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
 
 
 class EventsRequestParameters(_RequestParameters):
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=10, max=60),
-        retry=retry_if_exception_type(
-            (
-                requests.exceptions.RequestException,
-                requests.exceptions.Timeout,
-                requests.exceptions.ConnectionError,
-            )
-        ),
-        reraise=True,
-    )
+    @polymarket_retry
     def get_events(self) -> list[Event]:
         """Get events from Polymarket API using this request configuration."""
         url = f"{BASE_URL_POLYMARKET}/events"
@@ -471,18 +456,7 @@ class OrderBook(BaseModel):
     asks: list[OrderLevel]
 
     @staticmethod
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=10, max=60),
-        retry=retry_if_exception_type(
-            (
-                requests.exceptions.RequestException,
-                requests.exceptions.Timeout,
-                requests.exceptions.ConnectionError,
-            )
-        ),
-        reraise=True,
-    )
+    @polymarket_retry
     def get_order_book(token_id: str) -> OrderBook:
         """Get order book for a specific token ID from Polymarket CLOB API.
 
