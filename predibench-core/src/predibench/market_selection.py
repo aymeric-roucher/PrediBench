@@ -121,7 +121,7 @@ def _select_markets_for_events(
         if eligible_markets:
             best_market = max(
                 eligible_markets, key=lambda m: m.volume1wk
-            )  # NOTE: Market object has no such attribute
+            )
             event.selected_market_id = best_market.id
             events_with_selected_markets.append(event)
 
@@ -136,7 +136,10 @@ def choose_events(
     filter_crypto_events: bool = True,
     save_path: Path | None = None,
 ) -> list[Event]:
-    """Pick top events by volume for investment for the current week"""
+    """Pick top events by volume for investment for the current week
+    if True, then events ending around this date will be selected, but those events are probably closed, we can't use the volume24hr to filter out the events that are open.
+
+    """
     backward_mode = target_date != date.today()
     end_date = target_date + time_until_ending
     start_datetime, end_datetime = (
@@ -147,8 +150,8 @@ def choose_events(
         limit=500,
         order="volume" if backward_mode else "volume1wk",
         ascending=False,
-        end_datetime_min=start_datetime,
-        end_datetime_max=end_datetime,
+        end_date_min=start_datetime if backward_mode else None,
+        end_date_max=end_datetime,
     )
     events = request_parameters.get_events()
 
@@ -158,17 +161,14 @@ def choose_events(
     filtered_events = _filter_events_by_volume_and_markets(
         events=events, min_volume=min_volume, backward_mode=backward_mode
     )
+    filtered_events = filtered_events[: n_events + int(n_events * 0.2 +1)] # NOTE: a few events might be missing prices and will be removed later so we add a few more events to be sure to have enough
 
     for event in filtered_events:
         for market in event.markets:
             if backward_mode:
-                market.fill_prices(
-                    start_datetime=start_datetime, end_datetime=end_datetime
-                )
+                market.fill_prices(end_datetime=end_datetime)
             else:
-                market.fill_prices(
-                    start_datetime=start_datetime, end_datetime=end_datetime
-                )
+                market.fill_prices()
 
     filtered_events = _remove_markets_without_prices_in_events(filtered_events)
 

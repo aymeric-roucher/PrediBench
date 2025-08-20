@@ -90,7 +90,7 @@ class Market(BaseModel, arbitrary_types_allowed=True):
     prices: pd.Series | None = None
     price_outcome_name: str | None = None  # Name of the outcome the prices represent
 
-    def fill_prices(self, start_datetime: datetime, end_datetime: datetime) -> None:
+    def fill_prices(self, end_datetime: datetime | None = None) -> None:
         """Fill the prices field with timeseries data.
 
         Args:
@@ -101,7 +101,6 @@ class Market(BaseModel, arbitrary_types_allowed=True):
         if self.outcomes and len(self.outcomes) == 2 and self.outcomes[0].clob_token_id:
             ts_request = _HistoricalTimeSeriesRequestParameters(
                 market_id=self.outcomes[0].clob_token_id,
-                start_datetime=start_datetime,
                 end_datetime=end_datetime,
             )
             self.prices = ts_request.get_token_daily_timeseries()
@@ -201,8 +200,8 @@ class _RequestParameters(BaseModel):
     volume_num_max: float | None = None
     start_date_min: datetime | None = None
     start_date_max: datetime | None = None
-    end_datetime_min: datetime | None = None
-    end_datetime_max: datetime | None = None
+    end_date_min: datetime | None = None # NOTE: it is a datetime but in the API it must be a date, see https://docs.polymarket.com/developers/gamma-markets-api/get-events
+    end_date_max: datetime | None = None
     tag_id: int | None = None
     related_tags: bool | None = None
 
@@ -218,6 +217,7 @@ class MarketsRequestParameters(_RequestParameters):
                 requests.exceptions.ConnectionError,
             )
         ),
+        reraise=True,
     )
     def get_markets(
         self,
@@ -244,16 +244,16 @@ class MarketsRequestParameters(_RequestParameters):
         response.raise_for_status()
         output = response.json()
         markets = [Market.from_json(market) for market in output]
-        if self.end_datetime_min and self.end_datetime_max:
+        if self.end_date_min and self.end_date_max:
             filtered_markets = []
             excluded_count = 0
             for market in markets:
                 assert market is not None
                 if (
                     not (
-                        self.end_datetime_min
+                        self.end_date_min
                         <= market.end_datetime
-                        <= self.end_datetime_max
+                        <= self.end_date_max
                     )
                     and market.end_datetime is not None
                 ):
@@ -277,13 +277,11 @@ class MarketsRequestParameters(_RequestParameters):
 
 class _HistoricalTimeSeriesRequestParameters(BaseModel):
     market_id: str
-    start_datetime: datetime
-    end_datetime: datetime
+    end_datetime: datetime | None = None
 
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=10, max=60),
-        reraise=True,
         retry=retry_if_exception_type(
             (
                 requests.exceptions.RequestException,
@@ -291,82 +289,30 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
                 requests.exceptions.ConnectionError,
             )
         ),
+        reraise=True,
     )
     def get_token_daily_timeseries(self) -> pd.Series | None:
-        """Get token timeseries data using this request configuration.
-
-        Why no fidelity ? Because when the market is closed in an Event that is still open (bitcoin price for instance),
-        the argument fidelity will return an empty timeseries. Better get as much data as possible.
-
-        Some markets are present in the API and yet without prices, it is because they are not used and not traded,
-        in that case we will return None
-
-        If the requested date range exceeds MAX_INTERVAL_TIMESERIES, this method will split the range
-        into multiple requests and concatenate the results.
-        """
-        # If no date range specified or range is within limit, use original logic
-        if (
-            self.start_datetime is None
-            or self.end_datetime is None
-            or (self.end_datetime - self.start_datetime) <= MAX_INTERVAL_TIMESERIES
-        ):
-            return self._get_single_timeseries_request()
-
-        # Split the date range into smaller chunks to comply with API duration limits
-        date_chunks = _split_date_range(self.start_datetime, self.end_datetime)
-        logger.info(
-            f"Splitting date range into {len(date_chunks)} chunks for market {self.market_id}"
-        )
-
-        all_timeseries = []
-
-        for chunk_start, chunk_end in date_chunks:
-            # Create a new instance for this chunk to avoid modifying self
-            chunk_request = _HistoricalTimeSeriesRequestParameters(
-                market_id=self.market_id,
-                start_datetime=chunk_start,
-                end_datetime=chunk_end,
-            )
-
-            chunk_timeseries = chunk_request._get_single_timeseries_request()
-            if chunk_timeseries is None:
-                logger.warning(
-                    f"No timeseries data found for market {self.market_id} between {chunk_start.date()} and {chunk_end.date()}"
-                )
-                continue
-            all_timeseries.append(chunk_timeseries)
-
-        if not all_timeseries:
-            return None
-
-        # Concatenate all timeseries
-        combined_timeseries = pd.concat(all_timeseries).sort_index()
-
-        # Remove duplicates (keep last value for each date)
-        combined_timeseries = combined_timeseries[
-            ~combined_timeseries.index.duplicated(keep="last")
-        ]
-
-        return combined_timeseries
-
-    def _get_single_timeseries_request(self) -> pd.Series | None:
         """Make a single API request for timeseries data."""
         url = "https://clob.polymarket.com/prices-history"
         assert self.market_id is not None
 
-        params = {
-            "market": self.market_id,
-            # "interval": self.interval, # NOTE: interval and startTs are mutually exclusive
-            "startTs": str(int(self.start_datetime.timestamp())),
-            "endTs": str(int(self.end_datetime.timestamp())),
-            "fidelity": "60",
-        }
-
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        data = response.json()
-        if len(data["history"]) == 0:
-            return None
+        set_of_params = [
+            {
+                "market": self.market_id,
+                "interval": "max",
+                "fidelity": "1440",
+            },
+            {
+                "market": self.market_id,
+                "interval": "max",
+            },
+        ]
+        for params in set_of_params:
+            response = requests.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
+            if len(data["history"]) > 0:
+                break
 
         timeseries = (
             pd.Series(
@@ -383,10 +329,8 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
         timeseries.index = timeseries.index.tz_localize(timezone.utc).date
 
         # Filter timeseries to only include dates between start_datetime and end_datetime
-        timeseries = timeseries.loc[
-            (timeseries.index >= self.start_datetime.date())
-            & (timeseries.index <= self.end_datetime.date())
-        ]
+        if self.end_datetime is not None:
+            timeseries = timeseries.loc[timeseries.index <= self.end_datetime.date()]
 
         return timeseries
 
@@ -402,6 +346,7 @@ class EventsRequestParameters(_RequestParameters):
                 requests.exceptions.ConnectionError,
             )
         ),
+        reraise=True,
     )
     def get_events(self) -> list[Event]:
         """Get events from Polymarket API using this request configuration."""
@@ -536,6 +481,7 @@ class OrderBook(BaseModel):
                 requests.exceptions.ConnectionError,
             )
         ),
+        reraise=True,
     )
     def get_order_book(token_id: str) -> OrderBook:
         """Get order book for a specific token ID from Polymarket CLOB API.

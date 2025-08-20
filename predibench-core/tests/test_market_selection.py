@@ -11,12 +11,13 @@ from predibench.polymarket_data import load_events_from_file, save_events_to_fil
 logger = get_logger(__name__)
 
 
-def create_mock_events() -> list[Event]:
+def create_mock_events(base_date: date = None) -> list[Event]:
     """Create mock events for testing to avoid API rate limits."""
     mock_events = []
-    # Use today's date to ensure events fit within the test date range
-    today = date.today()
-    base_time = datetime.combine(today, datetime.min.time()).replace(
+    # Use provided base_date or today's date to ensure events fit within the test date range
+    if base_date is None:
+        base_date = date.today()
+    base_time = datetime.combine(base_date, datetime.min.time()).replace(
         tzinfo=timezone.utc
     )
 
@@ -233,8 +234,11 @@ def test_choose_events_event_caching_e2e(mock_get_events, mock_fill_prices):
 @patch("predibench.market_selection.EventsRequestParameters.get_events")
 def test_choose_events_backward(mock_get_events, mock_fill_prices):
     """Test choose_events function for backward mode."""
-    # Mock the API call to avoid rate limits
-    mock_get_events.return_value = create_mock_events()
+    # Test parameters
+    base_datetime = datetime(2025, 8, 15, tzinfo=timezone.utc)  # Fixed date for testing
+    
+    # Mock the API call to avoid rate limits - use the base date from the test
+    mock_get_events.return_value = create_mock_events(base_datetime.date())
 
     # Mock fill_prices to avoid API calls and provide mock price data
     def create_mock_prices(market_instance, start_datetime, end_datetime):
@@ -260,8 +264,6 @@ def test_choose_events_backward(mock_get_events, mock_fill_prices):
 
     mock_fill_prices.side_effect = fill_prices_wrapper
 
-    # Test parameters
-    base_datetime = datetime(2025, 8, 15, tzinfo=timezone.utc)  # Fixed date for testing
     event_selection_window = timedelta(days=7)
     max_n_events = 3
 
@@ -316,8 +318,8 @@ def main():
                 self, start_datetime, end_datetime
             )
         )
-        test_choose_events_event_caching_e2e()
-        test_choose_events_backward()
+        test_choose_events_event_caching_e2e(mock_get_events, mock_fill_prices)
+        test_choose_events_backward(mock_get_events, mock_fill_prices)
 
 
 if __name__ == "__main__":

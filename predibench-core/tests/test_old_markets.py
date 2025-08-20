@@ -35,8 +35,8 @@ def test_market_request_for_old_closed_markets():
         limit=20,
         closed=True,
         active=False,
-        end_datetime_min=end_datetime_min,
-        end_datetime_max=end_datetime_max,
+        end_date_min=end_datetime_min,
+        end_date_max=end_datetime_max,
         order="volumeNum",
         ascending=False,
     )
@@ -70,9 +70,7 @@ def test_price_series_retrieval_over_several_months():
         # Use the existing function with proper parameters
         timeseries_request_parameters = _HistoricalTimeSeriesRequestParameters(
             market_id=market_data["token_id"],
-            start_datetime=start_datetime,
             end_datetime=end_datetime,
-            interval="1d",
         )
 
         # Use the method from the request object
