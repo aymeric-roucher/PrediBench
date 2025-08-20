@@ -161,7 +161,7 @@ def choose_events(
     filtered_events = _filter_events_by_volume_and_markets(
         events=events, min_volume=min_volume, backward_mode=backward_mode
     )
-    filtered_events = filtered_events[: n_events + int(n_events * 0.2 +1)] # NOTE: a few events might be missing prices and will be removed later so we add a few more events to be sure to have enough
+    filtered_events = filtered_events[: n_events + int(n_events * 0.2 +3)] # NOTE: a few events might be missing prices and will be removed later so we add a few more events to be sure to have enough
 
     for event in filtered_events:
         for market in event.markets:

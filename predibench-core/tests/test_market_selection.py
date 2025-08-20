@@ -1,108 +1,21 @@
 from datetime import date, datetime, timedelta, timezone
-from unittest.mock import patch
 
 import pandas as pd
 from predibench.common import DATA_PATH
 from predibench.logger_config import get_logger
 from predibench.market_selection import choose_events
-from predibench.polymarket_api import Event, Market, MarketOutcome
 from predibench.polymarket_data import load_events_from_file, save_events_to_file
 
 logger = get_logger(__name__)
 
 
-def create_mock_events(base_date: date = None) -> list[Event]:
-    """Create mock events for testing to avoid API rate limits."""
-    mock_events = []
-    # Use provided base_date or today's date to ensure events fit within the test date range
-    if base_date is None:
-        base_date = date.today()
-    base_time = datetime.combine(base_date, datetime.min.time()).replace(
-        tzinfo=timezone.utc
-    )
 
-    for i in range(10):
-        # Create mock outcomes with prices in valid range (0.05 < price < 0.95)
-        price_base = 0.2 + (i * 0.05)  # Prices between 0.2 and 0.65
-        outcomes = [
-            MarketOutcome(
-                clob_token_id=f"token_{i}_0",
-                name="Yes",
-                price=price_base,  # Valid price range
-            ),
-            MarketOutcome(
-                clob_token_id=f"token_{i}_1",
-                name="No",
-                price=1.0 - price_base,  # Complement price
-            ),
-        ]
-
-        # Create mock market with proper volume1wk and end_datetime within test range
-        market = Market(
-            id=f"market_{i}",
-            question=f"Will event {i} happen?",
-            slug=f"event-{i}-market",
-            description=f"Mock market for event {i}",
-            end_datetime=base_time + timedelta(days=i + 1),  # Within 21-day window
-            creation_datetime=base_time - timedelta(days=30),
-            volumeNum=10000.0 + (i * 1000),  # Volume between 10k-19k
-            volume24hr=2000.0 + (i * 200),  # 24hr volume between 2k-3.8k
-            volume1wk=5000.0 + (i * 500),  # 1wk volume between 5k-9.5k (REQUIRED!)
-            volume1mo=20000.0 + (i * 1000),  # 1mo volume between 20k-29k
-            volume1yr=100000.0 + (i * 5000),  # 1yr volume between 100k-145k
-            liquidity=50000.0 + (i * 2000),  # Liquidity between 50k-68k
-            outcomes=outcomes,
-            prices=pd.Series(
-                name="price",
-                index=pd.date_range(
-                    start=base_time, end=base_time + timedelta(days=9), freq="D"
-                ),
-                data=[0.5 + 0.1 * (i % 5) for i in range(10)],
-            ),
-            price_outcome_name="Yes",
-        )
-
-        # Create mock event with volume24hr > 1000 and end_datetime within test range
-        event = Event(
-            id=f"event_{i}",
-            slug=f"mock-event-{i}",
-            title=f"Mock Event {i}",
-            description=f"This is a mock event for testing purposes - Event {i}",
-            start_datetime=base_time + timedelta(hours=i),
-            end_datetime=base_time + timedelta(days=i + 1),  # Within 21-day window
-            creation_datetime=base_time - timedelta(days=30),
-            volume=50000.0 + (i * 5000),  # Volume between 50k-95k
-            volume24hr=5000.0
-            + (i * 500),  # 24hr volume between 5k-9.5k (> 1000 REQUIRED!)
-            volume1wk=15000.0 + (i * 1000),  # 1wk volume between 15k-24k
-            volume1mo=60000.0 + (i * 3000),  # 1mo volume between 60k-87k
-            volume1yr=300000.0 + (i * 10000),  # 1yr volume between 300k-390k
-            liquidity=100000.0 + (i * 5000),  # Liquidity between 100k-145k
-            markets=[market],
-            selected_market_id=None,
-        )
-
-        mock_events.append(event)
-
-    return mock_events
-
-
-@patch("predibench.polymarket_api.Market.fill_prices")
-@patch("predibench.market_selection.EventsRequestParameters.get_events")
-def test_choose_events_event_caching_e2e(mock_get_events, mock_fill_prices):
+def test_choose_events_event_caching_e2e():
     """End-to-end test for event save/load functionality."""
-    # Mock the API call to avoid rate limits
-    mock_get_events.return_value = create_mock_events()
-
-    # Create a proper wrapper function that can handle both positional and keyword args
-    def fill_prices_wrapper(*args, **kwargs):
-        pass
-
-    mock_fill_prices.side_effect = fill_prices_wrapper
 
     # Test parameters (same as used in invest.py)
     today_date = date.today()
-    event_selection_window = timedelta(days=21)
+    event_selection_window = timedelta(days=6*7)
     max_n_events = 3
 
     # Step 1: Fetch events from API
@@ -114,6 +27,7 @@ def test_choose_events_event_caching_e2e(mock_get_events, mock_fill_prices):
 
     # checking events
     nb_markets_with_prices = 0
+    nb_markets_with_many_prices = 0
     nb_markets_without_prices = 0
     assert len(selected_events) == max_n_events, (
         f"Expected {max_n_events} events, got {len(selected_events)}"
@@ -132,11 +46,13 @@ def test_choose_events_event_caching_e2e(mock_get_events, mock_fill_prices):
             )
             if market.prices is not None and len(market.prices) >= 1:
                 nb_markets_with_prices += 1
+                if len(market.prices) > 2:
+                    nb_markets_with_many_prices += 1
             else:
                 nb_markets_without_prices += 1
-    assert nb_markets_with_prices > 0
+    assert nb_markets_with_prices > 10 # NOTE: this test might fail depending on the date, but it should be enough
     assert nb_markets_without_prices == 0
-
+    assert nb_markets_with_many_prices >= nb_markets_with_prices * 0.5 # NOTE: this test might fail depending on the date, for instance if this is a very new event but it should be enough
     # Step 2: Save events to file
     cache_file = DATA_PATH / "test_events_cache.json"
     save_events_to_file(selected_events, cache_file)
@@ -230,41 +146,12 @@ def test_choose_events_event_caching_e2e(mock_get_events, mock_fill_prices):
         cache_file.unlink()
 
 
-@patch("predibench.polymarket_api.Market.fill_prices")
-@patch("predibench.market_selection.EventsRequestParameters.get_events")
-def test_choose_events_backward(mock_get_events, mock_fill_prices):
+def test_choose_events_backward():
     """Test choose_events function for backward mode."""
     # Test parameters
-    base_datetime = datetime(2025, 8, 15, tzinfo=timezone.utc)  # Fixed date for testing
-    
-    # Mock the API call to avoid rate limits - use the base date from the test
-    mock_get_events.return_value = create_mock_events(base_datetime.date())
+    base_datetime = datetime(2024, 8, 15)  # Fixed date for testing
 
-    # Mock fill_prices to avoid API calls and provide mock price data
-    def create_mock_prices(market_instance, start_datetime, end_datetime):
-        # Create mock price data as a pandas Series
-        dates = pd.date_range(start=start_datetime, end=end_datetime, freq="D")
-        prices = [
-            0.5 + 0.1 * (i % 5) for i in range(len(dates))
-        ]  # Mock price fluctuation
-        market_instance.prices = pd.Series(prices, index=dates, name="price")
-        market_instance.price_outcome_name = "Yes"
-
-    # Create a proper wrapper function that can handle both positional and keyword args
-    def fill_prices_wrapper(*args, **kwargs):
-        # Extract the market instance (self)
-        if len(args) > 0:
-            market_instance = args[0]
-            start_dt = args[1] if len(args) > 1 else kwargs.get("start_datetime")
-            end_dt = args[2] if len(args) > 2 else kwargs.get("end_datetime")
-        else:
-            # This shouldn't happen, but just in case
-            return
-        create_mock_prices(market_instance, start_dt, end_dt)
-
-    mock_fill_prices.side_effect = fill_prices_wrapper
-
-    event_selection_window = timedelta(days=7)
+    event_selection_window = timedelta(days=6*7)
     max_n_events = 3
 
     # Test 1: Normal mode (backward_mode=False)
@@ -290,7 +177,7 @@ def test_choose_events_backward(mock_get_events, mock_fill_prices):
             assert len(market.outcomes) == 2, (
                 f"Market {market.question} has {len(market.outcomes)} outcomes, expected 2"
             )
-            if market.prices is not None and len(market.prices) >= 1:
+            if market.prices is not None and len(market.prices) > 10: # NOTE: this should be enough
                 nb_markets_with_prices += 1
             else:
                 nb_markets_without_prices += 1
@@ -298,28 +185,8 @@ def test_choose_events_backward(mock_get_events, mock_fill_prices):
 
 
 def main():
-    # Note: When running main() directly, we need to handle mocking differently
-    # For pytest, the decorators will work automatically
-    def create_mock_prices(market_instance, start_datetime, end_datetime):
-        dates = pd.date_range(start=start_datetime, end=end_datetime, freq="D")
-        prices = [0.5 + 0.1 * (i % 5) for i in range(len(dates))]
-        market_instance.prices = pd.Series(prices, index=dates, name="price")
-        market_instance.price_outcome_name = "Yes"
-
-    with (
-        patch(
-            "predibench.market_selection.EventsRequestParameters.get_events"
-        ) as mock_get_events,
-        patch("predibench.polymarket_api.Market.fill_prices") as mock_fill_prices,
-    ):
-        mock_get_events.return_value = create_mock_events()
-        mock_fill_prices.side_effect = (
-            lambda self, start_datetime, end_datetime: create_mock_prices(
-                self, start_datetime, end_datetime
-            )
-        )
-        test_choose_events_event_caching_e2e(mock_get_events, mock_fill_prices)
-        test_choose_events_backward(mock_get_events, mock_fill_prices)
+    test_choose_events_backward()
+    test_choose_events_event_caching_e2e()
 
 
 if __name__ == "__main__":
