@@ -67,20 +67,14 @@ def _filter_events_by_volume_and_markets(
 def _select_markets_for_events(
     events: list[Event], base_date: date, backward_mode: bool = False
 ) -> list[Event]:
-    """Select the market with highest volume1wk that has outcomes[0] price between 0.05 and 0.95."""
+    """Keep all relevant markets for each event instead of selecting just one."""
 
     if backward_mode:
-        # In backward mode: filter events by end_date > base_date (if end_date exists) and select markets by volume
-        events_with_selected_markets = []
+        events_with_markets = []
         for event in events:
             # Filter events where end_date is after base_date, or keep if end_date doesn't exist
             if event.end_datetime is None or event.end_datetime.date() > base_date:
-                if event.selected_market_id is not None:
-                    raise ValueError(
-                        f"Event '{event.title}' already has a selected market"
-                    )
-
-                # Select market with highest volume1wk (no price constraints in backward mode)
+                # Filter markets that are still active
                 eligible_markets = [
                     market
                     for market in event.markets
@@ -89,9 +83,8 @@ def _select_markets_for_events(
                 ]
 
                 if eligible_markets:
-                    best_market = max(eligible_markets, key=lambda m: m.volumeNum)
-                    event.selected_market_id = best_market.id
-                    events_with_selected_markets.append(event)
+                    event.markets = eligible_markets  # Keep all eligible markets
+                    events_with_markets.append(event)
 
                     end_date_str = (
                         event.end_datetime.date()
@@ -99,34 +92,27 @@ def _select_markets_for_events(
                         else "no end date"
                     )
                     logger.info(
-                        f"Backward mode: Selected event '{event.title}' ending {end_date_str}"
+                        f"Backward mode: Selected event '{event.title}' ending {end_date_str} with {len(eligible_markets)} markets"
                     )
 
-        return events_with_selected_markets
+        return events_with_markets
 
-    events_with_selected_markets = []
+    events_with_markets = []
     for event in events:
-        if event.selected_market_id is not None:
-            raise ValueError(f"Event '{event.title}' already has a selected market")
-
         eligible_markets = []
         for market in event.markets:
             if (
-                market.volume1wk is not None
-                and market.outcomes
+                market.outcomes
                 and len(market.outcomes) > 0
-                and 0.05 < market.outcomes[0].price < 0.95
             ):
                 eligible_markets.append(market)
 
         if eligible_markets:
-            best_market = max(
-                eligible_markets, key=lambda m: m.volume1wk
-            )
-            event.selected_market_id = best_market.id
-            events_with_selected_markets.append(event)
+            event.markets = eligible_markets  # Keep all eligible markets
+            events_with_markets.append(event)
+            logger.info(f"Event '{event.title}' has {len(eligible_markets)} eligible markets")
 
-    return events_with_selected_markets
+    return events_with_markets
 
 
 def choose_events(
