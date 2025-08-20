@@ -201,8 +201,8 @@ class _RequestParameters(BaseModel):
     volume_num_max: float | None = None
     start_date_min: datetime | None = None
     start_date_max: datetime | None = None
-    end_datetime_min: datetime | None = None
-    end_datetime_max: datetime | None = None
+    end_date_min: datetime | None = None # NOTE: it is a datetime but in the API it must be a date, see https://docs.polymarket.com/developers/gamma-markets-api/get-events
+    end_date_max: datetime | None = None
     tag_id: int | None = None
     related_tags: bool | None = None
 
@@ -245,16 +245,16 @@ class MarketsRequestParameters(_RequestParameters):
         response.raise_for_status()
         output = response.json()
         markets = [Market.from_json(market) for market in output]
-        if self.end_datetime_min and self.end_datetime_max:
+        if self.end_date_min and self.end_date_max:
             filtered_markets = []
             excluded_count = 0
             for market in markets:
                 assert market is not None
                 if (
                     not (
-                        self.end_datetime_min
+                        self.end_date_min
                         <= market.end_datetime
-                        <= self.end_datetime_max
+                        <= self.end_date_max
                     )
                     and market.end_datetime is not None
                 ):

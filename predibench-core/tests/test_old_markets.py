@@ -35,8 +35,8 @@ def test_market_request_for_old_closed_markets():
         limit=20,
         closed=True,
         active=False,
-        end_datetime_min=end_datetime_min,
-        end_datetime_max=end_datetime_max,
+        end_date_min=end_datetime_min,
+        end_date_max=end_datetime_max,
         order="volumeNum",
         ascending=False,
     )
