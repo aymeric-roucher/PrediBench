@@ -11,7 +11,7 @@
         "source": "/api/**",
         "run": {
           "serviceId": "predibench-fastapi",
-          "region": "us-east1"
+          "region": "europe-west1"
         }
       },
       {
