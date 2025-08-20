@@ -41,26 +41,32 @@ def _create_market_investment_decisions(
             betting_decision = BettingResult(
                 direction="nothing",
                 amount=0.0,
-                reasoning=f"Market is closed. Original reasoning: {market_decision.betting_decision.reasoning}"
+                reasoning=f"Market is closed. Original reasoning: {market_decision.reasoning}"
             )
             result = MarketInvestmentResult(
                 market_id=market_info["id"],
                 market_question=market_info["question"],
                 probability_assessment=market_decision.probability_assessment,
-                market_odds=market_decision.market_odds,
+                market_odds=market_info["current_price"] or 0.5,
                 confidence_in_assessment=market_decision.confidence_in_assessment,
                 betting_decision=betting_decision,
                 market_price=market_info["current_price"],
                 is_closed=True,
             )
         else:
+            from predibench.agent.dataclasses import BettingResult
+            betting_decision = BettingResult(
+                direction=market_decision.direction,
+                amount=market_decision.amount,
+                reasoning=market_decision.reasoning
+            )
             result = MarketInvestmentResult(
                 market_id=market_info["id"],
                 market_question=market_info["question"],
                 probability_assessment=market_decision.probability_assessment,
-                market_odds=market_decision.market_odds,
+                market_odds=market_info["current_price"] or 0.5,
                 confidence_in_assessment=market_decision.confidence_in_assessment,
-                betting_decision=market_decision.betting_decision,
+                betting_decision=betting_decision,
                 market_price=market_info["current_price"],
                 is_closed=False,
             )
@@ -157,8 +163,7 @@ def _process_event_investment(
     target_date: date,
     date_output_path: Path | None,
     timestamp_for_saving: str,
-    main_market_price_history_limit: int = 200,
-    other_markets_price_history_limit: int = 20,
+    price_history_limit: int = 20,
 ) -> EventInvestmentResult:
     """Process investment decisions for all relevant markets."""
     logger.info(f"Processing event: {event.title} with {len(event.markets)} markets")
@@ -174,7 +179,7 @@ def _process_event_investment(
             )
 
         # Use shorter price history for all markets to keep context manageable
-        price_limit = other_markets_price_history_limit
+        price_limit = price_history_limit
 
         # Check if market is closed and get price data
         if market.prices is not None and target_date in market.prices.index:
@@ -234,22 +239,33 @@ Date: {target_date.strftime("%B %d, %Y")}
 
 Event: {event.title}
 
-You have access to {len(market_data)} markets related to this event. For EACH market you want to bet on, you need to provide:
+You have access to {len(market_data)} markets related to this event. You must allocate your capital across these markets.
 
-1. probability_assessment: Your assessment of the true probability (0.0 to 1.0)
-2. market_odds: The current market price/odds (0.0 to 1.0) 
-3. confidence_in_assessment: How confident you are in your assessment (0.0 to 1.0)
-4. betting_decision: 
-   - direction: "buy_yes" (bet outcome happens), "buy_no" (bet outcome doesn't happen), or "nothing" (don't bet)
-   - amount: Fraction of allocated capital to bet (0.0 to 1.0)
-   - reasoning: Explanation for your decision
+CAPITAL ALLOCATION RULES:
+- You have exactly 1.0 units of capital to allocate
+- For each market, specify the fraction of capital to bet (0.0 to 1.0)
+- The sum of ALL amounts + unallocated_capital MUST equal 1.0
+- You can choose not to bet on markets with poor edges by setting direction="nothing" and amount=0.0
+- Any unallocated capital should be specified in the unallocated_capital parameter
+
+For EACH market, provide:
+1. market_id: The market ID
+2. reasoning: Explanation for your decision
+3. probability_assessment: Your assessment of the true probability (0.0 to 1.0)  
+4. confidence_in_assessment: How confident you are in your assessment (0.0 to 1.0)
+5. direction: "buy_yes" (bet outcome happens), "buy_no" (bet outcome doesn't happen), or "nothing" (don't bet)
+6. amount: Fraction of total capital to bet on this market (0.0 to 1.0)
 
 AVAILABLE MARKETS:
 {"".join(market_summaries)}
 
-Use the final_answer tool to provide your decisions. You can bet on multiple markets or skip markets you're not confident about.
+Use the final_answer tool to provide your decisions. Remember:
+- The prices shown are for the specific outcome mentioned
+- "buy_yes" means you think that outcome is more likely than the current price suggests
+- "buy_no" means you think it's less likely than the current price suggests
+- Your total capital allocation (sum of amounts + unallocated_capital) must equal 1.0
 
-Note: The prices shown are for the specific outcome mentioned. "buy_yes" means you think that outcome is more likely than the current price suggests. "buy_no" means you think it's less likely.
+Example: If you bet 0.3 on market A, 0.2 on market B, and nothing on market C, your unallocated_capital should be 0.5.
     """
 
     # Save prompt to file if date_output_path is provided
@@ -266,27 +282,38 @@ Note: The prices shown are for the specific outcome mentioned. "buy_yes" means y
 
     # Get agent decisions using smolagents
     if isinstance(model, str) and model == "test_random":
-        # Create random decisions for all markets
+        # Create random decisions for all markets with capital allocation constraint
         from predibench.agent.smolagents_utils import MarketDecision
-        from predibench.agent.dataclasses import BettingResult
         
         market_decisions = []
-        for market_info in market_data.values():
+        remaining_capital = 1.0
+        
+        market_ids = list(market_data.keys())
+        for i, market_info in enumerate(market_data.values()):
             direction = np.random.choice(["buy_yes", "buy_no", "nothing"], p=[0.3, 0.3, 0.4])
-            amount = np.random.uniform(0.1, 0.5) if direction != "nothing" else 0.0
             
-            betting_decision = BettingResult(
-                direction=direction,
-                amount=amount,
-                reasoning=f"Random decision for testing market {market_info['id']}"
-            )
+            # For the last market, use all remaining capital if betting, otherwise leave some unallocated
+            is_last_market = (i == len(market_ids) - 1)
+            if direction != "nothing":
+                if is_last_market:
+                    # Use up to remaining capital for last market
+                    max_amount = min(remaining_capital, 0.5)
+                    amount = np.random.uniform(0.0, max_amount) if max_amount > 0 else 0.0
+                else:
+                    # Leave some capital for future markets
+                    max_amount = min(remaining_capital * 0.6, 0.4)  # Use at most 60% of remaining, cap at 40%
+                    amount = np.random.uniform(0.0, max_amount) if max_amount > 0 else 0.0
+                remaining_capital -= amount
+            else:
+                amount = 0.0
             
             market_decision = MarketDecision(
                 market_id=market_info["id"],
+                reasoning=f"Random decision for testing market {market_info['id']}",
                 probability_assessment=np.random.uniform(0.1, 0.9),
-                market_odds=market_info["current_price"] or 0.5,
                 confidence_in_assessment=np.random.uniform(0.3, 0.8),
-                betting_decision=betting_decision
+                direction=direction,
+                amount=amount
             )
             market_decisions.append(market_decision)
         

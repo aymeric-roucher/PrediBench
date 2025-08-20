@@ -22,7 +22,6 @@ from tenacity import (
 from typing import Literal
 
 
-from predibench.agent.dataclasses import BettingResult
 
 
 class MarketDecision(BaseModel):
@@ -124,7 +123,7 @@ class GoogleSearchTool(Tool):
 
 
 @tool
-def final_answer(market_decisions: list[dict]) -> EventDecisions:
+def final_answer(market_decisions: list[dict], unallocated_capital: float) -> EventDecisions:
     """
     This tool is used to validate and return the final event decisions for all relevant markets.
 
@@ -133,38 +132,47 @@ def final_answer(market_decisions: list[dict]) -> EventDecisions:
     Args:
         market_decisions (list[dict]): List of market decisions. Each dict should contain:
             - market_id (str): The market ID
+            - reasoning (str): Reasoning for the decision
             - probability_assessment (float): Your probability assessment (0.0 to 1.0)
-            - market_odds (float): Current market odds (0.0 to 1.0)
             - confidence_in_assessment (float): Your confidence level (0.0 to 1.0)
-            - betting_decision (dict): Contains direction ("buy_yes"/"buy_no"/"nothing"), amount (0.0-1.0), reasoning (str)
+            - direction (str): "buy_yes", "buy_no", or "nothing"
+            - amount (float): Fraction of allocated capital (0.0 to 1.0)
+        unallocated_capital (float): Fraction of capital not allocated to any bet (0.0 to 1.0)
 
     Returns:
         EventDecisions: The validated EventDecisions object, raises error if invalid.
     """
     validated_decisions = []
+    total_allocated = 0.0
+    
     for decision_dict in market_decisions:
-        # Validate betting decision
-        betting_dict = decision_dict["betting_decision"]
-        assert betting_dict["direction"] in ["buy_yes", "buy_no", "nothing"], (
+        # Validate market decision fields
+        assert decision_dict["direction"] in ["buy_yes", "buy_no", "nothing"], (
             "Invalid direction, must be buy_yes, buy_no, or nothing"
         )
-        assert 0.0 <= betting_dict["amount"] <= 1.0, "Amount must be between 0.0 and 1.0"
-        assert len(betting_dict["reasoning"]) > 0, "Reasoning must be non-empty"
+        assert 0.0 <= decision_dict["amount"] <= 1.0, "Amount must be between 0.0 and 1.0"
+        assert len(decision_dict["reasoning"]) > 0, "Reasoning must be non-empty"
+        assert 0.0 <= decision_dict["probability_assessment"] <= 1.0, "Probability assessment must be between 0.0 and 1.0"
+        assert 0.0 <= decision_dict["confidence_in_assessment"] <= 1.0, "Confidence must be between 0.0 and 1.0"
         
-        betting_decision = BettingResult(
-            direction=betting_dict["direction"],
-            amount=betting_dict["amount"],
-            reasoning=betting_dict["reasoning"]
-        )
+        # Only count non-nothing bets toward total allocation
+        if decision_dict["direction"] != "nothing":
+            total_allocated += decision_dict["amount"]
         
         market_decision = MarketDecision(
             market_id=decision_dict["market_id"],
+            reasoning=decision_dict["reasoning"],
             probability_assessment=decision_dict["probability_assessment"],
-            market_odds=decision_dict["market_odds"],
             confidence_in_assessment=decision_dict["confidence_in_assessment"],
-            betting_decision=betting_decision
+            direction=decision_dict["direction"],
+            amount=decision_dict["amount"]
         )
         validated_decisions.append(market_decision)
+    
+    # Validate that total allocation adds up to 1.0
+    assert 0.0 <= unallocated_capital <= 1.0, "Unallocated capital must be between 0.0 and 1.0"
+    total_capital_used = total_allocated + unallocated_capital
+    assert abs(total_capital_used - 1.0) < 0.001, f"Total capital allocation must equal 1.0, got {total_capital_used:.3f} (allocated: {total_allocated:.3f}, unallocated: {unallocated_capital:.3f})"
     
     return EventDecisions(market_decisions=validated_decisions)
 
@@ -233,10 +241,13 @@ def run_deep_research(
         
         You must provide a list of market decisions. Each decision should include:
         1. market_id: The ID of the market
-        2. probability_assessment: Your probability assessment (0.0 to 1.0)
-        3. market_odds: Current market odds (0.0 to 1.0)
+        2. reasoning: Your reasoning for this decision
+        3. probability_assessment: Your probability assessment (0.0 to 1.0)
         4. confidence_in_assessment: Your confidence level (0.0 to 1.0)
-        5. betting_decision with direction ("buy_yes"/"buy_no"/"nothing"), amount (0.0-1.0), and reasoning
+        5. direction: "buy_yes", "buy_no", or "nothing"
+        6. amount: Fraction of capital to bet (0.0 to 1.0)
+        
+        The sum of all amounts must not exceed 1.0.
     """)
 
     structured_output = structured_model.generate(
