@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from smolagents.models import ApiModel
 
 from predibench.agent.runner import ModelInvestmentResult, run_agent_investments
-from predibench.common import DATA_PATH, ENV_VAR_HF_TOKEN
+from predibench.common import DATA_PATH, HUGGINFACE_API_KEY
 from predibench.logger_config import get_logger
 from predibench.market_selection import choose_events
 from predibench.polymarket_data import load_events_from_file
@@ -27,7 +27,7 @@ def run_investments_for_specific_date(
     cache_file_path: Path | None = None,
     load_from_cache: bool = False,
     filter_crypto_events: bool = True,
-    dataset_name: str = "m-ric/predibench-agent-choices",
+    dataset_name: str = "charles-azam/predibench",
     split: str = "test",
 ) -> list[ModelInvestmentResult]:
     """Run event-based investment simulation with multiple AI models."""
@@ -59,7 +59,7 @@ def run_investments_for_specific_date(
         logger.info(f"  - {event.title} (Volume: ${event.volume:,.0f})")
 
     timestamp = get_timestamp_string()
-    hf_token = os.getenv(ENV_VAR_HF_TOKEN)
+    hf_token = os.getenv(HUGGINFACE_API_KEY)
 
     results = run_agent_investments(
         models=models,
@@ -80,7 +80,7 @@ def run_investments_for_specific_date(
 if __name__ == "__main__":
     # Test with random model to verify new output format
     models = [
-        InferenceClientModelWithRetry(model_id="openai/gpt-oss-120b"),
+        "test_random",  # Use test model for verification
     ]
 
     results = run_investments_for_specific_date(

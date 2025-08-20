@@ -3,6 +3,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 import numpy as np
+import datasets
 from datasets import Dataset, concatenate_datasets, load_dataset
 from dotenv import load_dotenv
 from predibench.agent.dataclasses import (
@@ -79,12 +80,17 @@ def _upload_results_to_hf_dataset(
     results_per_model: list[ModelInvestmentResult],
     target_date: date,
     hf_token: str,
-    dataset_name: str = "m-ric/predibench-agent-choices",
+    dataset_name: str = "charles-azam/predibench",
     split: str = "train",
+    erase_existing: bool = False,
 ) -> None:
     """Upload investment results to the Hugging Face dataset."""
-    # Load the existing dataset
-    ds = load_dataset(dataset_name)
+    # Try to load the existing dataset, handle empty dataset case
+    try:
+        ds = load_dataset(dataset_name)
+    except datasets.data_files.EmptyDatasetError:
+        logger.info(f"Dataset {dataset_name} is empty, will create with new data")
+        ds = None
 
     # Prepare new data rows
     new_rows = []
@@ -99,20 +105,39 @@ def _upload_results_to_hf_dataset(
                 choice = choice_mapping.get(market_decision.betting_decision.direction, -1)
 
                 row = {
-                    "agent_name": model_result.model_id,
-                    "date": target_date,
-                    "question": market_decision.market_question,
-                    "choice": choice,
-                    "choice_raw": market_decision.betting_decision.direction,
+                    # ModelInvestmentResult fields
+                    "model_id": model_result.model_id,
+                    "agent_name": model_result.model_id,  # Keep for backward compatibility
+                    "target_date": model_result.target_date,
+                    "date": target_date,  # Keep for backward compatibility
+                    
+                    # EventInvestmentResult fields
+                    "event_id": event_result.event_id,
+                    "event_title": event_result.event_title,
+                    "event_description": event_result.event_description,
+                    
+                    # MarketInvestmentResult fields
                     "market_id": market_decision.market_id,
-                    "messages_count": 0,  # This would need to be tracked during agent execution
-                    "has_reasoning": market_decision.betting_decision.reasoning is not None,
-                    "timestamp_uploaded": current_timestamp,
-                    "rationale": market_decision.betting_decision.reasoning or "",
+                    "market_question": market_decision.market_question,
+                    "question": market_decision.market_question,  # Keep for backward compatibility
                     "probability_assessment": market_decision.probability_assessment,
                     "market_odds": market_decision.market_odds,
                     "confidence_in_assessment": market_decision.confidence_in_assessment,
+                    "market_price": market_decision.market_price,
+                    "is_closed": market_decision.is_closed,
+                    
+                    # BettingResult fields
+                    "betting_direction": market_decision.betting_decision.direction,
+                    "choice_raw": market_decision.betting_decision.direction,  # Keep for backward compatibility
                     "betting_amount": market_decision.betting_decision.amount,
+                    "betting_reasoning": market_decision.betting_decision.reasoning,
+                    "rationale": market_decision.betting_decision.reasoning or "",  # Keep for backward compatibility
+                    
+                    # Legacy/computed fields
+                    "choice": choice,
+                    "messages_count": 0,  # This would need to be tracked during agent execution
+                    "has_reasoning": market_decision.betting_decision.reasoning is not None,
+                    "timestamp_uploaded": current_timestamp,
                 }
                 new_rows.append(row)
 
@@ -121,13 +146,23 @@ def _upload_results_to_hf_dataset(
         new_dataset = Dataset.from_list(new_rows)
         # Concatenate with existing dataset using datasets.concatenate_datasets
 
-        # Check if split exists, if not use empty dataset
-        try:
-            existing_data = ds[split]
-        except KeyError:
-            existing_data = Dataset.from_list([])
-
-        combined_dataset = concatenate_datasets([existing_data, new_dataset])
+        # Handle dataset combination based on erase_existing flag
+        if erase_existing or ds is None:
+            # Either erasing existing data or dataset is empty, just use new data
+            combined_dataset = new_dataset
+            if erase_existing:
+                logger.info(f"Erasing existing dataset and creating fresh dataset with {len(new_dataset)} rows")
+            else:
+                logger.info(f"Dataset is empty, creating with {len(new_dataset)} rows")
+        else:
+            try:
+                existing_data = ds[split]
+                combined_dataset = concatenate_datasets([existing_data, new_dataset])
+                logger.info(f"Appending {len(new_dataset)} rows to existing {len(existing_data)} rows")
+            except KeyError:
+                # Split doesn't exist, just use new data
+                combined_dataset = new_dataset
+                logger.info(f"Split '{split}' doesn't exist, creating with {len(new_dataset)} rows")
 
         # Push back to hub as a pull request (safer approach)
         combined_dataset.push_to_hub(
