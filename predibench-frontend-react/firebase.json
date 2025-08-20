@@ -10,8 +10,8 @@
       {
         "source": "/api/**",
         "run": {
-          "serviceId": "predibench-fastapi-273710233257",
-          "region": "us-east1"
+          "serviceId": "rmgpgab-predibench-fastapi-europe-west1-Sibyllic-PrediBench-diz",
+          "region": "global"
         }
       },
       {
