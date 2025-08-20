@@ -277,7 +277,6 @@ class MarketsRequestParameters(_RequestParameters):
 
 class _HistoricalTimeSeriesRequestParameters(BaseModel):
     market_id: str
-    start_datetime: datetime | None = None
     end_datetime: datetime | None = None
 
     @retry(

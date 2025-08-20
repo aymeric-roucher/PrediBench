@@ -70,7 +70,6 @@ def test_price_series_retrieval_over_several_months():
         # Use the existing function with proper parameters
         timeseries_request_parameters = _HistoricalTimeSeriesRequestParameters(
             market_id=market_data["token_id"],
-            start_datetime=start_datetime,
             end_datetime=end_datetime,
         )
 
