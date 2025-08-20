@@ -1,0 +1,14 @@
+[project]
+name = "predibench-backend"
+version = "1.0.0"
+description = "Polymarket LLM Benchmark API"
+dependencies = [
+    "fastapi==0.104.1",
+    "uvicorn[standard]==0.24.0",
+    "pydantic==2.5.0",
+    "python-multipart==0.0.6",
+]
+requires-python = ">=3.11"
+
+[tool.uv]
+dev-dependencies = []
