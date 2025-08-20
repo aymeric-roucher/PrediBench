@@ -9,7 +9,7 @@ from smolagents import (
     ChatMessage,
     LiteLLMModel,
     Tool,
-    CodeAgent,
+    ToolCallingAgent,
     VisitWebpageTool,
     tool,
 )
@@ -200,7 +200,7 @@ The final_answer tool must contain the arguments rationale and decision.
         VisitWebpageTool(),
         final_answer,
     ]
-    agent = CodeAgent(
+    agent = ToolCallingAgent(
         tools=tools, model=model, max_steps=max_steps, return_full_result=True
     )
 

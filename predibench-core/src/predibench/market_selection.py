@@ -65,7 +65,7 @@ def _filter_events_by_volume_and_markets(
 
 
 def _select_markets_for_events(
-    events: list[Event], base_date: date, backward_mode: bool = False, min_price: float = 0.01, max_price: float = 0.99
+    events: list[Event], base_date: date, backward_mode: bool = False
 ) -> list[Event]:
     """Keep all relevant markets for each event instead of selecting just one."""
 
@@ -102,10 +102,8 @@ def _select_markets_for_events(
         eligible_markets = []
         for market in event.markets:
             if (
-                market.volume24hr is not None
-                and market.outcomes
+                market.outcomes
                 and len(market.outcomes) > 0
-                and min_price < market.outcomes[0].price < max_price
             ):
                 eligible_markets.append(market)
 

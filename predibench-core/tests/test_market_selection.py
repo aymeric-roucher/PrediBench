@@ -185,8 +185,8 @@ def test_choose_events_backward():
 
 
 def main():
-    test_choose_events_backward()
     test_choose_events_event_caching_e2e()
+    test_choose_events_backward()
 
 
 if __name__ == "__main__":

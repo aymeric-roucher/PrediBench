@@ -177,10 +177,6 @@ def _process_event_investment(
             raise ValueError(
                 "markets are supposed to be filtered, this should not be possible"
             )
-
-        # Use shorter price history for all markets to keep context manageable
-        price_limit = price_history_limit
-
         # Check if market is closed and get price data
         if market.prices is not None and target_date in market.prices.index:
             if backward_mode:
@@ -188,8 +184,8 @@ def _process_event_investment(
             else:
                 price_data = market.prices.dropna()
             # Limit price history
-            if len(price_data) > price_limit:
-                price_data = price_data.tail(price_limit)
+            if len(price_data) > price_history_limit:
+                price_data = price_data.tail(price_history_limit)
             recent_prices = price_data.to_string(index=True, header=False)
             current_price = float(market.prices.loc[target_date])
             is_closed = False
@@ -198,8 +194,8 @@ def _process_event_investment(
             if market.prices is not None and len(market.prices) > 0:
                 price_data = market.prices.dropna()
                 # Limit price history
-                if len(price_data) > price_limit:
-                    price_data = price_data.tail(price_limit)
+                if len(price_data) > price_history_limit:
+                    price_data = price_data.tail(price_history_limit)
                 recent_prices = price_data.to_string(index=True, header=False)
                 current_price = float(market.prices.dropna().iloc[-1])
             else:
