@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from predibench.date_utils import is_backward_mode
 from predibench.logger_config import get_logger
 from predibench.polymarket_api import (
     Event,
@@ -140,7 +141,7 @@ def choose_events(
     if True, then events ending around this date will be selected, but those events are probably closed, we can't use the volume24hr to filter out the events that are open.
 
     """
-    backward_mode = target_date != date.today()
+    backward_mode = is_backward_mode(target_date)
     end_date = target_date + time_until_ending
     start_datetime, end_datetime = (
         datetime.combine(target_date, datetime.min.time()),

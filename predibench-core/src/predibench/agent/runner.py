@@ -15,6 +15,7 @@ from predibench.agent.smolagents_utils import (
     run_deep_research,
     run_smolagents,
 )
+from predibench.date_utils import is_backward_mode
 from predibench.logger_config import get_logger
 from predibench.polymarket_api import Event
 from predibench.storage_utils import write_to_storage
@@ -136,7 +137,7 @@ def _process_event_investment(
 ) -> EventInvestmentResult:
     """Process investment decision for selected market."""
     logger.info(f"Processing event: {event.title} with selected market")
-    backward_mode = target_date != date.today()
+    backward_mode = is_backward_mode(target_date)
 
     if not event.selected_market_id:
         raise ValueError(
