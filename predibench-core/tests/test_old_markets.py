@@ -72,7 +72,6 @@ def test_price_series_retrieval_over_several_months():
             market_id=market_data["token_id"],
             start_datetime=start_datetime,
             end_datetime=end_datetime,
-            interval="1d",
         )
 
         # Use the method from the request object

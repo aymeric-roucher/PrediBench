@@ -161,17 +161,14 @@ def choose_events(
     filtered_events = _filter_events_by_volume_and_markets(
         events=events, min_volume=min_volume, backward_mode=backward_mode
     )
+    filtered_events = filtered_events[: n_events + int(n_events * 0.2 +1)] # NOTE: a few events might be missing prices and will be removed later so we add a few more events to be sure to have enough
 
     for event in filtered_events:
         for market in event.markets:
             if backward_mode:
-                market.fill_prices(
-                    start_datetime=start_datetime, end_datetime=end_datetime
-                )
+                market.fill_prices(end_datetime=end_datetime)
             else:
-                market.fill_prices(
-                    start_datetime=start_datetime, end_datetime=end_datetime
-                )
+                market.fill_prices()
 
     filtered_events = _remove_markets_without_prices_in_events(filtered_events)
 
