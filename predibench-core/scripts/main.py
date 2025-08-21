@@ -1,5 +1,5 @@
 import os
-from datetime import timedelta
+from datetime import date, timedelta
 
 import typer
 from predibench.common import DATA_PATH, ENV_VAR_HF_TOKEN
@@ -65,6 +65,7 @@ def main(
     logger.info(f"Starting investment analysis with model: {model_name}")
 
     results = run_investments_for_specific_date(
+        target_date=date.today(),
         time_until_ending=timedelta(days=days_ahead),
         max_n_events=max_events,
         models=models,
