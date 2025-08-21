@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pandas as pd
 import requests
@@ -216,10 +216,12 @@ class _RequestParameters(BaseModel):
     liquidity_num_max: float | None = None
     volume_num_min: float | None = None
     volume_num_max: float | None = None
-    start_date_min: datetime | None = None
-    start_date_max: datetime | None = None
-    end_date_min: datetime | None = None # NOTE: it is a datetime but in the API it must be a date, see https://docs.polymarket.com/developers/gamma-markets-api/get-events
-    end_date_max: datetime | None = None
+    start_date_min: date | None = None
+    start_date_max: date | None = None
+    end_date_min: date | None = (
+        None  # NOTE: In the API it must be a date, see https://docs.polymarket.com/developers/gamma-markets-api/get-events
+    )
+    end_date_max: date | None = None
     tag_id: int | None = None
     related_tags: bool | None = None
 
@@ -257,11 +259,7 @@ class MarketsRequestParameters(_RequestParameters):
             for market in markets:
                 assert market is not None
                 if (
-                    not (
-                        self.end_date_min
-                        <= market.end_datetime
-                        <= self.end_date_max
-                    )
+                    not (self.end_date_min <= market.end_datetime <= self.end_date_max)
                     and market.end_datetime is not None
                 ):
                     excluded_count += 1
