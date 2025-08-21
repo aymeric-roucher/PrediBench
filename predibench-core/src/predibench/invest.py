@@ -66,14 +66,15 @@ def run_investments_for_specific_date(
         logger.info(f"  - {event.title} (Volume: ${event.volume:,.0f})")
 
     for model in models:
-        if model.startswith("openai/"):
-            models[models.index(model)] = OpenAIModelWithRetry(
-                model_id=model[len("openai/") :]
-            )
-        elif model.startswith("huggingface/"):
-            models[models.index(model)] = InferenceClientModelWithRetry(
-                model_id=model[len("huggingface/") :]
-            )
+        if isinstance(model, str):
+            if model.startswith("openai/"):
+                models[models.index(model)] = OpenAIModelWithRetry(
+                    model_id=model[len("openai/") :]
+                )
+            elif model.startswith("huggingface/"):
+                models[models.index(model)] = InferenceClientModelWithRetry(
+                    model_id=model[len("huggingface/") :]
+                )
 
     results = run_agent_investments(
         models=models,
