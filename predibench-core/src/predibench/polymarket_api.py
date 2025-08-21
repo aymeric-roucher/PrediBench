@@ -259,7 +259,11 @@ class MarketsRequestParameters(_RequestParameters):
             for market in markets:
                 assert market is not None
                 if (
-                    not (self.end_date_min <= market.end_datetime <= self.end_date_max)
+                    not (
+                        self.end_date_min
+                        <= market.end_datetime.date()
+                        <= self.end_date_max
+                    )
                     and market.end_datetime is not None
                 ):
                     excluded_count += 1
