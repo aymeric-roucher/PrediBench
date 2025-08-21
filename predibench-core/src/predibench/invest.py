@@ -34,7 +34,7 @@ def run_investments_for_specific_date(
     cache_file_path: Path | None = None,
     load_from_cache: bool = False,
     filter_crypto_events: bool = True,
-    dataset_name: str = "m-ric/predibench-agent-decisions-2",
+    dataset_name: str = "Sibyllic/predibench",
     split: str = "test",
 ) -> list[ModelInvestmentDecisions]:
     """Run event-based investment simulation with multiple AI models."""
@@ -94,8 +94,8 @@ def run_investments_for_specific_date(
 if __name__ == "__main__":
     # Test with random model to verify new output format
     models = [
-        "test_random",  # Use test model for verification
-        "openai/gpt-4.1-mini",
+        "huggingface/openai/gpt-oss-120b",  # Use test model for verification
+        "huggingface/openai/gpt-oss-20b",  # Use test model for verification
     ]
 
     results = run_investments_for_specific_date(
