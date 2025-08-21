@@ -1,7 +1,5 @@
 import os
-import random
-import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import List
 
 import numpy as np
@@ -9,15 +7,8 @@ import pandas as pd
 from datasets import load_dataset
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-
-# Add predibench-core to path
-sys.path.append("../predibench-core/src")
-sys.path.append("/Users/aymeric/Documents/Code/predibench/predibench-core/src")
-sys.path.append(os.path.join(os.path.dirname(__file__), "../predibench-core/src"))
-
-# Import predibench modules - no fallback
 from predibench.pnl import get_pnls
+from pydantic import BaseModel
 
 print("Successfully imported predibench modules")
 
@@ -39,19 +30,19 @@ app.add_middleware(
 
 
 # Configuration
-AGENT_CHOICES_REPO = "m-ric/predibench-agent-choices"
+AGENT_CHOICES_REPO = "charles-azam/predibench"
 
 
 # Data models
 class PerformanceHistory(BaseModel):
     date: str
-    score: float
+    cumulative_pnl: float
 
 
 class LeaderboardEntry(BaseModel):
     id: str
     model: str
-    score: float
+    final_cumulative_pnl: float
     accuracy: float
     trades: int
     profit: int
@@ -72,8 +63,8 @@ class SimpleEvent(BaseModel):
 
 
 class Stats(BaseModel):
-    topScore: float
-    avgAccuracy: float
+    topFinalCumulativePnl: float
+    avgPnl: float
     totalTrades: int
     totalProfit: int
 
@@ -81,7 +72,7 @@ class Stats(BaseModel):
 # Real data loading functions
 def load_agent_choices():
     """Load agent choices from HuggingFace dataset"""
-    dataset = load_dataset(AGENT_CHOICES_REPO, split="train")
+    dataset = load_dataset(AGENT_CHOICES_REPO, split="test")
     dataset = dataset.to_pandas()
     return dataset.sort_values("date")
 
@@ -118,7 +109,7 @@ def calculate_real_performance():
         for date_idx, pnl_value in cumulative_pnl.items():
             performance_history.append(
                 PerformanceHistory(
-                    date=date_idx.strftime("%Y-%m-%d"), score=float(pnl_value)
+                    date=date_idx.strftime("%Y-%m-%d"), cumulative_pnl=float(pnl_value)
                 )
             )
 
@@ -157,24 +148,6 @@ def calculate_real_performance():
     return agents_performance
 
 
-# Mock data generation (fallback)
-def generate_performance_history(
-    base_score: float, days: int = 5
-) -> List[PerformanceHistory]:
-    history = []
-    current_score = base_score - random.uniform(3, 8)
-    base_date = datetime.now() - timedelta(days=days - 1)
-
-    for i in range(days):
-        date_str = (base_date + timedelta(days=i)).strftime("%Y-%m-%d")
-        variation = random.uniform(-1.5, 2.0) if i > 0 else 0
-        current_score = max(0, min(100, current_score + variation))
-
-        history.append(PerformanceHistory(date=date_str, score=round(current_score, 1)))
-
-    return history
-
-
 # Generate leaderboard from real data only
 def get_leaderboard() -> List[LeaderboardEntry]:
     real_performance = calculate_real_performance()
@@ -204,7 +177,7 @@ def get_leaderboard() -> List[LeaderboardEntry]:
         entry = LeaderboardEntry(
             id=str(i + 1),
             model=agent_name.replace("smolagent_", "").replace("--", "/"),
-            score=metrics["final_cumulative_pnl"],
+            final_cumulative_pnl=metrics["final_cumulative_pnl"],
             accuracy=metrics["accuracy"],
             trades=metrics["total_trades"],
             profit=int(metrics["final_cumulative_pnl"] * 1000),  # Convert to dollars
@@ -251,54 +224,9 @@ def get_events() -> List[SimpleEvent]:
     )
 
     print(f"Found {len(market_activity)} unique markets with activity")
+    events = []
 
-    # Create events based on the market IDs that have activity
-    simple_events = []
-    for idx, market in market_activity.head(
-        15
-    ).iterrows():  # Top 15 most active markets
-        market_id = market["market_id"]
-
-        # Get a sample of predictions for this market to generate title/description
-        market_data = df[df["market_id"] == market_id].iloc[0]
-
-        # Create a simplified event based on market activity
-        probability = max(
-            0.1, min(0.9, (market["avg_sentiment"] + 1) / 2)
-        )  # Convert from -1,1 to 0,1
-
-        # Try to infer category from market ID pattern or use default
-        category = "Prediction Markets"
-        if any(
-            word in str(market_id).lower()
-            for word in ["election", "trump", "biden", "president"]
-        ):
-            category = "Politics"
-        elif any(
-            word in str(market_id).lower() for word in ["bitcoin", "crypto", "eth"]
-        ):
-            category = "Crypto"
-        elif any(word in str(market_id).lower() for word in ["ai", "tech"]):
-            category = "Technology"
-        elif any(word in str(market_id).lower() for word in ["nfl", "nba", "sports"]):
-            category = "Sports"
-
-        simple_event = SimpleEvent(
-            id=str(market_id),
-            title=f"Market {str(market_id)[:20]}...",  # Abbreviated market ID
-            description=f"{market['num_agents']} models made {market['total_bets']} predictions on this market",
-            probability=probability,
-            volume=int(
-                market["total_bets"] * 1000
-            ),  # Simulate volume based on activity
-            endDate=market["last_bet_date"].strftime("%Y-%m-%d"),
-            category=category,
-            status="active",
-        )
-        simple_events.append(simple_event)
-
-    print(f"Created {len(simple_events)} events from market activity")
-    return simple_events
+    return events
 
 
 # API Endpoints
@@ -325,8 +253,9 @@ async def get_stats():
     leaderboard = get_leaderboard()
 
     return Stats(
-        topScore=max(entry.score for entry in leaderboard),
-        avgAccuracy=sum(entry.accuracy for entry in leaderboard) / len(leaderboard),
+        topFinalCumulativePnl=max(entry.final_cumulative_pnl for entry in leaderboard),
+        avgPnl=sum(entry.final_cumulative_pnl for entry in leaderboard)
+        / len(leaderboard),
         totalTrades=sum(entry.trades for entry in leaderboard),
         totalProfit=sum(entry.profit for entry in leaderboard),
     )
@@ -462,5 +391,5 @@ if __name__ == "__main__":
 
     import uvicorn
 
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 8081))
     uvicorn.run(app, host="0.0.0.0", port=port)
