@@ -63,9 +63,6 @@ def test_price_series_retrieval_over_several_months():
         print(f"\nTesting market {i + 1}: {market_data['question']}")
 
         end_datetime = datetime.fromisoformat(market_data["end_date"].replace("Z", ""))
-        start_datetime = datetime.fromisoformat(
-            market_data["start_date"].replace("Z", "")
-        )
 
         # Use the existing function with proper parameters
         timeseries_request_parameters = _HistoricalTimeSeriesRequestParameters(

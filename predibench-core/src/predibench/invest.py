@@ -10,7 +10,6 @@ from predibench.common import DATA_PATH, HUGGINFACE_API_KEY
 from predibench.logger_config import get_logger
 from predibench.market_selection import choose_events
 from predibench.polymarket_data import load_events_from_file
-from predibench.retry_models import InferenceClientModelWithRetry
 from predibench.utils import get_timestamp_string
 
 load_dotenv()
@@ -90,4 +89,3 @@ if __name__ == "__main__":
         output_path=DATA_PATH,
         target_date=date(2025, 8, 19),
     )
-    

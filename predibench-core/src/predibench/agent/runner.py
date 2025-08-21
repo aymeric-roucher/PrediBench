@@ -32,17 +32,18 @@ def _create_market_investment_decisions(
 ) -> list[MarketInvestmentResult]:
     """Convert EventDecisions to list of MarketInvestmentResult."""
     results = []
-    
+
     for market_decision in event_decisions.market_decisions:
         market_info = market_info_dict[market_decision.market_id]
-        
+
         if market_info["is_closed"]:
             # Create a "nothing" decision for closed markets
             from predibench.agent.dataclasses import BettingResult
+
             betting_decision = BettingResult(
                 direction="nothing",
                 amount=0.0,
-                reasoning=f"Market is closed. Original reasoning: {market_decision.reasoning}"
+                reasoning=f"Market is closed. Original reasoning: {market_decision.reasoning}",
             )
             result = MarketInvestmentResult(
                 market_id=market_info["id"],
@@ -56,10 +57,11 @@ def _create_market_investment_decisions(
             )
         else:
             from predibench.agent.dataclasses import BettingResult
+
             betting_decision = BettingResult(
                 direction=market_decision.direction,
                 amount=market_decision.amount,
-                reasoning=market_decision.reasoning
+                reasoning=market_decision.reasoning,
             )
             result = MarketInvestmentResult(
                 market_id=market_info["id"],
@@ -72,7 +74,7 @@ def _create_market_investment_decisions(
                 is_closed=False,
             )
         results.append(result)
-    
+
     return results
 
 
@@ -102,7 +104,9 @@ def _upload_results_to_hf_dataset(
             for market_decision in event_result.market_decisions:
                 # Map decision to choice value
                 choice_mapping = {"buy_yes": 1, "buy_no": 0, "nothing": -1}
-                choice = choice_mapping.get(market_decision.betting_decision.direction, -1)
+                choice = choice_mapping.get(
+                    market_decision.betting_decision.direction, -1
+                )
 
                 row = {
                     # ModelInvestmentResult fields
@@ -110,12 +114,10 @@ def _upload_results_to_hf_dataset(
                     "agent_name": model_result.model_id,  # Keep for backward compatibility
                     "target_date": model_result.target_date,
                     "date": target_date,  # Keep for backward compatibility
-                    
                     # EventInvestmentResult fields
                     "event_id": event_result.event_id,
                     "event_title": event_result.event_title,
                     "event_description": event_result.event_description,
-                    
                     # MarketInvestmentResult fields
                     "market_id": market_decision.market_id,
                     "market_question": market_decision.market_question,
@@ -125,18 +127,18 @@ def _upload_results_to_hf_dataset(
                     "confidence_in_assessment": market_decision.confidence_in_assessment,
                     "market_price": market_decision.market_price,
                     "is_closed": market_decision.is_closed,
-                    
                     # BettingResult fields
                     "betting_direction": market_decision.betting_decision.direction,
                     "choice_raw": market_decision.betting_decision.direction,  # Keep for backward compatibility
                     "betting_amount": market_decision.betting_decision.amount,
                     "betting_reasoning": market_decision.betting_decision.reasoning,
-                    "rationale": market_decision.betting_decision.reasoning or "",  # Keep for backward compatibility
-                    
+                    "rationale": market_decision.betting_decision.reasoning
+                    or "",  # Keep for backward compatibility
                     # Legacy/computed fields
                     "choice": choice,
                     "messages_count": 0,  # This would need to be tracked during agent execution
-                    "has_reasoning": market_decision.betting_decision.reasoning is not None,
+                    "has_reasoning": market_decision.betting_decision.reasoning
+                    is not None,
                     "timestamp_uploaded": current_timestamp,
                 }
                 new_rows.append(row)
@@ -151,18 +153,24 @@ def _upload_results_to_hf_dataset(
             # Either erasing existing data or dataset is empty, just use new data
             combined_dataset = new_dataset
             if erase_existing:
-                logger.info(f"Erasing existing dataset and creating fresh dataset with {len(new_dataset)} rows")
+                logger.info(
+                    f"Erasing existing dataset and creating fresh dataset with {len(new_dataset)} rows"
+                )
             else:
                 logger.info(f"Dataset is empty, creating with {len(new_dataset)} rows")
         else:
             try:
                 existing_data = ds[split]
                 combined_dataset = concatenate_datasets([existing_data, new_dataset])
-                logger.info(f"Appending {len(new_dataset)} rows to existing {len(existing_data)} rows")
+                logger.info(
+                    f"Appending {len(new_dataset)} rows to existing {len(existing_data)} rows"
+                )
             except KeyError:
                 # Split doesn't exist, just use new data
                 combined_dataset = new_dataset
-                logger.info(f"Split '{split}' doesn't exist, creating with {len(new_dataset)} rows")
+                logger.info(
+                    f"Split '{split}' doesn't exist, creating with {len(new_dataset)} rows"
+                )
 
         # Push back to hub as a pull request (safer approach)
         combined_dataset.push_to_hub(
@@ -315,39 +323,47 @@ Example: If you bet 0.3 on market A, 0.2 on market B, and nothing on market C, y
     if isinstance(model, str) and model == "test_random":
         # Create random decisions for all markets with capital allocation constraint
         from predibench.agent.smolagents_utils import MarketDecision
-        
+
         market_decisions = []
         remaining_capital = 1.0
-        
+
         market_ids = list(market_data.keys())
         for i, market_info in enumerate(market_data.values()):
-            direction = np.random.choice(["buy_yes", "buy_no", "nothing"], p=[0.3, 0.3, 0.4])
-            
+            direction = np.random.choice(
+                ["buy_yes", "buy_no", "nothing"], p=[0.3, 0.3, 0.4]
+            )
+
             # For the last market, use all remaining capital if betting, otherwise leave some unallocated
-            is_last_market = (i == len(market_ids) - 1)
+            is_last_market = i == len(market_ids) - 1
             if direction != "nothing":
                 if is_last_market:
                     # Use up to remaining capital for last market
                     max_amount = min(remaining_capital, 0.5)
-                    amount = np.random.uniform(0.0, max_amount) if max_amount > 0 else 0.0
+                    amount = (
+                        np.random.uniform(0.0, max_amount) if max_amount > 0 else 0.0
+                    )
                 else:
                     # Leave some capital for future markets
-                    max_amount = min(remaining_capital * 0.6, 0.4)  # Use at most 60% of remaining, cap at 40%
-                    amount = np.random.uniform(0.0, max_amount) if max_amount > 0 else 0.0
+                    max_amount = min(
+                        remaining_capital * 0.6, 0.4
+                    )  # Use at most 60% of remaining, cap at 40%
+                    amount = (
+                        np.random.uniform(0.0, max_amount) if max_amount > 0 else 0.0
+                    )
                 remaining_capital -= amount
             else:
                 amount = 0.0
-            
+
             market_decision = MarketDecision(
                 market_id=market_info["id"],
                 reasoning=f"Random decision for testing market {market_info['id']}",
                 probability_assessment=np.random.uniform(0.1, 0.9),
                 confidence_in_assessment=np.random.uniform(0.3, 0.8),
                 direction=direction,
-                amount=amount
+                amount=amount,
             )
             market_decisions.append(market_decision)
-        
+
         event_decisions = EventDecisions(market_decisions=market_decisions)
     elif isinstance(model, str) and model == "o3-deep-research":
         event_decisions = run_deep_research(

@@ -1,10 +1,5 @@
 from datetime import date, timedelta
 
-from predibench.agent.dataclasses import (
-    EventInvestmentResult,
-    MarketInvestmentResult,
-    ModelInvestmentResult,
-)
 from predibench.common import DATA_PATH
 from predibench.invest import run_investments_for_specific_date
 from smolagents.models import InferenceClientModel
@@ -26,8 +21,8 @@ def test_invest():
 
     assert isinstance(result, list)
     if len(result) > 0:
-        assert hasattr(result[0], 'model_id')
-        assert hasattr(result[0], 'target_date')
+        assert hasattr(result[0], "model_id")
+        assert hasattr(result[0], "target_date")
 
 
 def test_invest_backward():
@@ -46,5 +41,5 @@ def test_invest_backward():
 
     assert isinstance(result, list)
     if len(result) > 0:
-        assert hasattr(result[0], 'model_id')
-        assert hasattr(result[0], 'target_date')
+        assert hasattr(result[0], "model_id")
+        assert hasattr(result[0], "target_date")

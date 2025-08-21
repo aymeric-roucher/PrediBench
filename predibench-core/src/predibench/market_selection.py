@@ -101,16 +101,15 @@ def _select_markets_for_events(
     for event in events:
         eligible_markets = []
         for market in event.markets:
-            if (
-                market.outcomes
-                and len(market.outcomes) > 0
-            ):
+            if market.outcomes and len(market.outcomes) > 0:
                 eligible_markets.append(market)
 
         if eligible_markets:
             event.markets = eligible_markets  # Keep all eligible markets
             events_with_markets.append(event)
-            logger.info(f"Event '{event.title}' has {len(eligible_markets)} eligible markets")
+            logger.info(
+                f"Event '{event.title}' has {len(eligible_markets)} eligible markets"
+            )
 
     return events_with_markets
 
@@ -148,7 +147,9 @@ def choose_events(
     filtered_events = _filter_events_by_volume_and_markets(
         events=events, min_volume=min_volume, backward_mode=backward_mode
     )
-    filtered_events = filtered_events[: n_events + int(n_events * 0.2 +3)] # NOTE: a few events might be missing prices and will be removed later so we add a few more events to be sure to have enough
+    filtered_events = filtered_events[
+        : n_events + int(n_events * 0.2 + 3)
+    ]  # NOTE: a few events might be missing prices and will be removed later so we add a few more events to be sure to have enough
 
     for event in filtered_events:
         for market in event.markets:
