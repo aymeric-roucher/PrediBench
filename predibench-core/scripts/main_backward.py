@@ -1,8 +1,10 @@
 import os
 from datetime import date, timedelta
+from huggingface_hub import login
+from dotenv import load_dotenv
 
 import typer
-from predibench.common import DATA_PATH, ENV_VAR_HF_TOKEN
+from predibench.common import DATA_PATH
 from predibench.invest import run_investments_for_specific_date
 from predibench.logger_config import get_logger
 from predibench.retry_models import InferenceClientModelWithRetry, OpenAIModelWithRetry
@@ -11,13 +13,16 @@ logger = get_logger(__name__)
 
 app = typer.Typer()
 
+load_dotenv()
+login(os.getenv("HF_TOKEN"))
+
 MODEL_MAP = {
     "openai/gpt-5": OpenAIModelWithRetry(model_id="gpt-5"),
     "huggingface/openai/gpt-oss-120b": InferenceClientModelWithRetry(
-        model_id="openai/gpt-oss-120b", token=os.getenv(ENV_VAR_HF_TOKEN)
+        model_id="openai/gpt-oss-120b",
     ),
     "huggingface/deepseek-ai/DeepSeek-R1-0528": InferenceClientModelWithRetry(
-        model_id="deepseek-ai/DeepSeek-R1-0528", token=os.getenv(ENV_VAR_HF_TOKEN)
+        model_id="deepseek-ai/DeepSeek-R1-0528",
     ),
 }
 
