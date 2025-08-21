@@ -31,7 +31,7 @@ logger = get_logger(__name__)
 def _upload_results_to_hf_dataset(
     results_per_model: list[ModelInvestmentDecisions],
     target_date: date,
-    dataset_name: str = "charles-azam/predibench",
+    dataset_name: str = "Sibyllic/predibench",
     split: str = "train",
     erase_existing: bool = False,
 ) -> None:
