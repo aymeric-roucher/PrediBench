@@ -2,7 +2,7 @@ from typing import Generator, Type, TypeVar
 
 from smolagents import ChatMessage, ChatMessageStreamDelta, Tool
 from smolagents.models import ApiModel, InferenceClientModel, LiteLLMModel, OpenAIModel
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed, before_sleep_log, after_log
 
 from predibench.logger_config import get_logger
 
@@ -20,6 +20,8 @@ def add_retry_logic(base_class: Type[T]) -> Type[T]:
             wait=wait_fixed(61),
             retry=retry_if_exception_type((Exception,)),
             reraise=True,
+            before_sleep=before_sleep_log(logger, "INFO"),
+            after=after_log(logger, "INFO"),
         )
         def generate(
             self,
@@ -29,25 +31,21 @@ def add_retry_logic(base_class: Type[T]) -> Type[T]:
             tools_to_call_from: list[Tool] | None = None,
             **kwargs,
         ) -> ChatMessage:
-            try:
-                return super().generate(
-                    messages=messages,
-                    stop_sequences=stop_sequences,
-                    response_format=response_format,
-                    tools_to_call_from=tools_to_call_from,
-                    **kwargs,
-                )
-            except Exception as e:
-                logger.warning(
-                    f"{base_class.__name__} generate failed: {e}. Retrying in 60 seconds..."
-                )
-                raise e
+            return super().generate(
+                messages=messages,
+                stop_sequences=stop_sequences,
+                response_format=response_format,
+                tools_to_call_from=tools_to_call_from,
+                **kwargs,
+            )
 
         @retry(
             stop=stop_after_attempt(5),
             wait=wait_fixed(61),
             retry=retry_if_exception_type((Exception,)),
             reraise=True,
+            before_sleep=before_sleep_log(logger, "INFO"),
+            after=after_log(logger, "INFO"),
         )
         def generate_stream(
             self,
@@ -57,19 +55,13 @@ def add_retry_logic(base_class: Type[T]) -> Type[T]:
             tools_to_call_from: list[Tool] | None = None,
             **kwargs,
         ) -> Generator[ChatMessageStreamDelta, None, None]:
-            try:
-                return super().generate_stream(
-                    messages=messages,
-                    stop_sequences=stop_sequences,
-                    response_format=response_format,
-                    tools_to_call_from=tools_to_call_from,
-                    **kwargs,
-                )
-            except Exception as e:
-                logger.warning(
-                    f"{base_class.__name__} generate_stream failed: {e}. Retrying in 60 seconds..."
-                )
-                raise e
+            return super().generate_stream(
+                messages=messages,
+                stop_sequences=stop_sequences,
+                response_format=response_format,
+                tools_to_call_from=tools_to_call_from,
+                **kwargs,
+            )
 
     ModelWithRetry.__name__ = f"{base_class.__name__}WithRetry"
     ModelWithRetry.__doc__ = (
