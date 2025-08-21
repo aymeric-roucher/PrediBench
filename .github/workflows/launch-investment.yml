@@ -1,4 +1,4 @@
-name: Test and Deploy
+name: Launch Investment Analysis
 
 on:
   workflow_dispatch:
