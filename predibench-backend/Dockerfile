@@ -15,6 +15,7 @@ COPY main.py ./
 # Create user for security
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 RUN chown -R appuser:appuser /app
+RUN mkdir -p /home/appuser/.cache/uv && chown -R appuser:appuser /home/appuser/.cache
 USER appuser
 
 # Expose port
