@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 from predibench.common import DATA_PATH
@@ -9,13 +9,12 @@ from predibench.polymarket_data import load_events_from_file, save_events_to_fil
 logger = get_logger(__name__)
 
 
-
 def test_choose_events_event_caching_e2e():
     """End-to-end test for event save/load functionality."""
 
     # Test parameters (same as used in invest.py)
     today_date = date.today()
-    event_selection_window = timedelta(days=6*7)
+    event_selection_window = timedelta(days=6 * 7)
     max_n_events = 3
 
     # Step 1: Fetch events from API
@@ -50,9 +49,13 @@ def test_choose_events_event_caching_e2e():
                     nb_markets_with_many_prices += 1
             else:
                 nb_markets_without_prices += 1
-    assert nb_markets_with_prices > 10 # NOTE: this test might fail depending on the date, but it should be enough
+    assert (
+        nb_markets_with_prices > 10
+    )  # NOTE: this test might fail depending on the date, but it should be enough
     assert nb_markets_without_prices == 0
-    assert nb_markets_with_many_prices >= nb_markets_with_prices * 0.5 # NOTE: this test might fail depending on the date, for instance if this is a very new event but it should be enough
+    assert (
+        nb_markets_with_many_prices >= nb_markets_with_prices * 0.5
+    )  # NOTE: this test might fail depending on the date, for instance if this is a very new event but it should be enough
     # Step 2: Save events to file
     cache_file = DATA_PATH / "test_events_cache.json"
     save_events_to_file(selected_events, cache_file)
@@ -151,7 +154,7 @@ def test_choose_events_backward():
     # Test parameters
     base_datetime = datetime(2024, 8, 15)  # Fixed date for testing
 
-    event_selection_window = timedelta(days=6*7)
+    event_selection_window = timedelta(days=6 * 7)
     max_n_events = 3
 
     # Test 1: Normal mode (backward_mode=False)
@@ -177,7 +180,9 @@ def test_choose_events_backward():
             assert len(market.outcomes) == 2, (
                 f"Market {market.question} has {len(market.outcomes)} outcomes, expected 2"
             )
-            if market.prices is not None and len(market.prices) > 10: # NOTE: this should be enough
+            if (
+                market.prices is not None and len(market.prices) > 10
+            ):  # NOTE: this should be enough
                 nb_markets_with_prices += 1
             else:
                 nb_markets_without_prices += 1
