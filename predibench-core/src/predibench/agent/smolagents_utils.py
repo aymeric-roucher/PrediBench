@@ -22,14 +22,12 @@ from tenacity import (
 from typing import Literal
 
 
-
-
 class MarketDecision(BaseModel):
     market_id: str
     reasoning: str
-    probability_assessment: float # Model's assessment of probability (0.0 to 1.0)
-    confidence_in_assessment: float # Confidence level (0.0 to 1.0)
-    direction: Literal["buy_yes", "buy_no", "nothing"] # Direction of the bet
+    probability_assessment: float  # Model's assessment of probability (0.0 to 1.0)
+    confidence_in_assessment: float  # Confidence level (0.0 to 1.0)
+    direction: Literal["buy_yes", "buy_no", "nothing"]  # Direction of the bet
     amount: float  # Fraction of allocated capital (0.0 to 1.0)
 
 
@@ -123,7 +121,9 @@ class GoogleSearchTool(Tool):
 
 
 @tool
-def final_answer(market_decisions: list[dict], unallocated_capital: float) -> EventDecisions:
+def final_answer(
+    market_decisions: list[dict], unallocated_capital: float
+) -> EventDecisions:
     """
     This tool is used to validate and return the final event decisions for all relevant markets.
 
@@ -144,36 +144,46 @@ def final_answer(market_decisions: list[dict], unallocated_capital: float) -> Ev
     """
     validated_decisions = []
     total_allocated = 0.0
-    
+
     for decision_dict in market_decisions:
         # Validate market decision fields
         assert decision_dict["direction"] in ["buy_yes", "buy_no", "nothing"], (
             "Invalid direction, must be buy_yes, buy_no, or nothing"
         )
-        assert 0.0 <= decision_dict["amount"] <= 1.0, "Amount must be between 0.0 and 1.0"
+        assert 0.0 <= decision_dict["amount"] <= 1.0, (
+            "Amount must be between 0.0 and 1.0"
+        )
         assert len(decision_dict["reasoning"]) > 0, "Reasoning must be non-empty"
-        assert 0.0 <= decision_dict["probability_assessment"] <= 1.0, "Probability assessment must be between 0.0 and 1.0"
-        assert 0.0 <= decision_dict["confidence_in_assessment"] <= 1.0, "Confidence must be between 0.0 and 1.0"
-        
+        assert 0.0 <= decision_dict["probability_assessment"] <= 1.0, (
+            "Probability assessment must be between 0.0 and 1.0"
+        )
+        assert 0.0 <= decision_dict["confidence_in_assessment"] <= 1.0, (
+            "Confidence must be between 0.0 and 1.0"
+        )
+
         # Only count non-nothing bets toward total allocation
         if decision_dict["direction"] != "nothing":
             total_allocated += decision_dict["amount"]
-        
+
         market_decision = MarketDecision(
             market_id=decision_dict["market_id"],
             reasoning=decision_dict["reasoning"],
             probability_assessment=decision_dict["probability_assessment"],
             confidence_in_assessment=decision_dict["confidence_in_assessment"],
             direction=decision_dict["direction"],
-            amount=decision_dict["amount"]
+            amount=decision_dict["amount"],
         )
         validated_decisions.append(market_decision)
-    
+
     # Validate that total allocation adds up to 1.0
-    assert 0.0 <= unallocated_capital <= 1.0, "Unallocated capital must be between 0.0 and 1.0"
+    assert 0.0 <= unallocated_capital <= 1.0, (
+        "Unallocated capital must be between 0.0 and 1.0"
+    )
     total_capital_used = total_allocated + unallocated_capital
-    assert abs(total_capital_used - 1.0) < 0.001, f"Total capital allocation must equal 1.0, got {total_capital_used:.3f} (allocated: {total_allocated:.3f}, unallocated: {unallocated_capital:.3f})"
-    
+    assert abs(total_capital_used - 1.0) < 0.001, (
+        f"Total capital allocation must equal 1.0, got {total_capital_used:.3f} (allocated: {total_allocated:.3f}, unallocated: {unallocated_capital:.3f})"
+    )
+
     return EventDecisions(market_decisions=validated_decisions)
 
 

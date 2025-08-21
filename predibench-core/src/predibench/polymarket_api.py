@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import date, datetime, timedelta, timezone
 
 import pandas as pd
@@ -47,8 +48,8 @@ polymarket_retry = retry(
             requests.exceptions.ConnectionError,
         )
     ),
-    before_sleep=before_sleep_log(logger, log_level="WARNING"),
-    after=after_log(logger, log_level="INFO"),
+    before_sleep=before_sleep_log(logger, log_level=logging.WARNING),
+    after=after_log(logger, log_level=logging.INFO),
     reraise=True,
 )
 
@@ -230,10 +231,13 @@ class MarketsRequestParameters(_RequestParameters):
     @polymarket_retry
     def get_markets(
         self,
-        start_datetime: datetime | None = None,
         end_datetime: datetime | None = None,
     ) -> list[Market]:
-        """Get open markets from Polymarket API using this request configuration."""
+        """Get open markets from Polymarket API using this request configuration.
+
+        Args:
+            end_datetime: Limit datetime to fill market prices.
+        """
         url = f"{BASE_URL_POLYMARKET}/markets"
 
         if self.limit and self.limit > 500:
@@ -258,13 +262,8 @@ class MarketsRequestParameters(_RequestParameters):
             excluded_count = 0
             for market in markets:
                 assert market is not None
-                if (
-                    not (
-                        self.end_date_min
-                        <= market.end_datetime.date()
-                        <= self.end_date_max
-                    )
-                    and market.end_datetime is not None
+                if market.end_datetime is not None and not (
+                    self.end_date_min <= market.end_datetime.date() <= self.end_date_max
                 ):
                     excluded_count += 1
                     logger.warning(
@@ -278,9 +277,9 @@ class MarketsRequestParameters(_RequestParameters):
                 )
             markets = filtered_markets
 
-        if start_datetime and end_datetime:
+        if end_datetime:
             for market in markets:
-                market.fill_prices(start_datetime, end_datetime)
+                market.fill_prices(end_datetime)
         return markets
 
 

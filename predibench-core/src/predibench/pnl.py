@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, time
 
 import numpy as np
 import pandas as pd
@@ -47,8 +47,6 @@ class PnlCalculator:
         self.portfolio_sum_pnl = self.portfolio_daily_pnl.sum()
 
     def _assert_index_is_date(self, df: pd.DataFrame):
-        from datetime import date
-
         assert all(isinstance(idx, date) for idx in df.index), (
             "All index values must be date objects or timestamps without time component"
         )
@@ -291,19 +289,10 @@ class PnlCalculator:
         )
 
 
-def validate_continuous_prices(
-    prices_df: pd.DataFrame, start_date: date, end_date: date
-) -> None:
-    """Validate that returns data is continuous for the given date range.
-
-    Args:
-        returns_df: DataFrame with returns data indexed by date
-        start_date: First date that should have data
-        end_date: Last date that should have data
-
-    Raises:
-        ValueError: If any dates are missing from the range
-    """
+def validate_continuous_prices(prices_df: pd.DataFrame) -> None:
+    """Validate that this dataframe's date index is continuous"""
+    start_date = prices_df.index.min()
+    end_date = prices_df.index.max()
     expected_date_range = pd.date_range(start=start_date, end=end_date, freq="D").date
     actual_dates = set(prices_df.index)
     expected_dates = set(expected_date_range)
@@ -314,32 +303,31 @@ def validate_continuous_prices(
 
 
 def get_pnls(
-    positions_df: pd.DataFrame, write_plots: bool = False, end_date: date = None
+    positions_df: pd.DataFrame, end_date: date | None = None, write_plots: bool = False
 ) -> dict[str, PnlCalculator]:
     """Builds PnL calculators for each agent in the positions dataframe.
 
     Args:
         positions_df: DataFrame with positions data indexed by date
         write_plots: bool, if True, will write plots to the current directory
-        end_date: date to use for the investment
+        end_date: cutoff date
     """
     # Validate that we have continuous returns data
-    expected_start = positions_df["date"].min()
-    # should be a hyper parameters
-    expected_end = end_date
     markets = {}
     for market_id in positions_df["market_id"].unique():
         request_parameters = MarketsRequestParameters(
             id=market_id,
         )
         market = request_parameters.get_markets(
-            start_datetime=expected_start,
-            end_datetime=expected_end,  # 15 days back is the maximum allowed by the API
+            end_datetime=datetime.combine(end_date, time(0, 0, 0))
+            if end_date
+            else None,
+            # 15 days back is the maximum allowed by the API
         )[0]
         markets[market_id] = market
     prices_df = get_historical_returns(markets)
 
-    validate_continuous_prices(prices_df, expected_start, expected_end)
+    validate_continuous_prices(prices_df)
 
     pnl_calculators = {}
     for agent_name in positions_df["agent_name"].unique():
@@ -403,7 +391,7 @@ def get_pnl_calculator(
 
 def get_historical_returns(
     markets: dict[str, Market],
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> pd.DataFrame:
     """Get historical prices directly from timeseries data. Columns are market ids"""
     prices_df = pd.DataFrame(
         np.nan,
