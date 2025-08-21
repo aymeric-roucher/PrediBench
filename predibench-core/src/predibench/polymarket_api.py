@@ -54,38 +54,6 @@ polymarket_retry = retry(
 )
 
 
-def _split_date_range(
-    start_datetime: datetime, end_datetime: datetime
-) -> list[tuple[datetime, datetime]]:
-    """Split a date range into chunks of MAX_INTERVAL_TIMESERIES or smaller.
-
-    Args:
-        start_datetime: Start datetime
-        end_datetime: End datetime
-
-    Returns:
-        List of (start, end) datetime tuples, each representing a chunk <= MAX_INTERVAL_TIMESERIES
-    """
-    # Generate segment start times using pd.date_range
-    segment_starts = pd.date_range(
-        start=start_datetime, end=end_datetime, freq=MAX_INTERVAL_TIMESERIES
-    )
-    segment_starts = [start.to_pydatetime() for start in segment_starts]
-
-    chunks = []
-    for i, segment_start in enumerate(segment_starts):
-        if i == len(segment_starts) - 1:
-            # Last segment: end at the original end_datetime
-            chunk_end = end_datetime
-        else:
-            # Regular segment: end at next segment start - 1 second to avoid overlap
-            chunk_end = segment_starts[i + 1] - timedelta(hours=1)
-
-        chunks.append((segment_start, chunk_end))
-
-    return chunks
-
-
 class MarketOutcome(BaseModel):
     clob_token_id: str
     name: str
