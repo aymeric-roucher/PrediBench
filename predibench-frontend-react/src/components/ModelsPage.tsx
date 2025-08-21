@@ -50,7 +50,7 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{model.model}</p>
-                        <p className="text-sm text-muted-foreground">Score: {model.score.toFixed(1)}</p>
+                        <p className="text-sm text-muted-foreground">Score: {model.final_cumulative_pnl.toFixed(1)}</p>
                       </div>
                     </div>
                   </button>
@@ -71,7 +71,7 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-muted-foreground">Score</p>
-                        <p className="text-2xl font-bold">{selectedModelData.score.toFixed(1)}</p>
+                        <p className="text-2xl font-bold">{selectedModelData.final_cumulative_pnl.toFixed(1)}</p>
                       </div>
                       <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                         <span className="text-primary">🎯</span>
@@ -113,7 +113,7 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-muted-foreground">Profit</p>
-                        <p className="text-2xl font-bold text-green-600">${selectedModelData.profit.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-green-600">${Math.round(selectedModelData.final_cumulative_pnl * 1000).toLocaleString()}</p>
                       </div>
                       <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
                         <span className="text-green-600">💰</span>

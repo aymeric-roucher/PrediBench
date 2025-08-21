@@ -23,7 +23,7 @@ export function LeaderboardPage({ leaderboard, events }: LeaderboardPageProps) {
   const getTopModelsChartData = () => {
     const topModels = leaderboard.slice(0, 3)
     const dates = topModels[0]?.performanceHistory?.map(h => h.date) || []
-    
+
     return dates.map(date => {
       const dataPoint: any = { date }
       topModels.forEach(model => {
@@ -55,12 +55,11 @@ export function LeaderboardPage({ leaderboard, events }: LeaderboardPageProps) {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
-                        <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold ${
-                          index === 0 ? 'bg-yellow-100 text-yellow-800' :
+                        <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-800' :
                           index === 1 ? 'bg-slate-100 text-slate-800' :
-                          index === 2 ? 'bg-orange-100 text-orange-800' :
-                          'bg-muted text-muted-foreground'
-                        }`}>
+                            index === 2 ? 'bg-orange-100 text-orange-800' :
+                              'bg-muted text-muted-foreground'
+                          }`}>
                           {index + 1}
                         </div>
                         <div>
@@ -73,16 +72,12 @@ export function LeaderboardPage({ leaderboard, events }: LeaderboardPageProps) {
 
                       <div className="flex items-center space-x-6">
                         <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Score</p>
-                          <p className="text-lg font-bold">{entry.score.toFixed(1)}</p>
+                          <p className="text-sm text-muted-foreground">Final PnL</p>
+                          <p className="text-lg font-bold">{entry.final_cumulative_pnl.toFixed(1)}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Accuracy</p>
-                          <p className="text-lg font-semibold">{(entry.accuracy * 100).toFixed(0)}%</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Profit</p>
-                          <p className="text-lg font-semibold text-green-600">${entry.profit.toLocaleString()}</p>
+                          <p className="text-sm text-muted-foreground">Brier score</p>
+                          <p className="text-lg font-semibold text-green-600">${Math.round(entry.final_cumulative_pnl * 1000).toLocaleString()}</p>
                         </div>
                         <div className="flex items-center">
                           {getTrendIcon(entry.trend)}
@@ -144,12 +139,11 @@ export function LeaderboardPage({ leaderboard, events }: LeaderboardPageProps) {
                   <Card key={event.id} className="p-4 hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-3">
                       <h3 className="text-sm font-medium line-clamp-2 flex-1 mr-2">{event.title}</h3>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${
-                        event.category === 'Crypto' ? 'bg-orange-100 text-orange-800' :
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${event.category === 'Crypto' ? 'bg-orange-100 text-orange-800' :
                         event.category === 'Politics' ? 'bg-blue-100 text-blue-800' :
-                        event.category === 'Technology' ? 'bg-purple-100 text-purple-800' :
-                        'bg-green-100 text-green-800'
-                      }`}>
+                          event.category === 'Technology' ? 'bg-purple-100 text-purple-800' :
+                            'bg-green-100 text-green-800'
+                        }`}>
                         {event.category}
                       </span>
                     </div>

@@ -3,13 +3,11 @@ const API_BASE_URL = 'http://localhost:8080/api'
 export interface LeaderboardEntry {
   id: string
   model: string
-  score: number
-  accuracy: number
+  final_cumulative_pnl: number
   trades: number
-  profit: number
   lastUpdated: string
   trend: 'up' | 'down' | 'stable'
-  performanceHistory: { date: string; score: number }[]
+  performanceHistory: { date: string; cumulative_pnl: number }[]
 }
 
 export interface Event {
@@ -24,14 +22,14 @@ export interface Event {
 }
 
 export interface Stats {
-  topScore: number
-  avgAccuracy: number
+  topFinalCumulativePnl: number
+  avgPnl: number
   totalTrades: number
   totalProfit: number
 }
 
 class ApiService {
-  private async fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 5000): Promise<Response> {
+  private async fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 30000): Promise<Response> {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), timeout)
 

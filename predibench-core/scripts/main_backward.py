@@ -63,7 +63,7 @@ def main(
             output_path=DATA_PATH,
             target_date=target_date,
             dataset_name="m-ric/predibench-agent-choices",
-            split="test",
+            split="train",
         )
 
     logger.info(f"All analyses completed. Total results: {len(all_results)}")

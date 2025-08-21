@@ -1,3 +1,5 @@
+import { Trophy } from 'lucide-react'
+
 interface NavigationProps {
   currentPage: string
   onPageChange: (page: string) => void
@@ -5,27 +7,31 @@ interface NavigationProps {
 
 export function Navigation({ currentPage, onPageChange }: NavigationProps) {
   const pages = [
-    { id: 'leaderboard', name: 'Leaderboard', icon: '🏆' },
-    { id: 'models', name: 'Models', icon: '🤖' },
-    { id: 'questions', name: 'This Week\'s Questions', icon: '❓' }
+    { id: 'leaderboard', name: 'Leaderboard', icon: Trophy },
+    { id: 'models', name: 'Models', icon: null },
+    { id: 'questions', name: 'This Week\'s Questions', icon: null }
   ]
 
   return (
-    <div className="flex space-x-1">
+    <nav className="flex items-center space-x-1">
       {pages.map((page) => (
         <button
           key={page.id}
           onClick={() => onPageChange(page.id)}
-          className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
-            currentPage === page.id
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-          }`}
+          className={`
+            px-4 py-2 font-medium text-sm transition-colors duration-200
+            ${currentPage === page.id
+              ? 'text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+            }
+          `}
         >
-          <span className="mr-2">{page.icon}</span>
-          {page.name}
+          <div className="flex items-center space-x-2">
+            {page.icon && <page.icon size={16} />}
+            <span>{page.name}</span>
+          </div>
         </button>
       ))}
-    </div>
+    </nav>
   )
 }

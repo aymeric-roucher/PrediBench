@@ -308,7 +308,7 @@ def get_pnls(
     """Builds PnL calculators for each agent in the positions dataframe.
 
     Args:
-        positions_df: DataFrame with positions data indexed by date
+        positions_df: DataFrame with positions data, with columns [agent_name, market_id, date]
         write_plots: bool, if True, will write plots to the current directory
         end_date: cutoff date
     """

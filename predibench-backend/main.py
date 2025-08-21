@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import date, datetime
 from typing import List
@@ -8,6 +9,7 @@ from datasets import load_dataset
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from predibench.pnl import get_pnls
+from predibench.polymarket_api import Event
 from pydantic import BaseModel
 
 print("Successfully imported predibench modules")
@@ -30,7 +32,7 @@ app.add_middleware(
 
 
 # Configuration
-AGENT_CHOICES_REPO = "charles-azam/predibench"
+AGENT_CHOICES_REPO = "m-ric/predibench-agent-decisions-2"
 
 
 # Data models
@@ -43,23 +45,11 @@ class LeaderboardEntry(BaseModel):
     id: str
     model: str
     final_cumulative_pnl: float
-    accuracy: float
     trades: int
     profit: int
     lastUpdated: str
     trend: str
     performanceHistory: List[PerformanceHistory]
-
-
-class SimpleEvent(BaseModel):
-    id: str
-    title: str
-    description: str
-    probability: float
-    volume: int
-    endDate: str
-    category: str
-    status: str
 
 
 class Stats(BaseModel):
@@ -77,30 +67,43 @@ def load_agent_choices():
     return dataset.sort_values("date")
 
 
+AGENT_CHOICES = load_agent_choices()
+
+
 def calculate_real_performance():
     """Calculate real PnL and performance metrics exactly like gradio app"""
-    df = load_agent_choices()
-    print(f"Loaded {len(df)} agent choices")
+    agent_choices_df = AGENT_CHOICES
+    print(f"Loaded {len(agent_choices_df)} agent choices")
 
-    # Filter exactly like gradio app
-    df["timestamp_uploaded"] = pd.to_datetime(df["timestamp_uploaded"])
-    cutoff_date = pd.to_datetime("2025-08-18")
-    df = df[df["timestamp_uploaded"] < cutoff_date]
-    print(f"After timestamp filter: {len(df)} records")
+    agent_choices_df["timestamp_uploaded"] = pd.to_datetime(
+        agent_choices_df["timestamp_uploaded"]
+    )
+    today_date = datetime.today()
+    agent_choices_df = agent_choices_df[
+        agent_choices_df["timestamp_uploaded"] < today_date
+    ]
+    print(f"After timestamp filter: {len(agent_choices_df)} records")
 
-    # Date filter
-    df = df.loc[df["date"] > date(2025, 7, 19)]
-    print(f"After date filter: {len(df)} records")
-    print(f"Available agents: {df['agent_name'].unique().tolist()}")
+    positions = []
+    for i, row in agent_choices_df.iterrows():
+        for market_decision in json.loads(row["decisions_per_market"]):
+            positions.append(
+                {
+                    "date": row["date"],
+                    "market_id": market_decision["market_id"],
+                    "choice": market_decision["model_decision"]["bet"],
+                    "agent_name": row["agent_name"],
+                }
+            )
+    positions_df = pd.DataFrame.from_records(positions)
 
-    pnl_calculators = get_pnls(df, write_plots=False, end_date=datetime.today())
-    print(f"Generated PnL calculators for {len(pnl_calculators)} agents")
+    # positions_df = positions_df.pivot(index="date", columns="market_id", values="bet")
 
-    # Convert to the format expected by frontend - exactly like gradio
+    pnl_calculators = get_pnls(
+        positions_df, write_plots=False, end_date=datetime.today()
+    )
     agents_performance = {}
-    for agent in df["agent_name"].unique():
-        pnl_calculator = pnl_calculators[agent]
-        agent_data = df[df["agent_name"] == agent].copy()
+    for agent_name, pnl_calculator in pnl_calculators.items():
         daily_pnl = pnl_calculator.portfolio_daily_pnl
 
         # Generate performance history from cumulative PnL
@@ -121,18 +124,11 @@ def calculate_real_performance():
             else 0
         )
 
-        agents_performance[agent] = {
-            "agent_name": agent,
-            "long_positions": len(agent_data[agent_data["choice"] == 1]),
-            "short_positions": len(agent_data[agent_data["choice"] == -1]),
-            "no_positions": len(agent_data[agent_data["choice"] == 0]),
+        agents_performance[agent_name] = {
+            "agent_name": agent_name,
             "final_cumulative_pnl": final_pnl,
             "annualized_sharpe_ratio": sharpe_ratio,
             "performance_history": performance_history,
-            "total_trades": len(agent_data),
-            "accuracy": len(agent_data[agent_data["choice"] != 0]) / len(agent_data)
-            if len(agent_data) > 0
-            else 0,
             "daily_cumulative_pnl": pnl_calculator.portfolio_cumulative_pnl.tolist(),
             "dates": [
                 d.strftime("%Y-%m-%d")
@@ -140,9 +136,7 @@ def calculate_real_performance():
             ],
         }
 
-        print(
-            f"Agent {agent}: PnL={final_pnl:.3f}, Trades={len(agent_data)}, Sharpe={sharpe_ratio:.3f}"
-        )
+        print(f"Agent {agent_name}: PnL={final_pnl:.3f}, Sharpe={sharpe_ratio:.3f}")
 
     print(f"Calculated performance for {len(agents_performance)} agents")
     return agents_performance
@@ -163,7 +157,7 @@ def get_leaderboard() -> List[LeaderboardEntry]:
         # Determine trend
         history = metrics["performance_history"]
         if len(history) >= 2:
-            recent_change = history[-1].score - history[-2].score
+            recent_change = history[-1].cumulative_pnl - history[-2].cumulative_pnl
             trend = (
                 "up"
                 if recent_change > 0.1
@@ -178,9 +172,8 @@ def get_leaderboard() -> List[LeaderboardEntry]:
             id=str(i + 1),
             model=agent_name.replace("smolagent_", "").replace("--", "/"),
             final_cumulative_pnl=metrics["final_cumulative_pnl"],
-            accuracy=metrics["accuracy"],
-            trades=metrics["total_trades"],
-            profit=int(metrics["final_cumulative_pnl"] * 1000),  # Convert to dollars
+            trades=0,
+            profit=0,
             lastUpdated=datetime.now().strftime("%Y-%m-%d"),
             trend=trend,
             performanceHistory=metrics["performance_history"],
@@ -190,41 +183,23 @@ def get_leaderboard() -> List[LeaderboardEntry]:
     return leaderboard
 
 
-# Get events that models have actually bet on
-def get_events() -> List[SimpleEvent]:
-    """Get events based on what models have actually predicted on"""
+def get_events() -> List[Event]:
+    """Get events based that models ran predictions on"""
     # Load agent choices to see what markets they've been betting on
-    df = load_agent_choices()
+    df = AGENT_CHOICES
+    event_ids = df["event_id"].unique()
 
-    # Apply same filtering as gradio app
-    df["timestamp_uploaded"] = pd.to_datetime(df["timestamp_uploaded"])
-    cutoff_date = pd.to_datetime("2025-08-18")
-    df = df[df["timestamp_uploaded"] < cutoff_date]
-    df = df.loc[df["date"] > date(2025, 7, 19)]
-
-    print(f"Found {len(df)} agent choices for events")
-
-    # Get unique markets that models have bet on
-    market_activity = (
-        df.groupby("market_id")
-        .agg({"choice": ["count", "mean"], "date": "max", "agent_name": "nunique"})
-        .reset_index()
-    )
-
-    # Flatten column names
-    market_activity.columns = [
-        "market_id",
-        "total_bets",
-        "avg_sentiment",
-        "last_bet_date",
-        "num_agents",
-    ]
-    market_activity = market_activity.sort_values(
-        ["num_agents", "total_bets"], ascending=False
-    )
-
-    print(f"Found {len(market_activity)} unique markets with activity")
     events = []
+    for event_id in event_ids:
+        from predibench.polymarket_api import EventsRequestParameters
+
+        events_request_parameters = EventsRequestParameters(
+            event_ids=[event_id],
+            limit=1,
+        )
+        one_event_list = events_request_parameters.get_events()
+        # event = Event.from_json(event_id)
+        events.append(one_event_list[0])
 
     return events
 
@@ -241,7 +216,7 @@ async def get_leaderboard_endpoint():
     return get_leaderboard()
 
 
-@app.get("/api/events", response_model=List[SimpleEvent])
+@app.get("/api/events", response_model=List[Event])
 async def get_events_endpoint():
     """Get active Polymarket events"""
     return get_events()
