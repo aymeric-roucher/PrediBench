@@ -9,7 +9,7 @@ export function Navigation({ currentPage, onPageChange }: NavigationProps) {
   const pages = [
     { id: 'leaderboard', name: 'Leaderboard', icon: Trophy },
     { id: 'models', name: 'Models', icon: null },
-    { id: 'questions', name: 'This Week\'s Questions', icon: null }
+    { id: 'events', name: 'Events', icon: null }
   ]
 
   return (

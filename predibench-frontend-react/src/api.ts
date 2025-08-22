@@ -5,20 +5,61 @@ export interface LeaderboardEntry {
   model: string
   final_cumulative_pnl: number
   trades: number
+  accuracy: number
   lastUpdated: string
   trend: 'up' | 'down' | 'stable'
   performanceHistory: { date: string; cumulative_pnl: number }[]
 }
 
+export interface MarketData {
+  market_id: string
+  question: string
+  price_data: { date: string; price: number }[]
+  positions: { date: string; position: number; type: 'long' | 'short' }[]
+}
+
+export interface MarketPnL {
+  market_id: string
+  question: string
+  pnl_data: { date: string; pnl: number }[]
+}
+
+export interface ModelMarketDetails {
+  markets: MarketData[]
+  market_pnls: MarketPnL[]
+  price_chart_data: Record<string, unknown>[]
+  pnl_chart_data: Record<string, unknown>[]
+  market_info: { market_id: string; question: string; short_name: string }[]
+}
+
+export interface Market {
+  id: string
+  question: string
+  slug: string
+  description: string
+  outcomes: MarketOutcome[]
+}
+
+export interface MarketOutcome {
+  name: string
+  price: number
+}
+
 export interface Event {
   id: string
+  slug: string
   title: string
-  description: string
-  probability: number
-  volume: number
-  endDate: string
-  category: string
-  status: 'active' | 'resolved'
+  description: string | null
+  start_datetime: string | null
+  end_datetime: string | null
+  creation_datetime: string
+  volume: number | null
+  volume24hr: number | null
+  volume1wk: number | null
+  volume1mo: number | null
+  volume1yr: number | null
+  liquidity: number | null
+  markets: Market[]
 }
 
 export interface Stats {
@@ -54,8 +95,22 @@ class ApiService {
     return await response.json()
   }
 
-  async getEvents(): Promise<Event[]> {
-    const response = await this.fetchWithTimeout(`${API_BASE_URL}/events`)
+  async getEvents(params?: {
+    search?: string
+    category?: string
+    sort_by?: string
+    order?: string
+    limit?: number
+  }): Promise<Event[]> {
+    const searchParams = new URLSearchParams()
+    if (params?.search) searchParams.append('search', params.search)
+    if (params?.category) searchParams.append('category', params.category)
+    if (params?.sort_by) searchParams.append('sort_by', params.sort_by)
+    if (params?.order) searchParams.append('order', params.order)
+    if (params?.limit) searchParams.append('limit', params.limit.toString())
+    
+    const url = `${API_BASE_URL}/events${searchParams.toString() ? `?${searchParams.toString()}` : ''}`
+    const response = await this.fetchWithTimeout(url)
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
@@ -74,6 +129,30 @@ class ApiService {
 
   async getModelDetails(modelId: string): Promise<LeaderboardEntry | null> {
     const response = await this.fetchWithTimeout(`${API_BASE_URL}/model/${modelId}`)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    return await response.json()
+  }
+
+  async getModelMarketDetails(modelId: string): Promise<ModelMarketDetails> {
+    const response = await this.fetchWithTimeout(`${API_BASE_URL}/model/${modelId}/markets`)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    return await response.json()
+  }
+
+  async getEventDetails(eventId: string): Promise<Event> {
+    const response = await this.fetchWithTimeout(`${API_BASE_URL}/event/${eventId}`)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    return await response.json()
+  }
+
+  async getEventMarketPrices(eventId: string): Promise<{ [marketId: string]: { date: string; price: number }[] }> {
+    const response = await this.fetchWithTimeout(`${API_BASE_URL}/event/${eventId}/markets/prices`)
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }

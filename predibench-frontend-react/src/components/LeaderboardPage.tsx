@@ -29,7 +29,7 @@ export function LeaderboardPage({ leaderboard, events }: LeaderboardPageProps) {
       topModels.forEach(model => {
         const point = model.performanceHistory.find(h => h.date === date)
         if (point) {
-          dataPoint[model.model] = point.score
+          dataPoint[model.model] = point.cumulative_pnl
         }
       })
       return dataPoint
@@ -136,44 +136,41 @@ export function LeaderboardPage({ leaderboard, events }: LeaderboardPageProps) {
             <CardContent>
               <div className="space-y-4">
                 {events.slice(0, 6).map((event) => (
-                  <Card key={event.id} className="p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-sm font-medium line-clamp-2 flex-1 mr-2">{event.title}</h3>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ${event.category === 'Crypto' ? 'bg-orange-100 text-orange-800' :
-                        event.category === 'Politics' ? 'bg-blue-100 text-blue-800' :
-                          event.category === 'Technology' ? 'bg-purple-100 text-purple-800' :
-                            'bg-green-100 text-green-800'
-                        }`}>
-                        {event.category}
-                      </span>
-                    </div>
+                  <a key={event.id} href={`/events/${event.id}`}>
+                    <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
+                      <div className="flex items-start justify-between mb-3">
+                        <h3 className="text-sm font-medium line-clamp-2 flex-1 mr-2">{event.title}</h3>
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {event.markets?.length || 0} Markets
+                        </span>
+                      </div>
 
                     <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{event.description}</p>
 
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Probability</span>
-                        <span className="font-medium">{(event.probability * 100).toFixed(0)}%</span>
-                      </div>
-                      <div className="w-full bg-secondary rounded-full h-2">
-                        <div
-                          className="bg-primary h-2 rounded-full transition-all"
-                          style={{ width: `${event.probability * 100}%` }}
-                        ></div>
+                        <span className="text-muted-foreground">Volume</span>
+                        <span className="font-medium">
+                          {event.volume ? `$${(event.volume / 1000).toFixed(0)}K` : 'N/A'}
+                        </span>
                       </div>
 
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center text-muted-foreground">
                           <DollarSign className="h-3 w-3 mr-1" />
-                          ${(event.volume / 1000).toFixed(0)}K volume
+                          {event.liquidity ? `$${(event.liquidity / 1000).toFixed(0)}K liquidity` : 'No liquidity'}
                         </div>
                         <div className="flex items-center text-muted-foreground">
                           <Calendar className="h-3 w-3 mr-1" />
-                          {event.endDate}
+                          {event.end_datetime 
+                            ? new Date(event.end_datetime).toLocaleDateString()
+                            : 'No end date'
+                          }
                         </div>
                       </div>
                     </div>
-                  </Card>
+                    </Card>
+                  </a>
                 ))}
               </div>
             </CardContent>

@@ -1,19 +1,20 @@
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import type { Event, LeaderboardEntry, Stats } from './api'
 import { apiService } from './api'
-import { Navigation } from './components/Navigation'
+import { Layout } from './components/Layout'
 import { LeaderboardPage } from './components/LeaderboardPage'
 import { ModelsPage } from './components/ModelsPage'
 import { QuestionsPage } from './components/QuestionsPage'
+import { EventDetail } from './components/EventDetail'
 
-function App() {
+function AppContent() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [currentPage, setCurrentPage] = useState('leaderboard')
-  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const location = useLocation()
 
   const loadData = async () => {
     try {
@@ -40,59 +41,27 @@ function App() {
     } catch (error) {
       console.error('Error loading data:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-      console.error('Error details:', {
-        message: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined,
-        name: error instanceof Error ? error.name : 'Unknown'
-      })
       setError(`Failed to load data: ${errorMessage}`)
     } finally {
       setLoading(false)
-      setRefreshing(false)
     }
   }
-
 
   useEffect(() => {
     loadData()
   }, [])
 
-  const renderCurrentPage = () => {
-    switch (currentPage) {
-      case 'leaderboard':
-        return <LeaderboardPage leaderboard={leaderboard} events={events} />
-      case 'models':
-        return <ModelsPage leaderboard={leaderboard} />
-      case 'questions':
-        return <QuestionsPage events={events} leaderboard={leaderboard} />
-      default:
-        return <LeaderboardPage leaderboard={leaderboard} events={events} />
-    }
+  const getCurrentPage = () => {
+    if (location.pathname === '/') return 'leaderboard'
+    if (location.pathname === '/events') return 'events'
+    if (location.pathname === '/models') return 'models'
+    if (location.pathname.startsWith('/events/')) return 'events'
+    return 'leaderboard'
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Header and Navigation */}
-      <header className="border-b border-border bg-card shadow-sm">
-        <div className="container mx-auto px-6 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col">
-              <h1 className="text-3xl font-bold tracking-tight">
-                PrediBench
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Letting LLMs bet their money on the future
-              </p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Navigation currentPage={currentPage} onPageChange={setCurrentPage} />
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Page Content */}
-      {error ? (
+  if (error) {
+    return (
+      <Layout currentPage={getCurrentPage()}>
         <div className="container mx-auto px-6 py-12 text-center">
           <h2 className="text-xl font-bold text-red-600 mb-2">Error Loading Data</h2>
           <p className="text-muted-foreground mb-4">{error}</p>
@@ -111,17 +80,49 @@ function App() {
             <p>Events data: {events.length} entries</p>
           </div>
         </div>
-      ) : loading ? (
-        <div className="container mx-auto px-6 py-12 flex items-center justify-center">
-          <div className="flex items-center space-x-3">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <span className="text-muted-foreground">Loading benchmark data...</span>
-          </div>
-        </div>
-      ) : (
-        renderCurrentPage()
-      )}
-    </div>
+      </Layout>
+    )
+  }
+
+  return (
+    <Layout currentPage={getCurrentPage()}>
+      <Routes>
+        <Route path="/" element={<LeaderboardPage leaderboard={leaderboard} events={events} />} />
+        <Route path="/events" element={<QuestionsPage events={events} leaderboard={leaderboard} loading={loading} />} />
+        <Route path="/models" element={<ModelsPage leaderboard={leaderboard} />} />
+        <Route 
+          path="/events/:eventId" 
+          element={
+            <EventDetailWrapper events={events} leaderboard={leaderboard} />
+          } 
+        />
+      </Routes>
+    </Layout>
+  )
+}
+
+function EventDetailWrapper({ events, leaderboard }: { events: Event[], leaderboard: LeaderboardEntry[] }) {
+  const location = useLocation()
+  const eventId = location.pathname.split('/events/')[1]
+  const event = events.find(e => e.id === eventId)
+  
+  if (!event) {
+    return (
+      <div className="container mx-auto px-6 py-12 text-center">
+        <h2 className="text-xl font-bold mb-2">Event Not Found</h2>
+        <p className="text-muted-foreground">The event you're looking for doesn't exist.</p>
+      </div>
+    )
+  }
+  
+  return <EventDetail event={event} leaderboard={leaderboard} />
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
   )
 }
 
