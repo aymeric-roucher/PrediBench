@@ -74,13 +74,16 @@ def load_agent_choices():
 
 
 @lru_cache(maxsize=32)
-def get_events_by_ids(event_ids_tuple: tuple, limit: int = 1) -> list:
+def get_events_by_ids(event_ids: tuple[str, ...]) -> list[Event]:
     """Cached wrapper for EventsRequestParameters.get_events()"""
-    events_request_parameters = EventsRequestParameters(
-        event_ids=list(event_ids_tuple),
-        limit=limit,
-    )
-    return events_request_parameters.get_events()
+    events = []
+    for event_id in event_ids:
+        events_request_parameters = EventsRequestParameters(
+            id=event_id,
+            limit=1,
+        )
+        events.append(events_request_parameters.get_events()[0])
+    return events
 
 
 @lru_cache(maxsize=1)
@@ -203,14 +206,9 @@ def get_events_that_received_predictions() -> list[Event]:
     """Get events based that models ran predictions on"""
     # Load agent choices to see what markets they've been betting on
     df = load_agent_choices()
-    event_ids = df["event_id"].unique()
+    event_ids = tuple(df["event_id"].unique())
 
-    events = []
-    for event_id in event_ids:
-        one_event_list = get_events_by_ids((event_id,), 1)
-        events.append(one_event_list[0])
-
-    return events
+    return get_events_by_ids(event_ids)
 
 
 # API Endpoints
@@ -481,7 +479,7 @@ async def get_model_investment_details(agent_id: str):
 @app.get("/api/event/{event_id}")
 async def get_event_details(event_id: str):
     """Get detailed information for a specific event including all its markets"""
-    events_list = get_events_by_ids((event_id,), 1)
+    events_list = get_events_by_ids((event_id,))
 
     if not events_list:
         return {"error": "Event not found"}
@@ -492,7 +490,7 @@ async def get_event_details(event_id: str):
 @app.get("/api/event/{event_id}/markets/prices")
 async def get_event_market_prices(event_id: str):
     """Get price history for all markets in an event"""
-    events_list = get_events_by_ids((event_id,), 1)
+    events_list = get_events_by_ids((event_id,))
 
     if not events_list:
         return {}
