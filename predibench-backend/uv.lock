@@ -2040,7 +2040,7 @@ wheels = [
 [[package]]
 name = "predibench"
 version = "0.1.0"
-source = { git = "https://github.com/aymeric-roucher/PrediBench?subdirectory=predibench-core#f093ce81885359ace8d2bf84cbbf62b06cf1fd2d" }
+source = { git = "https://github.com/aymeric-roucher/PrediBench?subdirectory=predibench-core#2424c41e90d2559df33e57966ce618abc5e219e4" }
 dependencies = [
     { name = "apscheduler" },
     { name = "coloredlogs" },

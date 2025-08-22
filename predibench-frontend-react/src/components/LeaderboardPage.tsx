@@ -23,12 +23,12 @@ export function LeaderboardPage({ leaderboard, events, loading = false }: Leader
 
   const getTopModelsChartData = () => {
     const topModels = leaderboard.slice(0, 3)
-    const dates = topModels[0]?.performanceHistory?.map(h => h.date) || []
+    const dates = topModels[0]?.pnl_history?.map(h => h.date) || []
 
     return dates.map(date => {
       const dataPoint: any = { date }
       topModels.forEach(model => {
-        const point = model.performanceHistory.find(h => h.date === date)
+        const point = model.pnl_history.find(h => h.date === date)
         if (point) {
           dataPoint[model.model] = point.cumulative_pnl
         }
@@ -80,38 +80,38 @@ export function LeaderboardPage({ leaderboard, events, loading = false }: Leader
                       key={entry.id}
                       className="p-4 rounded-lg border border-border hover:border-primary/50 transition-all hover:shadow-md"
                     >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-800' :
-                          index === 1 ? 'bg-slate-100 text-slate-800' :
-                            index === 2 ? 'bg-orange-100 text-orange-800' :
-                              'bg-muted text-muted-foreground'
-                          }`}>
-                          {index + 1}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-800' :
+                            index === 1 ? 'bg-slate-100 text-slate-800' :
+                              index === 2 ? 'bg-orange-100 text-orange-800' :
+                                'bg-muted text-muted-foreground'
+                            }`}>
+                            {index + 1}
+                          </div>
+                          <div>
+                            <h3 className="font-semibold">{entry.model}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              {entry.trades} trades • Updated {entry.lastUpdated}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="font-semibold">{entry.model}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {entry.trades} trades • Updated {entry.lastUpdated}
-                          </p>
-                        </div>
-                      </div>
 
-                      <div className="flex items-center space-x-6">
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Final PnL</p>
-                          <p className="text-lg font-bold">{entry.final_cumulative_pnl.toFixed(1)}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Brier score</p>
-                          <p className="text-lg font-semibold text-green-600">${Math.round(entry.final_cumulative_pnl * 1000).toLocaleString()}</p>
-                        </div>
-                        <div className="flex items-center">
-                          {getTrendIcon(entry.trend)}
+                        <div className="flex items-center space-x-6">
+                          <div className="text-right">
+                            <p className="text-sm text-muted-foreground">Final PnL</p>
+                            <p className="text-lg font-bold">{entry.final_cumulative_pnl.toFixed(1)}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-muted-foreground">Brier score</p>
+                            <p className="text-lg font-semibold text-green-600">${Math.round(entry.final_cumulative_pnl * 1000).toLocaleString()}</p>
+                          </div>
+                          <div className="flex items-center">
+                            {getTrendIcon(entry.trend)}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
                   ))
                 )}
               </div>
@@ -133,27 +133,27 @@ export function LeaderboardPage({ leaderboard, events, loading = false }: Leader
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={getTopModelsChartData()}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
-                    <YAxis stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px'
-                      }}
-                    />
-                    {leaderboard.slice(0, 3).map((model, index) => (
-                      <Line
-                        key={model.id}
-                        type="monotone"
-                        dataKey={model.model}
-                        stroke={['#3B82F6', '#10B981', '#F59E0B'][index]}
-                        strokeWidth={2}
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
+                      <YAxis stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px'
+                        }}
                       />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
+                      {leaderboard.slice(0, 3).map((model, index) => (
+                        <Line
+                          key={model.id}
+                          type="monotone"
+                          dataKey={model.model}
+                          stroke={['#3B82F6', '#10B981', '#F59E0B'][index]}
+                          strokeWidth={2}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
                 )}
               </div>
             </CardContent>
@@ -196,40 +196,40 @@ export function LeaderboardPage({ leaderboard, events, loading = false }: Leader
                 ) : (
                   events.slice(0, 6).map((event) => (
                     <a key={event.id} href={`/events/${event.id}`}>
-                    <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
-                      <div className="flex items-start justify-between mb-3">
-                        <h3 className="text-sm font-medium line-clamp-2 flex-1 mr-2">{event.title}</h3>
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {event.markets?.length || 0} Markets
-                        </span>
-                      </div>
-
-                    <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{event.description}</p>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Volume</span>
-                        <span className="font-medium">
-                          {event.volume ? `$${(event.volume / 1000).toFixed(0)}K` : 'N/A'}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center text-muted-foreground">
-                          <DollarSign className="h-3 w-3 mr-1" />
-                          {event.liquidity ? `$${(event.liquidity / 1000).toFixed(0)}K liquidity` : 'No liquidity'}
+                      <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
+                        <div className="flex items-start justify-between mb-3">
+                          <h3 className="text-sm font-medium line-clamp-2 flex-1 mr-2">{event.title}</h3>
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {event.markets?.length || 0} Markets
+                          </span>
                         </div>
-                        <div className="flex items-center text-muted-foreground">
-                          <Calendar className="h-3 w-3 mr-1" />
-                          {event.end_datetime 
-                            ? new Date(event.end_datetime).toLocaleDateString()
-                            : 'No end date'
-                          }
+
+                        <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{event.description}</p>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">Volume</span>
+                            <span className="font-medium">
+                              {event.volume ? `$${(event.volume / 1000).toFixed(0)}K` : 'N/A'}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center text-muted-foreground">
+                              <DollarSign className="h-3 w-3 mr-1" />
+                              {event.liquidity ? `$${(event.liquidity / 1000).toFixed(0)}K liquidity` : 'No liquidity'}
+                            </div>
+                            <div className="flex items-center text-muted-foreground">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              {event.end_datetime
+                                ? new Date(event.end_datetime).toLocaleDateString()
+                                : 'No end date'
+                              }
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                    </Card>
-                  </a>
+                      </Card>
+                    </a>
                   ))
                 )}
               </div>

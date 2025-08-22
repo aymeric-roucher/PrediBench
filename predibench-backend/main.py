@@ -41,9 +41,9 @@ AGENT_CHOICES_REPO = "m-ric/predibench-agent-decisions-2"
 
 
 # Data models
-class PerformanceHistory(BaseModel):
+class DataPoint(BaseModel):
     date: str
-    cumulative_pnl: float
+    value: float
 
 
 class LeaderboardEntry(BaseModel):
@@ -54,7 +54,7 @@ class LeaderboardEntry(BaseModel):
     profit: int
     lastUpdated: str
     trend: str
-    performanceHistory: list[PerformanceHistory]
+    pnl_history: list[DataPoint]
 
 
 class Stats(BaseModel):
@@ -125,12 +125,10 @@ def calculate_real_performance():
 
         # Generate performance history from cumulative PnL
         cumulative_pnl = pnl_calculator.portfolio_cumulative_pnl
-        performance_history = []
+        pnl_history = []
         for date_idx, pnl_value in cumulative_pnl.items():
-            performance_history.append(
-                PerformanceHistory(
-                    date=date_idx.strftime("%Y-%m-%d"), cumulative_pnl=float(pnl_value)
-                )
+            pnl_history.append(
+                DataPoint(date=date_idx.strftime("%Y-%m-%d"), value=float(pnl_value))
             )
 
         # Calculate metrics exactly like gradio
@@ -145,7 +143,7 @@ def calculate_real_performance():
             "agent_name": agent_name,
             "final_cumulative_pnl": final_pnl,
             "annualized_sharpe_ratio": sharpe_ratio,
-            "performance_history": performance_history,
+            "pnl_history": pnl_history,
             "daily_cumulative_pnl": pnl_calculator.portfolio_cumulative_pnl.tolist(),
             "dates": [
                 d.strftime("%Y-%m-%d")
@@ -173,9 +171,9 @@ def get_leaderboard() -> list[LeaderboardEntry]:
         )
     ):
         # Determine trend
-        history = metrics["performance_history"]
+        history = metrics["pnl_history"]
         if len(history) >= 2:
-            recent_change = history[-1].cumulative_pnl - history[-2].cumulative_pnl
+            recent_change = history[-1].value - history[-2].value
             trend = (
                 "up"
                 if recent_change > 0.1
@@ -194,7 +192,7 @@ def get_leaderboard() -> list[LeaderboardEntry]:
             profit=0,
             lastUpdated=datetime.now().strftime("%Y-%m-%d"),
             trend=trend,
-            performanceHistory=metrics["performance_history"],
+            pnl_history=metrics["pnl_history"],
         )
         leaderboard.append(entry)
 
@@ -335,27 +333,26 @@ async def get_model_investment_details(agent_id: str):
     agent_positions = positions_df[positions_df["agent_name"] == agent_id]
 
     if agent_positions.empty:
-        return {"markets": [], "market_pnls": []}
+        return {"markets": []}
 
     # Prepare market data with questions
-    markets_data = []
-    market_pnls = []
+    markets_data = {}
 
     # Get market questions from events
     events = get_events_that_received_predictions()
-    event_dict = {event.id: event for event in events}
+    market_dict = {}
+    for event in events:
+        for market in event.markets:
+            market_dict[market.id] = market
 
     # Process each market this agent traded
     for market_id in agent_positions["market_id"].unique():
-        market_positions = agent_positions[agent_positions["market_id"] == market_id]
-
         # Get market question
-        market_question = "Unknown Market"
-        market_question = event_dict[market_id].question
+        market_question = market_dict[market_id].question
 
         # Get price data if available
         price_data = []
-        market_prices = pnl_calculator.prices[market_id].dropna()
+        market_prices = pnl_calculator.prices[market_id].fillna(0)
         for date_idx, price in market_prices.items():
             price_data.append(
                 {
@@ -364,118 +361,46 @@ async def get_model_investment_details(agent_id: str):
                 }
             )
 
-        # Get position markers
+        # Get position markers, ffill positions
+        market_positions = agent_positions[agent_positions["market_id"] == market_id][
+            ["date", "choice"]
+        ]
+        market_positions = pd.concat(
+            [
+                market_positions,
+                pd.DataFrame({"date": [market_prices.index[-1]], "choice": [np.nan]}),
+            ]
+        )  # Add a last value to allow ffill to work
+        market_positions["date"] = pd.to_datetime(market_positions["date"])
+        market_positions["choice"] = market_positions["choice"].astype(float)
+        market_positions = market_positions.set_index("date")
+        market_positions = market_positions.resample("D").ffill(limit=7).reset_index()
+
         position_markers = []
         for _, pos_row in market_positions.iterrows():
             position_markers.append(
                 {
-                    "date": str(pos_row["date"]),
-                    "position": float(pos_row["choice"]),
-                    "type": "long" if pos_row["choice"] > 0 else "short",
+                    "date": pos_row["date"].strftime("%Y-%m-%d"),
+                    "position": pos_row["choice"],
                 }
             )
-
-        markets_data.append(
-            {
-                "market_id": market_id,
-                "question": market_question,
-                "price_data": price_data,
-                "positions": position_markers,
-            }
-        )
 
         # Get market-specific PnL
-        if market_id in pnl_calculator.pnl.columns:
-            market_pnl = pnl_calculator.pnl[market_id].cumsum()
-            pnl_data = []
-            for date_idx, pnl_value in market_pnl.items():
-                pnl_data.append(
-                    {"date": date_idx.strftime("%Y-%m-%d"), "pnl": float(pnl_value)}
-                )
-
-            market_pnls.append(
-                {
-                    "market_id": market_id,
-                    "question": market_question,
-                    "pnl_data": pnl_data,
-                }
+        market_pnl = pnl_calculator.pnl[market_id].cumsum().fillna(0)
+        pnl_data = []
+        for date_idx, pnl_value in market_pnl.items():
+            pnl_data.append(
+                {"date": date_idx.strftime("%Y-%m-%d"), "pnl": float(pnl_value)}
             )
+        markets_data[market_id] = {
+            "market_id": market_id,
+            "question": market_question,
+            "prices": price_data,
+            "positions": position_markers,
+            "pnl_data": pnl_data,
+        }
 
-    # Also create unified chart data for easier frontend consumption
-
-    # Collect all unique dates for price data
-    all_price_dates = set()
-    all_pnl_dates = set()
-
-    for market in markets_data:
-        for price_point in market["price_data"]:
-            all_price_dates.add(price_point["date"])
-
-    for market in market_pnls:
-        for pnl_point in market["pnl_data"]:
-            all_pnl_dates.add(pnl_point["date"])
-
-    price_dates_sorted = sorted(list(all_price_dates))
-    pnl_dates_sorted = sorted(list(all_pnl_dates))
-
-    # Create unified price chart data
-    price_chart_data = []
-    for target_date in price_dates_sorted:
-        data_point = {"date": target_date}
-        for market in markets_data:
-            # Find price for this date
-            price_point = next(
-                (p for p in market["price_data"] if p["date"] == target_date), None
-            )
-            data_point[f"price_{market['market_id']}"] = (
-                price_point["price"] if price_point else None
-            )
-            data_point[f"name_{market['market_id']}"] = (
-                market["question"][:40] + "..."
-                if len(market["question"]) > 40
-                else market["question"]
-            )
-        price_chart_data.append(data_point)
-
-    # Create unified PnL chart data
-    pnl_chart_data = []
-    for target_date in pnl_dates_sorted:
-        data_point = {"date": target_date}
-        for market in market_pnls:
-            # Find PnL for this date
-            pnl_point = next(
-                (p for p in market["pnl_data"] if p["date"] == target_date), None
-            )
-            data_point[f"pnl_{market['market_id']}"] = (
-                pnl_point["pnl"] if pnl_point else None
-            )
-            data_point[f"name_{market['market_id']}"] = (
-                market["question"][:40] + "..."
-                if len(market["question"]) > 40
-                else market["question"]
-            )
-        pnl_chart_data.append(data_point)
-
-    # Create market info for legend/colors
-    market_info = []
-    for market in markets_data:
-        market_info.append(
-            {
-                "market_id": market["market_id"],
-                "question": market["question"],
-                "short_name": market["question"][:40] + "..."
-                if len(market["question"]) > 40
-                else market["question"],
-            }
-        )
-
-    return {
-        "markets": markets_data,
-        "market_pnls": market_pnls,
-        "price_chart_data": price_chart_data,
-        "pnl_chart_data": pnl_chart_data,
-        "market_info": market_info,
-    }
+    return markets_data
 
 
 @app.get("/api/event/{event_id}")
@@ -558,8 +483,7 @@ async def get_event_investments(event_id: str):
                 model_decision=betting_result,
             )
             market_investments.append(market_investment)
-
-    return market_investments[:8]  # Limit to 8 results for UI
+    return market_investments
 
 
 @app.get("/api/health")
