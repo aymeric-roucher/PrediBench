@@ -1,33 +1,36 @@
-from pydantic import BaseModel
-from typing import Literal
 from datetime import date
 
+from pydantic import BaseModel, Field
 
-class BettingResult(BaseModel):
-    direction: Literal["buy_yes", "buy_no", "nothing"]
-    amount: float  # Fraction of allocated capital (0.0 to 1.0)
-    reasoning: str
+# NOTE: price ad odd of the 'yes' on any market should be equal, since normalized to 1
 
 
-class MarketInvestmentResult(BaseModel):
+class SingleModelDecision(BaseModel):
+    rationale: str
+    odds: float = Field(
+        ..., ge=0.0, le=1.0
+    )  # Model's assessment of probability (0.0 to 1.0)
+    bet: float = Field(
+        ..., ge=-1.0, le=1.0
+    )  # Model's bet on this market (-1.0 to 1.0, sums of absolute values must be 1 with bets on other markets from this event)
+
+
+class MarketInvestmentDecision(BaseModel):
     market_id: str
-    market_question: str
-    probability_assessment: float  # Model's assessment of probability (0.0 to 1.0)
-    market_odds: float  # Current market price/odds (0.0 to 1.0)
-    confidence_in_assessment: float  # Confidence level (0.0 to 1.0)
-    betting_decision: BettingResult
-    market_price: float | None = None
-    is_closed: bool = False
+    model_decision: SingleModelDecision
+    market_question: str | None = None
 
 
-class EventInvestmentResult(BaseModel):
+class EventInvestmentDecisions(BaseModel):
     event_id: str
     event_title: str
     event_description: str | None = None
-    market_decisions: list[MarketInvestmentResult]  # Multiple markets per event
+    market_investment_decisions: list[
+        MarketInvestmentDecision
+    ]  # Multiple markets per event
 
 
-class ModelInvestmentResult(BaseModel):
+class ModelInvestmentDecisions(BaseModel):
     model_id: str
     target_date: date
-    event_results: list[EventInvestmentResult]
+    event_investment_decisions: list[EventInvestmentDecisions]

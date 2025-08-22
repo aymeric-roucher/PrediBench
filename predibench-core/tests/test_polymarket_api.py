@@ -1,12 +1,10 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from predibench.polymarket_api import (
-    MAX_INTERVAL_TIMESERIES,
     EventsRequestParameters,
     MarketsRequestParameters,
     OrderBook,
     _HistoricalTimeSeriesRequestParameters,
-    _split_date_range,
 )
 
 
@@ -138,105 +136,6 @@ def test_get_market_events():
     second_ids = {event.id for event in events_second}
     # Events should be different (though not necessarily disjoint due to API behavior)
     assert len(first_ids.union(second_ids)) > len(first_ids)
-
-
-def test_split_date_range_small():
-    """Test that small date ranges don't get split."""
-    start_datetime = datetime(2024, 1, 1)
-    end_datetime = datetime(2024, 1, 10)
-
-    chunks = _split_date_range(start_datetime, end_datetime)
-
-    assert len(chunks) == 1
-    assert chunks[0] == (start_datetime, end_datetime)
-
-
-def test_split_date_range_large():
-    """Test that large date ranges get split into multiple chunks."""
-    start_datetime = datetime(2024, 1, 1)
-    end_datetime = datetime(2024, 1, 31)  # 30 days, should be split
-
-    chunks = _split_date_range(start_datetime, end_datetime)
-
-    assert len(chunks) > 1
-
-    # Check that chunks cover the entire range without gaps
-    assert chunks[0][0] == start_datetime
-    assert chunks[-1][1] == end_datetime
-
-    # Check that each chunk is within the limit
-    for chunk_start, chunk_end in chunks:
-        assert chunk_end - chunk_start <= MAX_INTERVAL_TIMESERIES
-
-    # Check that chunks don't overlap (except by 1 hour)
-    for i in range(len(chunks) - 1):
-        current_end = chunks[i][1]
-        next_start = chunks[i + 1][0]
-        assert next_start == current_end + timedelta(hours=1)
-
-
-def test_split_date_range_very_large():
-    """Test splitting a very large date range (60 days)."""
-    start_datetime = datetime(2024, 1, 1)
-    end_datetime = datetime(2024, 3, 1)  # ~60 days
-
-    chunks = _split_date_range(start_datetime, end_datetime)
-
-    # Should split into at least 4 chunks (60 days / 14 days ≈ 4.3)
-    assert len(chunks) >= 4
-
-    # Verify continuity
-    reconstructed_range = chunks[-1][1] - chunks[0][0]
-    original_range = end_datetime - start_datetime
-    # Allow for small differences due to the 1-hour gaps between chunks
-    assert (
-        abs((reconstructed_range - original_range).total_seconds())
-        <= (len(chunks) - 1) * 3600
-    )
-
-
-def test_split_date_range_multi_split_precise():
-    """Test precise multi-split behavior with known intervals."""
-    # Create a range that should split into exactly 3 chunks
-    start_datetime = datetime(2024, 1, 1, 0, 0, 0)
-    # Add 2 * MAX_INTERVAL_TIMESERIES + some extra time to force 3 chunks
-    end_datetime = start_datetime + (2 * MAX_INTERVAL_TIMESERIES) + timedelta(days=5)
-
-    chunks = _split_date_range(start_datetime, end_datetime)
-
-    # Should have exactly 3 chunks
-    assert len(chunks) == 3, f"Expected 3 chunks, got {len(chunks)}"
-
-    # First chunk should start at start_datetime
-    assert chunks[0][0] == start_datetime
-
-    # Last chunk should end at end_datetime
-    assert chunks[-1][1] == end_datetime
-
-    # Check that segment starts are correctly spaced by MAX_INTERVAL_TIMESERIES
-    expected_second_start = start_datetime + MAX_INTERVAL_TIMESERIES
-    expected_third_start = start_datetime + (2 * MAX_INTERVAL_TIMESERIES)
-
-    assert chunks[1][0] == expected_second_start
-    assert chunks[2][0] == expected_third_start
-
-    # Check that chunk ends are properly offset by 1 hour from next start
-    assert chunks[0][1] == expected_second_start - timedelta(hours=1)
-    assert chunks[1][1] == expected_third_start - timedelta(hours=1)
-
-    # Verify no chunk exceeds MAX_INTERVAL_TIMESERIES
-    for i, (chunk_start, chunk_end) in enumerate(chunks):
-        duration = chunk_end - chunk_start
-        assert duration <= MAX_INTERVAL_TIMESERIES, (
-            f"Chunk {i} duration {duration} exceeds limit"
-        )
-
-    print(
-        f"Successfully split {end_datetime - start_datetime} into {len(chunks)} chunks:"
-    )
-    for i, (chunk_start, chunk_end) in enumerate(chunks):
-        duration = chunk_end - chunk_start
-        print(f"  Chunk {i + 1}: {chunk_start} to {chunk_end} (duration: {duration})")
 
 
 if __name__ == "__main__":

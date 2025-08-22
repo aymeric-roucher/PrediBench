@@ -101,8 +101,6 @@ def _write_file_to_bucket_or_data_dir(file_path: Path, blob_name: str) -> bool:
         blob = bucket.blob(blob_name)
         blob.upload_from_filename(str(file_path))
         print(f"✅ Uploaded {blob_name} to bucket and saved locally")
-    else:
-        print(f"✅ Saved {blob_name} locally only (no bucket access)")
 
     return True
 

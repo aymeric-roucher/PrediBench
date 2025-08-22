@@ -1,18 +1,19 @@
+import json
 import os
 from datetime import date, datetime
 from pathlib import Path
 
-import numpy as np
 import datasets
+import numpy as np
 from datasets import Dataset, concatenate_datasets, load_dataset
 from dotenv import load_dotenv
 from predibench.agent.dataclasses import (
-    EventInvestmentResult,
-    MarketInvestmentResult,
-    ModelInvestmentResult,
+    EventInvestmentDecisions,
+    MarketInvestmentDecision,
+    ModelInvestmentDecisions,
+    SingleModelDecision,
 )
 from predibench.agent.smolagents_utils import (
-    EventDecisions,
     run_deep_research,
     run_smolagents,
 )
@@ -27,62 +28,10 @@ load_dotenv()
 logger = get_logger(__name__)
 
 
-def _create_market_investment_decisions(
-    event_decisions: EventDecisions, market_info_dict: dict
-) -> list[MarketInvestmentResult]:
-    """Convert EventDecisions to list of MarketInvestmentResult."""
-    results = []
-
-    for market_decision in event_decisions.market_decisions:
-        market_info = market_info_dict[market_decision.market_id]
-
-        if market_info["is_closed"]:
-            # Create a "nothing" decision for closed markets
-            from predibench.agent.dataclasses import BettingResult
-
-            betting_decision = BettingResult(
-                direction="nothing",
-                amount=0.0,
-                reasoning=f"Market is closed. Original reasoning: {market_decision.reasoning}",
-            )
-            result = MarketInvestmentResult(
-                market_id=market_info["id"],
-                market_question=market_info["question"],
-                probability_assessment=market_decision.probability_assessment,
-                market_odds=market_info["current_price"] or 0.5,
-                confidence_in_assessment=market_decision.confidence_in_assessment,
-                betting_decision=betting_decision,
-                market_price=market_info["current_price"],
-                is_closed=True,
-            )
-        else:
-            from predibench.agent.dataclasses import BettingResult
-
-            betting_decision = BettingResult(
-                direction=market_decision.direction,
-                amount=market_decision.amount,
-                reasoning=market_decision.reasoning,
-            )
-            result = MarketInvestmentResult(
-                market_id=market_info["id"],
-                market_question=market_info["question"],
-                probability_assessment=market_decision.probability_assessment,
-                market_odds=market_info["current_price"] or 0.5,
-                confidence_in_assessment=market_decision.confidence_in_assessment,
-                betting_decision=betting_decision,
-                market_price=market_info["current_price"],
-                is_closed=False,
-            )
-        results.append(result)
-
-    return results
-
-
 def _upload_results_to_hf_dataset(
-    results_per_model: list[ModelInvestmentResult],
+    results_per_model: list[ModelInvestmentDecisions],
     target_date: date,
-    hf_token: str,
-    dataset_name: str = "charles-azam/predibench",
+    dataset_name: str = "Sibyllic/predibench",
     split: str = "train",
     erase_existing: bool = False,
 ) -> None:
@@ -98,50 +47,30 @@ def _upload_results_to_hf_dataset(
     new_rows = []
     current_timestamp = datetime.now()
 
-    for model_result in results_per_model:
-        for event_result in model_result.event_results:
-            # Handle multiple market decisions per event
-            for market_decision in event_result.market_decisions:
-                # Map decision to choice value
-                choice_mapping = {"buy_yes": 1, "buy_no": 0, "nothing": -1}
-                choice = choice_mapping.get(
-                    market_decision.betting_decision.direction, -1
-                )
-
-                row = {
-                    # ModelInvestmentResult fields
-                    "model_id": model_result.model_id,
-                    "agent_name": model_result.model_id,  # Keep for backward compatibility
-                    "target_date": model_result.target_date,
-                    "date": target_date,  # Keep for backward compatibility
-                    # EventInvestmentResult fields
-                    "event_id": event_result.event_id,
-                    "event_title": event_result.event_title,
-                    "event_description": event_result.event_description,
-                    # MarketInvestmentResult fields
-                    "market_id": market_decision.market_id,
-                    "market_question": market_decision.market_question,
-                    "question": market_decision.market_question,  # Keep for backward compatibility
-                    "probability_assessment": market_decision.probability_assessment,
-                    "market_odds": market_decision.market_odds,
-                    "confidence_in_assessment": market_decision.confidence_in_assessment,
-                    "market_price": market_decision.market_price,
-                    "is_closed": market_decision.is_closed,
-                    # BettingResult fields
-                    "betting_direction": market_decision.betting_decision.direction,
-                    "choice_raw": market_decision.betting_decision.direction,  # Keep for backward compatibility
-                    "betting_amount": market_decision.betting_decision.amount,
-                    "betting_reasoning": market_decision.betting_decision.reasoning,
-                    "rationale": market_decision.betting_decision.reasoning
-                    or "",  # Keep for backward compatibility
-                    # Legacy/computed fields
-                    "choice": choice,
-                    "messages_count": 0,  # This would need to be tracked during agent execution
-                    "has_reasoning": market_decision.betting_decision.reasoning
-                    is not None,
-                    "timestamp_uploaded": current_timestamp,
-                }
-                new_rows.append(row)
+    for model_investment_decision in results_per_model:
+        for (
+            event_investment_decision
+        ) in model_investment_decision.event_investment_decisions:
+            row = {
+                # ModelInvestmentResult fields
+                "model_id": model_investment_decision.model_id,
+                "agent_name": model_investment_decision.model_id,  # Keep for backward compatibility
+                "target_date": model_investment_decision.target_date,
+                "date": target_date,  # Keep for backward compatibility
+                # EventInvestmentResult fields
+                "event_id": event_investment_decision.event_id,
+                "event_title": event_investment_decision.event_title,
+                "event_description": event_investment_decision.event_description,
+                # MarketInvestmentResult fields
+                "decisions_per_market": json.dumps(
+                    event_investment_decision.market_investment_decisions,
+                    default=lambda obj: obj.model_dump()
+                    if hasattr(obj, "model_dump")
+                    else obj,
+                ),
+                "timestamp_uploaded": current_timestamp,
+            }
+            new_rows.append(row)
 
     if new_rows:
         # Create a new dataset with the new rows
@@ -176,7 +105,6 @@ def _upload_results_to_hf_dataset(
         combined_dataset.push_to_hub(
             dataset_name,
             split=split,
-            token=hf_token,
         )
 
         logger.info(f"Successfully uploaded {len(new_rows)} new rows to HF dataset")
@@ -185,7 +113,7 @@ def _upload_results_to_hf_dataset(
 
 
 def save_model_result(
-    model_result: ModelInvestmentResult,
+    model_result: ModelInvestmentDecisions,
     date_output_path: Path,
     timestamp_for_saving: str,
 ) -> None:
@@ -207,7 +135,7 @@ def _process_event_investment(
     date_output_path: Path | None,
     timestamp_for_saving: str,
     price_history_limit: int = 20,
-) -> EventInvestmentResult:
+) -> EventInvestmentDecisions:
     """Process investment decisions for all relevant markets."""
     logger.info(f"Processing event: {event.title} with {len(event.markets)} markets")
     backward_mode = is_backward_mode(target_date)
@@ -281,28 +209,17 @@ Event: {event.title}
 You have access to {len(market_data)} markets related to this event. You must allocate your capital across these markets.
 
 CAPITAL ALLOCATION RULES:
-- You have exactly 1.0 units of capital to allocate
-- For each market, specify the fraction of capital to bet (0.0 to 1.0)
-- The sum of ALL amounts + unallocated_capital MUST equal 1.0
-- You can choose not to bet on markets with poor edges by setting direction="nothing" and amount=0.0
-- Any unallocated capital should be specified in the unallocated_capital parameter
-
-For EACH market, provide:
+- You have exactly 1.0 dollars to allocate. Negative bets can be done to short the market, but they still count in absolute value towards the 1.0 dollar allocation.
+- For EACH market, specify your bet. Provide:
 1. market_id: The market ID
-2. reasoning: Explanation for your decision
-3. probability_assessment: Your assessment of the true probability (0.0 to 1.0)  
-4. confidence_in_assessment: How confident you are in your assessment (0.0 to 1.0)
-5. direction: "buy_yes" (bet outcome happens), "buy_no" (bet outcome doesn't happen), or "nothing" (don't bet)
-6. amount: Fraction of total capital to bet on this market (0.0 to 1.0)
+2. rationale: Explanation for your decision
+4. odds: The odds you think the market will settle at
+3. bet: The amount you bet on this market (can be negative if you want to short the market, e.g. if it's overpriced)
+- The sum of ALL (absolute value of bets) + unallocated_capital must equal 1.0
+- You can choose not to bet on markets with poor edges by setting bets summing to lower than 1 and a non-zero unallocated_capital
 
 AVAILABLE MARKETS:
 {"".join(market_summaries)}
-
-Use the final_answer tool to provide your decisions. Remember:
-- The prices shown are for the specific outcome mentioned
-- "buy_yes" means you think that outcome is more likely than the current price suggests
-- "buy_no" means you think it's less likely than the current price suggests
-- Your total capital allocation (sum of amounts + unallocated_capital) must equal 1.0
 
 Example: If you bet 0.3 on market A, 0.2 on market B, and nothing on market C, your unallocated_capital should be 0.5.
     """
@@ -319,60 +236,40 @@ Example: If you bet 0.3 on market A, 0.2 on market B, and nothing on market C, y
         write_to_storage(prompt_file, full_question)
         logger.info(f"Saved prompt to {prompt_file}")
 
-    # Get agent decisions using smolagents
     if isinstance(model, str) and model == "test_random":
         # Create random decisions for all markets with capital allocation constraint
-        from predibench.agent.smolagents_utils import MarketDecision
 
         market_decisions = []
-        remaining_capital = 1.0
+        per_event_allocation = 1.0
 
-        market_ids = list(market_data.keys())
-        for i, market_info in enumerate(market_data.values()):
-            direction = np.random.choice(
-                ["buy_yes", "buy_no", "nothing"], p=[0.3, 0.3, 0.4]
+        number_markets = len(market_data)
+        invested_values = np.random.random(number_markets)
+        invested_values = (
+            per_event_allocation * invested_values / np.sum(invested_values)
+        )  # Random numbers that sum to per_event_allocation
+
+        for market_info, invested_value in zip(market_data.values(), invested_values):
+            amount = invested_value
+
+            model_decision = SingleModelDecision(
+                rationale=f"Random decision for testing market {market_info['id']}",
+                odds=np.random.uniform(0.1, 0.9),
+                bet=amount,
             )
-
-            # For the last market, use all remaining capital if betting, otherwise leave some unallocated
-            is_last_market = i == len(market_ids) - 1
-            if direction != "nothing":
-                if is_last_market:
-                    # Use up to remaining capital for last market
-                    max_amount = min(remaining_capital, 0.5)
-                    amount = (
-                        np.random.uniform(0.0, max_amount) if max_amount > 0 else 0.0
-                    )
-                else:
-                    # Leave some capital for future markets
-                    max_amount = min(
-                        remaining_capital * 0.6, 0.4
-                    )  # Use at most 60% of remaining, cap at 40%
-                    amount = (
-                        np.random.uniform(0.0, max_amount) if max_amount > 0 else 0.0
-                    )
-                remaining_capital -= amount
-            else:
-                amount = 0.0
-
-            market_decision = MarketDecision(
+            market_decision = MarketInvestmentDecision(
                 market_id=market_info["id"],
-                reasoning=f"Random decision for testing market {market_info['id']}",
-                probability_assessment=np.random.uniform(0.1, 0.9),
-                confidence_in_assessment=np.random.uniform(0.3, 0.8),
-                direction=direction,
-                amount=amount,
+                model_decision=model_decision,
             )
             market_decisions.append(market_decision)
 
-        event_decisions = EventDecisions(market_decisions=market_decisions)
     elif isinstance(model, str) and model == "o3-deep-research":
-        event_decisions = run_deep_research(
+        market_decisions = run_deep_research(
             model_id="o3-deep-research",
             question=full_question,
             structured_output_model_id="gpt-5",
         )
     else:
-        event_decisions = run_smolagents(
+        market_decisions = run_smolagents(
             model=model,
             question=full_question,
             cutoff_date=target_date if backward_mode else None,
@@ -380,18 +277,19 @@ Example: If you bet 0.3 on market A, 0.2 on market B, and nothing on market C, y
             search_api_key=os.getenv("SERPER_API_KEY"),
             max_steps=20,
         )
+    for market_decision in market_decisions:
+        market_decision.market_question = market_data[market_decision.market_id][
+            "question"
+        ]
 
-    # Convert to MarketInvestmentResults for all markets
-    market_decisions = _create_market_investment_decisions(
-        event_decisions=event_decisions, market_info_dict=market_data
-    )
-
-    return EventInvestmentResult(
+    event_decisions = EventInvestmentDecisions(
         event_id=event.id,
         event_title=event.title,
         event_description=event.description,
-        market_decisions=market_decisions,
+        market_investment_decisions=market_decisions,
     )
+
+    return event_decisions
 
 
 def _process_single_model(
@@ -400,24 +298,26 @@ def _process_single_model(
     target_date: date,
     date_output_path: Path | None,
     timestamp_for_saving: str,
-) -> ModelInvestmentResult:
+) -> ModelInvestmentDecisions:
     """Process investments for all events for a model."""
-    event_results = []
+    all_event_decisions = []
 
     for event in events:
         logger.info(f"Processing event: {event.title}")
-        event_result = _process_event_investment(
+        event_decisions = _process_event_investment(
             model=model,
             event=event,
             target_date=target_date,
             date_output_path=date_output_path,
             timestamp_for_saving=timestamp_for_saving,
         )
-        event_results.append(event_result)
+        all_event_decisions.append(event_decisions)
 
     model_id = model.model_id if isinstance(model, ApiModel) else model
-    model_result = ModelInvestmentResult(
-        model_id=model_id, target_date=target_date, event_results=event_results
+    model_result = ModelInvestmentDecisions(
+        model_id=model_id,
+        target_date=target_date,
+        event_investment_decisions=all_event_decisions,
     )
 
     if date_output_path:
@@ -434,11 +334,10 @@ def run_agent_investments(
     events: list[Event],
     target_date: date,
     date_output_path: Path | None,
-    dataset_name: str,
     split: str,
-    hf_token_for_dataset: str | None,
     timestamp_for_saving: str,
-) -> list[ModelInvestmentResult]:
+    dataset_name: str | None = None,
+) -> list[ModelInvestmentDecisions]:
     """Launch agent investments for events on a specific date."""
     logger.info(f"Running agent investments for {len(models)} models on {target_date}")
     logger.info(f"Processing {len(events)} events")
@@ -456,13 +355,12 @@ def run_agent_investments(
         )
         results.append(model_result)
 
-    if hf_token_for_dataset:
+    if dataset_name:
         _upload_results_to_hf_dataset(
             results_per_model=results,
             target_date=target_date,
             dataset_name=dataset_name,
             split=split,
-            hf_token=hf_token_for_dataset,
         )
 
     return results
