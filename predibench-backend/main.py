@@ -8,7 +8,7 @@ import pandas as pd
 from datasets import load_dataset
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from predibench.agent.dataclasses import BettingResult, MarketInvestmentResult
+from predibench.agent.dataclasses import MarketInvestmentDecision, SingleModelDecision
 from predibench.pnl import get_pnls
 from predibench.polymarket_api import (
     Event,
@@ -420,12 +420,12 @@ async def get_model_investment_details(agent_id: str):
 
     # Create unified price chart data
     price_chart_data = []
-    for date in price_dates_sorted:
-        data_point = {"date": date}
+    for target_date in price_dates_sorted:
+        data_point = {"date": target_date}
         for market in markets_data:
             # Find price for this date
             price_point = next(
-                (p for p in market["price_data"] if p["date"] == date), None
+                (p for p in market["price_data"] if p["date"] == target_date), None
             )
             data_point[f"price_{market['market_id']}"] = (
                 price_point["price"] if price_point else None
@@ -439,11 +439,13 @@ async def get_model_investment_details(agent_id: str):
 
     # Create unified PnL chart data
     pnl_chart_data = []
-    for date in pnl_dates_sorted:
-        data_point = {"date": date}
+    for target_date in pnl_dates_sorted:
+        data_point = {"date": target_date}
         for market in market_pnls:
             # Find PnL for this date
-            pnl_point = next((p for p in market["pnl_data"] if p["date"] == date), None)
+            pnl_point = next(
+                (p for p in market["pnl_data"] if p["date"] == target_date), None
+            )
             data_point[f"pnl_{market['market_id']}"] = (
                 pnl_point["pnl"] if pnl_point else None
             )
@@ -512,7 +514,7 @@ async def get_event_market_prices(event_id: str):
 
 
 @app.get(
-    "/api/event/{event_id}/investments", response_model=list[MarketInvestmentResult]
+    "/api/event/{event_id}/investments", response_model=list[MarketInvestmentDecision]
 )
 async def get_event_investments(event_id: str):
     """Get real investment choices for a specific event"""
@@ -543,38 +545,18 @@ async def get_event_investments(event_id: str):
         for market_decision in decisions:
             market_id = market_decision["market_id"]
             model_decision = market_decision["model_decision"]
-
-            # Map bet value to betting direction
-            bet_value = model_decision["bet"]
-            if bet_value > 0.5:
-                direction = "buy_yes"
-                amount = bet_value
-            elif bet_value < -0.5:
-                direction = "buy_no"
-                amount = abs(bet_value)
-            else:
-                direction = "nothing"
-                amount = 0.0
-
             # Create betting result
-            betting_result = BettingResult(
-                direction=direction,
-                amount=amount,
-                reasoning=model_decision["reasoning"],
+            betting_result = SingleModelDecision(
+                bet=model_decision["bet"],
+                odds=model_decision["odds"],
+                rationale=model_decision["rationale"],
             )
 
             # Create market investment result
-            market_investment = MarketInvestmentResult(
+            market_investment = MarketInvestmentDecision(
                 market_id=market_id,
-                market_question=market_decision["market_question"],
-                probability_assessment=model_decision["probability_assessment"],
-                market_odds=model_decision["market_odds"],
-                confidence_in_assessment=model_decision["confidence_in_assessment"],
-                betting_decision=betting_result,
-                market_price=model_decision["market_price"],
-                is_closed=model_decision["is_closed"],
+                model_decision=betting_result,
             )
-
             market_investments.append(market_investment)
 
     return market_investments[:8]  # Limit to 8 results for UI
