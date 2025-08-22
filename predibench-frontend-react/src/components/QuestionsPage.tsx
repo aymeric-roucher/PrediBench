@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { DollarSign, X, Search, Clock, TrendingUp } from 'lucide-react'
+import { Clock, DollarSign, Search, TrendingUp, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { Event, LeaderboardEntry } from '../api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
@@ -70,13 +70,13 @@ export function QuestionsPage({ events, leaderboard, loading: initialLoading = f
     const days = 30
     const data = []
     let price = Math.random() * 0.4 + 0.3
-    
+
     for (let i = 0; i < days; i++) {
       const date = new Date()
       date.setDate(date.getDate() - (days - i))
       price += (Math.random() - 0.5) * 0.1
       price = Math.max(0.1, Math.min(0.9, price))
-      
+
       data.push({
         date: date.toISOString().split('T')[0],
         price: parseFloat(price.toFixed(3)),
@@ -95,15 +95,15 @@ export function QuestionsPage({ events, leaderboard, loading: initialLoading = f
   // Filter and sort events
   const filteredAndSortedEvents = events
     .filter(event => {
-      const matchesSearch = searchQuery === '' || 
+      const matchesSearch = searchQuery === '' ||
         event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         event.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        event.markets?.some(market => 
+        event.markets?.some(market =>
           market.question?.toLowerCase().includes(searchQuery.toLowerCase())
         )
-      
-      const matchesStatus = isLive ? (event.end_datetime ? new Date(event.end_datetime) > new Date() : true) : true
-      
+
+      const matchesStatus = isLive ? (event.end_datetime ? new Date(event.end_datetime) > new Date() : true) : (event.end_datetime ? new Date(event.end_datetime) <= new Date() : false)
+
       return matchesSearch && matchesStatus
     })
     .sort((a, b) => {
@@ -180,7 +180,7 @@ export function QuestionsPage({ events, leaderboard, loading: initialLoading = f
                   <div className="text-center">
                     <p className="text-sm text-muted-foreground">Ends</p>
                     <p className="text-2xl font-bold">
-                      {selectedEvent.end_datetime 
+                      {selectedEvent.end_datetime
                         ? new Date(selectedEvent.end_datetime).toLocaleDateString()
                         : 'N/A'
                       }
@@ -207,10 +207,10 @@ export function QuestionsPage({ events, leaderboard, loading: initialLoading = f
                     <div className="mb-4 flex flex-wrap gap-2">
                       {selectedEvent?.markets?.map((market, index) => (
                         <div key={market.id} className="flex items-center space-x-2">
-                          <div 
-                            className="w-3 h-3 rounded-full" 
-                            style={{ 
-                              backgroundColor: `hsl(${index * 360 / (selectedEvent.markets?.length || 1)}, 70%, 50%)` 
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{
+                              backgroundColor: `hsl(${index * 360 / (selectedEvent.markets?.length || 1)}, 70%, 50%)`
                             }}
                           ></div>
                           <span className="text-sm text-muted-foreground line-clamp-1">
@@ -219,12 +219,12 @@ export function QuestionsPage({ events, leaderboard, loading: initialLoading = f
                         </div>
                       ))}
                     </div>
-                    
+
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis 
-                          dataKey="date" 
+                        <XAxis
+                          dataKey="date"
                           stroke="hsl(var(--muted-foreground))"
                           type="category"
                           allowDuplicatedCategory={false}
@@ -237,11 +237,11 @@ export function QuestionsPage({ events, leaderboard, loading: initialLoading = f
                             borderRadius: '8px'
                           }}
                           formatter={(value: any, name: string) => [
-                            `${(Number(value) * 100).toFixed(1)}%`, 
+                            `${(Number(value) * 100).toFixed(1)}%`,
                             name
                           ]}
                         />
-                        
+
                         {/* Create a line for each market */}
                         {selectedEvent?.markets?.map((market, index) => {
                           const marketData = marketPricesData[market.id] || []
@@ -284,11 +284,10 @@ export function QuestionsPage({ events, leaderboard, loading: initialLoading = f
                       <div key={index} className="p-4 rounded-lg border border-border">
                         <div className="flex items-center justify-between mb-2">
                           <h4 className="font-medium">{prediction.model}</h4>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            prediction.prediction === 'Yes' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-red-100 text-red-800'
-                          }`}>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${prediction.prediction === 'Yes'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                            }`}>
                             {prediction.prediction}
                           </span>
                         </div>
@@ -332,22 +331,10 @@ export function QuestionsPage({ events, leaderboard, loading: initialLoading = f
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-4">
-          {/* Topic Filter */}
-          <div className="flex items-center space-x-2">
-            <span className="text-sm font-medium">Topic:</span>
-            <select className="px-3 py-1 border border-border rounded bg-background text-sm">
-              <option value="">All</option>
-              <option value="politics">Politics</option>
-              <option value="crypto">Crypto</option>
-              <option value="technology">Technology</option>
-              <option value="economics">Economics</option>
-            </select>
-          </div>
-
           {/* Sort By */}
           <div className="flex items-center space-x-2">
             <span className="text-sm font-medium">Sort by:</span>
-            <select 
+            <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'volume' | 'probability' | 'endDate')}
               className="px-3 py-1 border border-border rounded bg-background text-sm"
@@ -361,7 +348,7 @@ export function QuestionsPage({ events, leaderboard, loading: initialLoading = f
           {/* Order */}
           <div className="flex items-center space-x-2">
             <span className="text-sm font-medium">Order:</span>
-            <select 
+            <select
               value={orderBy}
               onChange={(e) => setOrderBy(e.target.value as 'asc' | 'desc')}
               className="px-3 py-1 border border-border rounded bg-background text-sm"
@@ -376,11 +363,10 @@ export function QuestionsPage({ events, leaderboard, loading: initialLoading = f
             <span className="text-sm font-medium">Status:</span>
             <button
               onClick={() => setIsLive(!isLive)}
-              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                isLive 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-gray-100 text-gray-800'
-              }`}
+              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${isLive
+                ? 'bg-green-100 text-green-800'
+                : 'bg-gray-100 text-gray-800'
+                }`}
             >
               {isLive ? 'Live' : 'Historical'}
             </button>
@@ -393,7 +379,7 @@ export function QuestionsPage({ events, leaderboard, loading: initialLoading = f
         {initialLoading || events.length === 0 ? (
           // Show skeleton loading cards while loading
           Array.from({ length: 6 }).map((_, index) => (
-            <Card key={index} className="border-l-4 border-l-gray-200">
+            <Card key={index}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1 space-y-2">
@@ -442,7 +428,7 @@ export function QuestionsPage({ events, leaderboard, loading: initialLoading = f
           filteredAndSortedEvents.map((event) => (
             <Card
               key={event.id}
-              className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-l-4 border-l-primary"
+              className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
               onClick={() => setSelectedEvent(event)}
             >
               <CardHeader className="pb-3">
@@ -503,7 +489,7 @@ export function QuestionsPage({ events, leaderboard, loading: initialLoading = f
                     <div className="flex items-center text-muted-foreground">
                       <Clock className="h-4 w-4 mr-1" />
                       <span className="text-xs">
-                        {event.end_datetime 
+                        {event.end_datetime
                           ? `Closes ${new Date(event.end_datetime).toLocaleDateString()}`
                           : 'No end date'
                         }

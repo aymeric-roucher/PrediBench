@@ -6,9 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 interface LeaderboardPageProps {
   leaderboard: LeaderboardEntry[]
   events: Event[]
+  loading?: boolean
 }
 
-export function LeaderboardPage({ leaderboard, events }: LeaderboardPageProps) {
+export function LeaderboardPage({ leaderboard, events, loading = false }: LeaderboardPageProps) {
   const getTrendIcon = (trend: 'up' | 'down' | 'stable') => {
     switch (trend) {
       case 'up':
@@ -48,11 +49,37 @@ export function LeaderboardPage({ leaderboard, events }: LeaderboardPageProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {leaderboard.map((entry, index) => (
-                  <div
-                    key={entry.id}
-                    className="p-4 rounded-lg border border-border hover:border-primary/50 transition-all hover:shadow-md"
-                  >
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <div key={index} className="p-4 rounded-lg border border-border">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse"></div>
+                          <div>
+                            <div className="h-4 bg-gray-200 rounded animate-pulse w-24 mb-2"></div>
+                            <div className="h-3 bg-gray-200 rounded animate-pulse w-32"></div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-6">
+                          <div className="text-right">
+                            <div className="h-3 bg-gray-200 rounded animate-pulse w-16 mb-1"></div>
+                            <div className="h-5 bg-gray-200 rounded animate-pulse w-12"></div>
+                          </div>
+                          <div className="text-right">
+                            <div className="h-3 bg-gray-200 rounded animate-pulse w-20 mb-1"></div>
+                            <div className="h-5 bg-gray-200 rounded animate-pulse w-16"></div>
+                          </div>
+                          <div className="w-4 h-4 bg-gray-200 rounded animate-pulse"></div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  leaderboard.map((entry, index) => (
+                    <div
+                      key={entry.id}
+                      className="p-4 rounded-lg border border-border hover:border-primary/50 transition-all hover:shadow-md"
+                    >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
                         <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-800' :
@@ -85,7 +112,8 @@ export function LeaderboardPage({ leaderboard, events }: LeaderboardPageProps) {
                       </div>
                     </div>
                   </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
@@ -98,8 +126,13 @@ export function LeaderboardPage({ leaderboard, events }: LeaderboardPageProps) {
             </CardHeader>
             <CardContent>
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={getTopModelsChartData()}>
+                {loading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={getTopModelsChartData()}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
                     <YAxis stroke="hsl(var(--muted-foreground))" />
@@ -121,6 +154,7 @@ export function LeaderboardPage({ leaderboard, events }: LeaderboardPageProps) {
                     ))}
                   </LineChart>
                 </ResponsiveContainer>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -135,8 +169,33 @@ export function LeaderboardPage({ leaderboard, events }: LeaderboardPageProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {events.slice(0, 6).map((event) => (
-                  <a key={event.id} href={`/events/${event.id}`}>
+                {loading ? (
+                  Array.from({ length: 6 }).map((_, index) => (
+                    <Card key={index} className="p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1 mr-2 space-y-2">
+                          <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4"></div>
+                          <div className="h-4 bg-gray-200 rounded animate-pulse w-1/2"></div>
+                        </div>
+                        <div className="h-6 w-16 bg-gray-200 rounded-full animate-pulse"></div>
+                      </div>
+                      <div className="h-3 bg-gray-200 rounded animate-pulse w-full mb-2"></div>
+                      <div className="h-3 bg-gray-200 rounded animate-pulse w-2/3 mb-3"></div>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="h-3 bg-gray-200 rounded animate-pulse w-12"></div>
+                          <div className="h-3 bg-gray-200 rounded animate-pulse w-16"></div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="h-3 bg-gray-200 rounded animate-pulse w-20"></div>
+                          <div className="h-3 bg-gray-200 rounded animate-pulse w-20"></div>
+                        </div>
+                      </div>
+                    </Card>
+                  ))
+                ) : (
+                  events.slice(0, 6).map((event) => (
+                    <a key={event.id} href={`/events/${event.id}`}>
                     <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
                       <div className="flex items-start justify-between mb-3">
                         <h3 className="text-sm font-medium line-clamp-2 flex-1 mr-2">{event.title}</h3>
@@ -171,7 +230,8 @@ export function LeaderboardPage({ leaderboard, events }: LeaderboardPageProps) {
                     </div>
                     </Card>
                   </a>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>

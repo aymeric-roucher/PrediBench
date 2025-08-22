@@ -18,6 +18,12 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
   const selectedModelData = leaderboard.find(m => m.id === selectedModel)
 
   useEffect(() => {
+    if (!selectedModel && leaderboard.length > 0) {
+      setSelectedModel(leaderboard[0].id)
+    }
+  }, [leaderboard, selectedModel])
+
+  useEffect(() => {
     if (selectedModel) {
       setLoading(true)
       apiService.getModelMarketDetails(selectedModel)
