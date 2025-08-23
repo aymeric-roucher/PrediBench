@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Trophy, BarChart3, Newspaper } from 'lucide-react'
+import { Button } from './ui/button'
 
 interface LayoutProps {
   children: ReactNode
@@ -48,6 +49,12 @@ export function Layout({ children, currentPage }: LayoutProps) {
                   </a>
                 ))}
               </nav>
+              <Button 
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => console.log('Submit clicked')}
+              >
+                Submit
+              </Button>
             </div>
           </div>
         </div>
