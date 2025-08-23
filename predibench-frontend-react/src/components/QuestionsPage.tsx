@@ -38,12 +38,13 @@ export function QuestionsPage({ events, loading: initialLoading = false }: Quest
         case 'volume':
           comparison = (a.volume || 0) - (b.volume || 0)
           break
-        case 'probability':
+        case 'probability': {
           // Use average probability of markets
           const aAvgProb = a.markets?.reduce((sum, m) => sum + (m.outcomes?.[0]?.price || 0), 0) / (a.markets?.length || 1)
           const bAvgProb = b.markets?.reduce((sum, m) => sum + (m.outcomes?.[0]?.price || 0), 0) / (b.markets?.length || 1)
           comparison = (aAvgProb || 0) - (bAvgProb || 0)
           break
+        }
         case 'endDate':
           comparison = new Date(a.end_datetime || '').getTime() - new Date(b.end_datetime || '').getTime()
           break
