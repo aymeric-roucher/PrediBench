@@ -77,7 +77,7 @@ def test_polymarket_api_integration():
 
     # Test timeseries functionality
     timeseries_request_parameters = _HistoricalTimeSeriesRequestParameters(
-        market_id=token_id,
+        clob_token_id=token_id,
         end_datetime=datetime.now(),
     )
     timeseries = timeseries_request_parameters.get_token_daily_timeseries()
