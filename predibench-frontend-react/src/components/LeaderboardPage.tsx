@@ -200,7 +200,7 @@ export function LeaderboardPage({ leaderboard, events, loading = false }: Leader
                         <div className="flex items-start justify-between mb-3">
                           <h3 className="text-sm font-medium line-clamp-2 flex-1 mr-2">{event.title}</h3>
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {event.markets?.length || 0} Markets
+                            {event.markets.length} Markets
                           </span>
                         </div>
 

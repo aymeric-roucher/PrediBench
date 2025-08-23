@@ -1,10 +1,6 @@
-<<<<<<< Updated upstream
-import { Calendar } from 'lucide-react'
-=======
 import { ExternalLink, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
->>>>>>> Stashed changes
 import type { Event, LeaderboardEntry } from '../api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 
@@ -13,9 +9,6 @@ interface EventDetailProps {
   leaderboard: LeaderboardEntry[]
 }
 
-<<<<<<< Updated upstream
-export function EventDetail({ event, leaderboard }: EventDetailProps) {
-=======
 interface PriceData {
   date: string
   price: number
@@ -101,25 +94,26 @@ export function EventDetail({ event, leaderboard }: EventDetailProps) {
       loadEventDetails(event.id)
     }
   }, [event])
->>>>>>> Stashed changes
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <button
           onClick={() => window.history.back()}
-          className="text-muted-foreground hover:text-foreground mb-4 text-sm"
+          className="flex items-center text-muted-foreground hover:text-foreground transition-colors"
         >
-          ← Back to Events
+          ← Back to events
         </button>
-        <h1 className="text-3xl font-bold mb-2">{event.title}</h1>
-        <p className="text-muted-foreground text-lg">{event.description}</p>
+        <button
+          onClick={() => window.history.back()}
+          className="p-2 rounded-lg hover:bg-muted transition-colors"
+        >
+          <X className="h-5 w-5" />
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Event Details */}
         <div className="lg:col-span-2">
-<<<<<<< Updated upstream
-=======
           <Card className="mb-8">
             <CardHeader>
               <div className="flex items-start justify-between">
@@ -173,32 +167,12 @@ export function EventDetail({ event, leaderboard }: EventDetailProps) {
           </Card>
 
           {/* Market Price Charts - Superposed */}
->>>>>>> Stashed changes
           <Card>
             <CardHeader>
-              <CardTitle>Event Information</CardTitle>
-              <CardDescription>Prediction market details and statistics</CardDescription>
+              <CardTitle>Market Price History</CardTitle>
+              <CardDescription>30-day price movements for all markets in this event</CardDescription>
             </CardHeader>
             <CardContent>
-<<<<<<< Updated upstream
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="font-semibold mb-2">Market Details</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Markets:</span>
-                      <span>{event.markets?.length || 0}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Volume:</span>
-                      <span>{event.volume ? `$${(event.volume / 1000).toFixed(0)}K` : 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Liquidity:</span>
-                      <span>{event.liquidity ? `$${(event.liquidity / 1000).toFixed(0)}K` : 'N/A'}</span>
-                    </div>
-                  </div>
-=======
               {loading ? (
                 <div className="h-64 flex items-center justify-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -264,45 +238,12 @@ export function EventDetail({ event, leaderboard }: EventDetailProps) {
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
->>>>>>> Stashed changes
                 </div>
-
-                <div>
-                  <h3 className="font-semibold mb-2">Timeline</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                      <span className="text-muted-foreground">End Date:</span>
-                      <span className="ml-2">
-                        {event.end_datetime 
-                          ? new Date(event.end_datetime).toLocaleDateString()
-                          : 'No end date'
-                        }
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
+        </div>
 
-<<<<<<< Updated upstream
-          {/* Markets */}
-          {event.markets && event.markets.length > 0 && (
-            <Card className="mt-8">
-              <CardHeader>
-                <CardTitle>Markets</CardTitle>
-                <CardDescription>Individual betting markets for this event</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {event.markets.map((market, index) => (
-                    <div key={index} className="border rounded-lg p-4">
-                      <h4 className="font-medium mb-2">{market.question || `Market ${index + 1}`}</h4>
-                      <p className="text-sm text-muted-foreground">{market.description || 'No description available'}</p>
-                    </div>
-                  ))}
-=======
         {/* Latest Model Predictions */}
         <div className="lg:col-span-1">
           <Card>
@@ -341,44 +282,8 @@ export function EventDetail({ event, leaderboard }: EventDetailProps) {
                       ))}
                     </tbody>
                   </table>
->>>>>>> Stashed changes
                 </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Model Performance */}
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle>Model Performance</CardTitle>
-              <CardDescription>How models performed on this event</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {leaderboard.slice(0, 5).map((model, index) => (
-                  <div key={model.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                        index === 0 ? 'bg-yellow-100 text-yellow-800' :
-                        index === 1 ? 'bg-slate-100 text-slate-800' :
-                        index === 2 ? 'bg-orange-100 text-orange-800' :
-                        'bg-muted text-muted-foreground'
-                      }`}>
-                        {index + 1}
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">{model.model}</p>
-                        <p className="text-xs text-muted-foreground">{model.trades} trades</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold">{model.final_cumulative_pnl.toFixed(1)}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              )}
             </CardContent>
           </Card>
         </div>

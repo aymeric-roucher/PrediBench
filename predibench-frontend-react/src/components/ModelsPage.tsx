@@ -120,6 +120,16 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
 
   const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00c49f', '#ffbb28', '#ff8042']
 
+  // Debug logging
+  // if (marketDetails && marketDetails.markets.length > 0) {
+  //   console.log('Market details:', {
+  //     marketCount: marketDetails.markets.length,
+  //     pnlCount: marketDetails.market_pnls.length,
+  //     priceDataPoints: marketDetails.price_chart_data?.length,
+  //     pnlDataPoints: marketDetails.pnl_chart_data?.length,
+  //     marketInfo: marketDetails.market_info
+  //   })
+  // }
 
   return (
     <div className="container mx-auto px-4 py-8">
