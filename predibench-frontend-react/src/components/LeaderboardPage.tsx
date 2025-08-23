@@ -30,7 +30,7 @@ export function LeaderboardPage({ leaderboard, events, loading = false }: Leader
       topModels.forEach(model => {
         const point = model.pnl_history.find(h => h.date === date)
         if (point) {
-          dataPoint[model.model] = point.cumulative_pnl
+          dataPoint[model.model] = point.value
         }
       })
       return dataPoint

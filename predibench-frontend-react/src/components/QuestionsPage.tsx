@@ -32,7 +32,7 @@ export function QuestionsPage({ events, leaderboard, loading: initialLoading = f
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<'volume' | 'probability' | 'endDate'>('volume')
   const [orderBy, setOrderBy] = useState<'asc' | 'desc'>('desc')
-  const [isLive, setIsLive] = useState(true)
+  const [isLive, setIsLive] = useState(false)
 
   const loadEventDetails = async (eventId: string) => {
     setLoading(true)
@@ -102,7 +102,7 @@ export function QuestionsPage({ events, leaderboard, loading: initialLoading = f
           market.question?.toLowerCase().includes(searchQuery.toLowerCase())
         )
 
-      const matchesStatus = isLive ? (event.end_datetime ? new Date(event.end_datetime) > new Date() : true) : (event.end_datetime ? new Date(event.end_datetime) <= new Date() : false)
+      const matchesStatus = isLive ? (event.end_datetime ? new Date(event.end_datetime) > new Date() : true) : true
 
       return matchesSearch && matchesStatus
     })
@@ -358,7 +358,7 @@ export function QuestionsPage({ events, leaderboard, loading: initialLoading = f
             </select>
           </div>
 
-          {/* Live/Historical Toggle */}
+          {/* Live/All Toggle */}
           <div className="flex items-center space-x-2">
             <span className="text-sm font-medium">Status:</span>
             <button
@@ -368,7 +368,7 @@ export function QuestionsPage({ events, leaderboard, loading: initialLoading = f
                 : 'bg-gray-100 text-gray-800'
                 }`}
             >
-              {isLive ? 'Live' : 'Historical'}
+              {isLive ? 'Live' : 'All'}
             </button>
           </div>
         </div>
