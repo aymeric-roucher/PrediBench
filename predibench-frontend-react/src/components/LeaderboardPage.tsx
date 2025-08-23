@@ -23,14 +23,14 @@ export function LeaderboardPage({ leaderboard, events, loading = false }: Leader
 
   const getTopModelsChartData = () => {
     const topModels = leaderboard.slice(0, 3)
-    const dates = topModels[0]?.performanceHistory?.map(h => h.date) || []
+    const dates = topModels[0]?.pnl_history?.map(h => h.date) || []
 
     return dates.map(date => {
       const dataPoint: any = { date }
       topModels.forEach(model => {
-        const point = model.performanceHistory.find(h => h.date === date)
+        const point = model.pnl_history.find(h => h.date === date)
         if (point) {
-          dataPoint[model.model] = point.cumulative_pnl
+          dataPoint[model.model] = point.value
         }
       })
       return dataPoint

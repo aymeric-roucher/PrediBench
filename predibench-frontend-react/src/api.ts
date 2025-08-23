@@ -8,28 +8,20 @@ export interface LeaderboardEntry {
   accuracy: number
   lastUpdated: string
   trend: 'up' | 'down' | 'stable'
-  performanceHistory: { date: string; cumulative_pnl: number }[]
+  pnl_history: { date: string; value: number }[]
 }
 
 export interface MarketData {
   market_id: string
   question: string
-  price_data: { date: string; price: number }[]
-  positions: { date: string; position: number; type: 'long' | 'short' }[]
-}
-
-export interface MarketPnL {
-  market_id: string
-  question: string
+  prices: { date: string; price: number }[]
+  positions: { date: string; position: number }[]
   pnl_data: { date: string; pnl: number }[]
 }
 
+
 export interface ModelMarketDetails {
-  markets: MarketData[]
-  market_pnls: MarketPnL[]
-  price_chart_data: Record<string, unknown>[]
-  pnl_chart_data: Record<string, unknown>[]
-  market_info: { market_id: string; question: string; short_name: string }[]
+  [marketId: string]: MarketData
 }
 
 export interface Market {
@@ -108,7 +100,7 @@ class ApiService {
     if (params?.sort_by) searchParams.append('sort_by', params.sort_by)
     if (params?.order) searchParams.append('order', params.order)
     if (params?.limit) searchParams.append('limit', params.limit.toString())
-    
+
     const url = `${API_BASE_URL}/events${searchParams.toString() ? `?${searchParams.toString()}` : ''}`
     const response = await this.fetchWithTimeout(url)
     if (!response.ok) {

@@ -99,5 +99,3 @@ def test_upload_results_to_hf_dataset():
     dataset = load_dataset("Sibyllic/dummy")
     df_dataset = dataset["test"].to_pandas()
     assert len(df_dataset) == 4
-
-
