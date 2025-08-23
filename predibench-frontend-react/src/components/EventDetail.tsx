@@ -1,12 +1,11 @@
 import { ExternalLink, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import type { Event, LeaderboardEntry } from '../api'
+import type { Event } from '../api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 
 interface EventDetailProps {
   event: Event
-  leaderboard: LeaderboardEntry[]
 }
 
 interface PriceData {
@@ -26,7 +25,7 @@ interface MarketInvestmentDecision {
   rationale: string
 }
 
-export function EventDetail({ event, leaderboard }: EventDetailProps) {
+export function EventDetail({ event }: EventDetailProps) {
   const [marketPricesData, setMarketPricesData] = useState<{ [marketId: string]: PriceData[] }>({})
   const [investmentDecisions, setInvestmentDecisions] = useState<MarketInvestmentDecision[]>([])
   const [loading, setLoading] = useState(false)
