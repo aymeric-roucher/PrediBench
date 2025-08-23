@@ -51,7 +51,7 @@ export function Layout({ children, currentPage }: LayoutProps) {
               </nav>
               <Button 
                 className="bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={() => console.log('Submit clicked')}
+                onClick={() => window.location.href = '/dashboard'}
               >
                 Submit
               </Button>
