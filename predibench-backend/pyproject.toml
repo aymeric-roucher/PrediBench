@@ -18,6 +18,7 @@ dependencies = [
     "tenacity>=8.0.0",
     "coloredlogs>=15.0.0",
     "predibench",
+    "firebase-admin>=7.1.0",
 ]
 
 [tool.uv.sources]

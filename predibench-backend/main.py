@@ -2,11 +2,12 @@ import json
 import os
 from datetime import date, datetime
 from functools import lru_cache
+from typing import Optional
 
 import numpy as np
 import pandas as pd
 from datasets import load_dataset
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from predibench.agent.dataclasses import MarketInvestmentDecision, SingleModelDecision
 from predibench.pnl import get_pnls
@@ -16,8 +17,29 @@ from predibench.polymarket_api import (
     _HistoricalTimeSeriesRequestParameters,
 )
 from pydantic import BaseModel
+import firebase_admin
+from firebase_admin import credentials, auth
 
 print("Successfully imported predibench modules")
+
+# Initialize Firebase Admin SDK
+try:
+    firebase_admin.initialize_app(credentials.Certificate({
+        "type": "service_account",
+        "project_id": "predibench",
+        "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID"),
+        "private_key": os.getenv("FIREBASE_PRIVATE_KEY", "").replace('\\n', '\n'),
+        "client_email": os.getenv("FIREBASE_CLIENT_EMAIL"),
+        "client_id": os.getenv("FIREBASE_CLIENT_ID"),
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+        "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{os.getenv('FIREBASE_CLIENT_EMAIL')}"
+    }))
+    print("Firebase Admin initialized successfully")
+except Exception as e:
+    print(f"Firebase Admin initialization failed: {e}")
+    print("Continuing without Firebase Admin - submissions will not work")
 
 app = FastAPI(title="Polymarket LLM Benchmark API", version="1.0.0")
 
@@ -62,6 +84,34 @@ class Stats(BaseModel):
     avgPnl: float
     totalTrades: int
     totalProfit: int
+
+
+class UserSubmission(BaseModel):
+    agent_name: str
+    date: str
+    event_id: str
+    decisions_per_market: str  # JSON string
+    timestamp_uploaded: Optional[str] = None
+
+
+class SubmissionResponse(BaseModel):
+    success: bool
+    message: str
+    submission_id: Optional[str] = None
+
+
+# Auth dependency
+async def verify_firebase_token(authorization: Optional[str] = Header(None)):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header required")
+    
+    try:
+        # Remove 'Bearer ' prefix
+        token = authorization.replace('Bearer ', '')
+        decoded_token = auth.verify_id_token(token)
+        return decoded_token
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
 
 # Real data loading functions
@@ -159,7 +209,7 @@ def calculate_real_performance():
 
 # Generate leaderboard from real data only
 @lru_cache(maxsize=1)
-def get_leaderboard() -> list[LeaderboardEntry]:
+def get_official_leaderboard() -> list[LeaderboardEntry]:
     real_performance = calculate_real_performance()
 
     leaderboard = []
@@ -199,6 +249,35 @@ def get_leaderboard() -> list[LeaderboardEntry]:
     return leaderboard
 
 
+def get_combined_leaderboard() -> list[LeaderboardEntry]:
+    """Get leaderboard combining official and user submissions"""
+    official_entries = get_official_leaderboard()
+    
+    # Add user submissions as placeholder entries (in production, calculate real PnL)
+    user_entries = []
+    for submission in user_submissions:
+        # Create a basic leaderboard entry for user submission
+        # In production, you'd calculate real PnL from their predictions
+        user_entry = LeaderboardEntry(
+            id=submission['submission_id'],
+            model=f"{submission['agent_name']} (User)",
+            final_cumulative_pnl=0.0,  # Placeholder - calculate real PnL
+            trades=len(json.loads(submission['decisions_per_market'])),
+            profit=0,
+            lastUpdated=submission['timestamp_uploaded'][:10],
+            trend="stable",
+            performanceHistory=[PerformanceHistory(
+                date=submission['date'],
+                cumulative_pnl=0.0
+            )]
+        )
+        user_entries.append(user_entry)
+    
+    # Combine and sort by PnL
+    all_entries = official_entries + user_entries
+    return sorted(all_entries, key=lambda x: x.final_cumulative_pnl, reverse=True)
+
+
 @lru_cache(maxsize=1)
 def get_events_that_received_predictions() -> list[Event]:
     """Get events based that models ran predictions on"""
@@ -218,7 +297,7 @@ async def root():
 @app.get("/api/leaderboard", response_model=list[LeaderboardEntry])
 async def get_leaderboard_endpoint():
     """Get the current leaderboard with LLM performance data"""
-    return get_leaderboard()
+    return get_combined_leaderboard()
 
 
 @app.get("/api/events", response_model=list[Event])
@@ -261,7 +340,7 @@ async def get_events_endpoint(
 @app.get("/api/stats", response_model=Stats)
 async def get_stats():
     """Get overall benchmark statistics"""
-    leaderboard = get_leaderboard()
+    leaderboard = get_combined_leaderboard()
 
     return Stats(
         topFinalCumulativePnl=max(entry.final_cumulative_pnl for entry in leaderboard),
@@ -275,7 +354,7 @@ async def get_stats():
 @app.get("/api/model/{model_id}", response_model=LeaderboardEntry)
 async def get_model_details(model_id: str):
     """Get detailed information for a specific model"""
-    leaderboard = get_leaderboard()
+    leaderboard = get_combined_leaderboard()
     model = next((entry for entry in leaderboard if entry.id == model_id), None)
 
     if not model:
@@ -489,6 +568,71 @@ async def get_event_investments(event_id: str):
 @app.get("/api/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+
+# In-memory storage for user submissions (in production, use a database)
+user_submissions = []
+
+
+@app.post("/api/submissions", response_model=SubmissionResponse)
+async def submit_results(
+    submission: UserSubmission,
+    user_token: dict = Depends(verify_firebase_token)
+):
+    """Submit user model results to the leaderboard"""
+    try:
+        # Validate the submission format
+        try:
+            decisions = json.loads(submission.decisions_per_market)
+            if not isinstance(decisions, list):
+                raise HTTPException(status_code=400, detail="decisions_per_market must be a JSON array")
+            
+            # Validate each decision has required fields
+            for decision in decisions:
+                if not all(key in decision for key in ['market_id', 'model_decision']):
+                    raise HTTPException(status_code=400, detail="Each decision must have 'market_id' and 'model_decision'")
+                
+                model_decision = decision['model_decision']
+                if not all(key in model_decision for key in ['bet', 'odds', 'rationale']):
+                    raise HTTPException(status_code=400, detail="model_decision must have 'bet', 'odds', and 'rationale'")
+        
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="decisions_per_market must be valid JSON")
+        
+        # Add metadata to submission
+        submission_with_metadata = submission.model_dump()
+        submission_with_metadata['user_id'] = user_token['uid']
+        submission_with_metadata['user_email'] = user_token.get('email', 'unknown')
+        submission_with_metadata['timestamp_uploaded'] = datetime.now().isoformat()
+        submission_with_metadata['submission_id'] = f"user_{user_token['uid'][:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        # Store submission (in production, save to database)
+        user_submissions.append(submission_with_metadata)
+        
+        return SubmissionResponse(
+            success=True,
+            message="Submission received successfully",
+            submission_id=submission_with_metadata['submission_id']
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@app.get("/api/submissions")
+async def get_user_submissions(user_token: dict = Depends(verify_firebase_token)):
+    """Get current user's submissions"""
+    user_id = user_token['uid']
+    user_subs = [sub for sub in user_submissions if sub.get('user_id') == user_id]
+    return {"submissions": user_subs}
+
+
+@app.get("/api/submissions/all")
+async def get_all_submissions():
+    """Get all user submissions (for admin/debugging)"""
+    return {"submissions": user_submissions, "count": len(user_submissions)}
 
 
 if __name__ == "__main__":
