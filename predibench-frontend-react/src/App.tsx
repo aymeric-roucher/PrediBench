@@ -8,6 +8,7 @@ import { ModelsPage } from './components/ModelsPage'
 import { QuestionsPage } from './components/QuestionsPage'
 import { EventDetail } from './components/EventDetail'
 import { Dashboard } from './components/Dashboard'
+import { AuthProvider } from './contexts/AuthContext'
 
 function AppContent() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
@@ -124,7 +125,9 @@ function EventDetailWrapper({ events, leaderboard }: { events: Event[], leaderbo
 function App() {
   return (
     <Router>
-      <AppContent />
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </Router>
   )
 }

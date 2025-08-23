@@ -1,7 +1,19 @@
 import { useState, useEffect } from 'react'
+import { 
+  collection, 
+  doc, 
+  getDocs, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc,
+  serverTimestamp,
+  onSnapshot
+} from 'firebase/firestore'
 import { Button } from './ui/button'
 import { Card } from './ui/card'
 import { Copy, RefreshCw, Plus, Trash2 } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
+import { db } from '../lib/firebase'
 
 interface Agent {
   id: string
@@ -14,51 +26,107 @@ export function Dashboard() {
   const [agents, setAgents] = useState<Agent[]>([])
   const [newAgentName, setNewAgentName] = useState('')
   const [isCreating, setIsCreating] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const { currentUser } = useAuth()
 
   useEffect(() => {
-    const savedAgents = localStorage.getItem('agents')
-    if (savedAgents) {
-      setAgents(JSON.parse(savedAgents))
-    }
-  }, [])
+    if (!currentUser) return
 
-  const saveAgents = (updatedAgents: Agent[]) => {
-    setAgents(updatedAgents)
-    localStorage.setItem('agents', JSON.stringify(updatedAgents))
+    const agentsRef = collection(db, `users/${currentUser.uid}/agents`)
+    
+    // Real-time listener for agents
+    const unsubscribe = onSnapshot(agentsRef, (snapshot) => {
+      const agentsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Agent[]
+      
+      setAgents(agentsData)
+      setLoading(false)
+    })
+
+    // Migrate localStorage data if it exists
+    migrateLocalStorageData()
+
+    return unsubscribe
+  }, [currentUser])
+
+  const migrateLocalStorageData = async () => {
+    if (!currentUser) return
+    
+    const localAgents = localStorage.getItem('agents')
+    if (localAgents) {
+      try {
+        const parsedAgents = JSON.parse(localAgents) as Agent[]
+        const agentsRef = collection(db, `users/${currentUser.uid}/agents`)
+        
+        // Check if user already has agents in Firestore
+        const existingAgents = await getDocs(agentsRef)
+        if (existingAgents.empty && parsedAgents.length > 0) {
+          // Migrate each agent to Firestore
+          for (const agent of parsedAgents) {
+            await addDoc(agentsRef, {
+              name: agent.name,
+              token: agent.token,
+              createdAt: new Date(agent.createdAt)
+            })
+          }
+          
+          // Clear localStorage after successful migration
+          localStorage.removeItem('agents')
+          console.log('Migrated agents from localStorage to Firestore')
+        }
+      } catch (error) {
+        console.error('Error migrating localStorage data:', error)
+      }
+    }
   }
 
   const generateToken = () => {
     return 'agent_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36)
   }
 
-  const createAgent = () => {
-    if (!newAgentName.trim()) return
+  const createAgent = async () => {
+    if (!newAgentName.trim() || !currentUser) return
 
-    const newAgent: Agent = {
-      id: Math.random().toString(36).substring(2, 11),
-      name: newAgentName.trim(),
-      token: generateToken(),
-      createdAt: new Date().toISOString()
+    try {
+      const agentsRef = collection(db, `users/${currentUser.uid}/agents`)
+      await addDoc(agentsRef, {
+        name: newAgentName.trim(),
+        token: generateToken(),
+        createdAt: serverTimestamp()
+      })
+      
+      setNewAgentName('')
+      setIsCreating(false)
+    } catch (error) {
+      console.error('Error creating agent:', error)
     }
-
-    const updatedAgents = [...agents, newAgent]
-    saveAgents(updatedAgents)
-    setNewAgentName('')
-    setIsCreating(false)
   }
 
-  const regenerateToken = (agentId: string) => {
-    const updatedAgents = agents.map(agent =>
-      agent.id === agentId
-        ? { ...agent, token: generateToken() }
-        : agent
-    )
-    saveAgents(updatedAgents)
+  const regenerateToken = async (agentId: string) => {
+    if (!currentUser) return
+
+    try {
+      const agentRef = doc(db, `users/${currentUser.uid}/agents`, agentId)
+      await updateDoc(agentRef, {
+        token: generateToken(),
+        lastUpdated: serverTimestamp()
+      })
+    } catch (error) {
+      console.error('Error regenerating token:', error)
+    }
   }
 
-  const deleteAgent = (agentId: string) => {
-    const updatedAgents = agents.filter(agent => agent.id !== agentId)
-    saveAgents(updatedAgents)
+  const deleteAgent = async (agentId: string) => {
+    if (!currentUser) return
+
+    try {
+      const agentRef = doc(db, `users/${currentUser.uid}/agents`, agentId)
+      await deleteDoc(agentRef)
+    } catch (error) {
+      console.error('Error deleting agent:', error)
+    }
   }
 
   const copyToken = async (token: string) => {
@@ -70,6 +138,17 @@ export function Dashboard() {
     }
   }
 
+  if (!currentUser) {
+    return (
+      <div className="container mx-auto px-6 py-8 text-center">
+        <h1 className="text-3xl font-bold mb-4">Agent Dashboard</h1>
+        <p className="text-muted-foreground mb-4">
+          Please log in to create and manage your agents.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="container mx-auto px-6 py-8">
       <div className="mb-8">
@@ -79,8 +158,10 @@ export function Dashboard() {
         </p>
       </div>
 
-      {/* Create New Agent */}
-      <Card className="p-6 mb-6">
+      {!loading && (
+        <>
+          {/* Create New Agent */}
+          <Card className="p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Create New Agent</h2>
         {!isCreating ? (
           <Button onClick={() => setIsCreating(true)} className="flex items-center gap-2">
@@ -182,6 +263,14 @@ export function Dashboard() {
   -d '{"prediction": "your_prediction_data"}'`}
           </code>
         </Card>
+      )}
+      </>
+      )}
+
+      {loading && (
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">Loading your agents...</p>
+        </div>
       )}
     </div>
   )
