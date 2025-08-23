@@ -1,7 +1,8 @@
 import { Activity, Calendar, DollarSign, TrendingUp } from 'lucide-react'
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { Event, LeaderboardEntry } from '../api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
+import { VisxLineChart } from './ui/visx-line-chart'
+import { getChartColor } from './ui/chart-colors'
 
 interface LeaderboardPageProps {
   leaderboard: LeaderboardEntry[]
@@ -21,21 +22,6 @@ export function LeaderboardPage({ leaderboard, events, loading = false }: Leader
     }
   }
 
-  const getTopModelsChartData = () => {
-    const topModels = leaderboard.slice(0, 3)
-    const dates = topModels[0]?.pnl_history?.map(h => h.date) || []
-
-    return dates.map(date => {
-      const dataPoint: any = { date }
-      topModels.forEach(model => {
-        const point = model.pnl_history.find(h => h.date === date)
-        if (point) {
-          dataPoint[model.model] = point.value
-        }
-      })
-      return dataPoint
-    })
-  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -131,29 +117,19 @@ export function LeaderboardPage({ leaderboard, events, loading = false }: Leader
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
                 ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={getTopModelsChartData()}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
-                      <YAxis stroke="hsl(var(--muted-foreground))" />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px'
-                        }}
-                      />
-                      {leaderboard.slice(0, 3).map((model, index) => (
-                        <Line
-                          key={model.id}
-                          type="monotone"
-                          dataKey={model.model}
-                          stroke={['#3B82F6', '#10B981', '#F59E0B'][index]}
-                          strokeWidth={2}
-                        />
-                      ))}
-                    </LineChart>
-                  </ResponsiveContainer>
+                  <VisxLineChart
+                    height={256}
+                    margin={{ left: 60, top: 35, bottom: 38, right: 27 }}
+                    series={leaderboard.slice(0, 3).map((model, index) => ({
+                      dataKey: model.model,
+                      data: (model.pnl_history || []).map(point => ({
+                        x: point.date,
+                        y: point.value
+                      })),
+                      stroke: getChartColor(index),
+                      name: model.model
+                    }))}
+                  />
                 )}
               </div>
             </CardContent>

@@ -1,99 +1,15 @@
 import { useEffect, useState } from 'react'
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { LeaderboardEntry, ModelMarketDetails } from '../api'
 import { apiService } from '../api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
+import { VisxLineChart } from './ui/visx-line-chart'
+import { VisxPnLChart } from './ui/visx-pnl-chart'
+import { getChartColor } from './ui/chart-colors'
 
 interface ModelsPageProps {
   leaderboard: LeaderboardEntry[]
 }
 
-// Utility function to merge market data for charts
-function mergeMarketData(markets: any[], dataType: 'prices' | 'pnl_data') {
-  const allDates = new Set<string>()
-  const dataMap = new Map<string, any>()
-
-  // Collect all unique dates and create a map for each market's data
-  markets.forEach((market) => {
-    const data = market[dataType] || []
-    data.forEach((point: any) => {
-      allDates.add(point.date)
-      if (!dataMap.has(point.date)) {
-        dataMap.set(point.date, { date: point.date })
-      }
-      const key = dataType === 'prices' ? `price_${market.market_id}` : `pnl_${market.market_id}`
-      const value = dataType === 'prices' ? point.price : point.pnl
-      dataMap.get(point.date)[key] = value
-
-      // For PnL data, also include position information
-      if (dataType === 'pnl_data') {
-        const positionData = market.positions?.find((p: any) => p.date === point.date)
-        if (positionData) {
-          dataMap.get(point.date)[`position_${market.market_id}`] = positionData.position
-        }
-      }
-    })
-  })
-
-  // Convert to array and sort by date
-  return Array.from(dataMap.values()).sort((a, b) =>
-    new Date(a.date).getTime() - new Date(b.date).getTime()
-  )
-}
-
-const CustomPnLDot = (props: any) => {
-  const { cx, cy, dataKey, payload } = props;
-
-  // Extract market_id from dataKey (format: pnl_{market_id})
-  const marketId = dataKey.split('_')[1];
-  const positionKey = `position_${marketId}`;
-  const position = payload[positionKey];
-
-  // Return null if no position data
-  if (position === undefined || position === null) {
-    return null;
-  }
-
-  const size = 6;
-
-  if (position > 0) {
-    // Triangle up for positive position
-    return (
-      <svg>
-        <polygon
-          points={`${cx},${cy - size} ${cx - size},${cy + size} ${cx + size},${cy + size}`}
-          fill={props.stroke}
-          stroke={props.stroke}
-          strokeWidth={1}
-        />
-      </svg>
-    );
-  } else if (position < 0) {
-    // Triangle down for negative position
-    return (
-      <svg>
-        <polygon
-          points={`${cx},${cy + size} ${cx - size},${cy - size} ${cx + size},${cy - size}`}
-          fill={props.stroke}
-          stroke={props.stroke}
-          strokeWidth={1}
-        />
-      </svg>
-    );
-  } else {
-    // Empty circle for zero position
-    return (
-      <svg>
-        <circle
-          cx={cx}
-          cy={cy}
-          r={size}
-          fill={props.stroke}
-        />
-      </svg>
-    );
-  }
-};
 
 export function ModelsPage({ leaderboard }: ModelsPageProps) {
   const [selectedModel, setSelectedModel] = useState<string>(leaderboard[0]?.id || '')
@@ -118,7 +34,6 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
     }
   }, [selectedModel])
 
-  const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00c49f', '#ffbb28', '#ff8042']
 
   // Debug logging
   // if (marketDetails && marketDetails.markets.length > 0) {
@@ -248,55 +163,20 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
                     <div className="mb-8">
                       <h3 className="text-lg font-semibold mb-4">Price Evolution</h3>
                       <div className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={mergeMarketData(Object.values(marketDetails), 'prices')}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                            <XAxis
-                              dataKey="date"
-                              stroke="hsl(var(--muted-foreground))"
-                            />
-                            <YAxis
-                              stroke="hsl(var(--muted-foreground))"
-                              domain={[0, 1]}
-                              label={{ value: 'Price', angle: -90, position: 'insideLeft' }}
-                            />
-                            <Tooltip
-                              contentStyle={{
-                                backgroundColor: 'hsl(var(--card))',
-                                border: '1px solid hsl(var(--border))',
-                                borderRadius: '8px',
-                                fontSize: '12px',
-                                padding: '8px',
-                                lineHeight: '1.2'
-                              }}
-                              labelFormatter={(value) => `Date: ${value}`}
-                              formatter={(value: unknown, name: string) => {
-                                if (value === null || value === undefined || value === 0.0) return null
-                                return [
-                                  typeof value === 'number' ? value.toFixed(3) : String(value),
-                                  name
-                                ]
-                              }}
-                            />
-                            {Object.values(marketDetails).map((market, marketIndex) => {
-                              const color = colors[marketIndex % colors.length]
-                              const dataKey = `price_${market.market_id}`
-                              return (
-                                <Line
-                                  key={`price_line_${market.market_id}`}
-                                  type="monotone"
-                                  dataKey={dataKey}
-                                  stroke={color}
-                                  strokeWidth={2}
-                                  dot={false}
-                                  connectNulls={false}
-                                  name={market.question}
-                                  activeDot={{ r: 6, strokeWidth: 2 }}
-                                />
-                              )
-                            })}
-                          </LineChart>
-                        </ResponsiveContainer>
+                        <VisxLineChart
+                          height={320}
+                          margin={{ left: 60, top: 35, bottom: 38, right: 27 }}
+                          yDomain={[0, 1]}
+                          series={Object.values(marketDetails).map((market, marketIndex) => ({
+                            dataKey: `price_${market.market_id}`,
+                            data: (market.prices || []).map(point => ({
+                              x: point.date,
+                              y: point.price
+                            })),
+                            stroke: getChartColor(marketIndex),
+                            name: market.question
+                          }))}
+                        />
                       </div>
                     </div>
 
@@ -305,55 +185,25 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
                       <div>
                         <h3 className="text-lg font-semibold mb-4">Cumulative PnL</h3>
                         <div className="h-80">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={mergeMarketData(Object.values(marketDetails).filter(m => m.pnl_data && m.pnl_data.length > 0), 'pnl_data')}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                              <XAxis
-                                dataKey="date"
-                                stroke="hsl(var(--muted-foreground))"
-                              />
-                              <YAxis
-                                stroke="hsl(var(--muted-foreground))"
-                                label={{ value: 'Cumulative PnL', angle: -90, position: 'insideLeft' }}
-                              />
-                              <Tooltip
-                                contentStyle={{
-                                  backgroundColor: 'hsl(var(--card))',
-                                  border: '1px solid hsl(var(--border))',
-                                  borderRadius: '8px',
-                                  fontSize: '12px',
-                                  padding: '8px',
-                                  lineHeight: '1.2'
-                                }}
-                                labelFormatter={(value) => `Date: ${value}`}
-                                formatter={(value: unknown, name: string) => {
-                                  if (value === null || value === undefined || value === 0.0) return null
-                                  return [
-                                    typeof value === 'number' ? value.toFixed(3) : String(value),
-                                    name
-                                  ]
-                                }}
-                              />
-                              {Object.values(marketDetails).map((market, marketIndex) => {
-                                if (!market.pnl_data || market.pnl_data.length === 0) return null
-                                const color = colors[marketIndex % colors.length]
-                                const dataKey = `pnl_${market.market_id}`
-                                return (
-                                  <Line
-                                    key={`pnl_line_${market.market_id}`}
-                                    type="monotone"
-                                    dataKey={dataKey}
-                                    stroke={color}
-                                    strokeWidth={2}
-                                    dot={(props) => <CustomPnLDot {...props} dataKey={dataKey} stroke={color} />}
-                                    connectNulls={false}
-                                    name={market.question}
-                                    activeDot={{ r: 6, strokeWidth: 2 }}
-                                  />
-                                )
-                              })}
-                            </LineChart>
-                          </ResponsiveContainer>
+                          <VisxPnLChart
+                            height={320}
+                            margin={{ left: 60, top: 35, bottom: 38, right: 27 }}
+                            series={Object.values(marketDetails)
+                              .filter(market => market.pnl_data && market.pnl_data.length > 0)
+                              .map((market, marketIndex) => ({
+                                dataKey: `pnl_${market.market_id}`,
+                                data: (market.pnl_data || []).map(point => {
+                                  const positionData = market.positions?.find((p: { date: string }) => p.date === point.date)
+                                  return {
+                                    x: point.date,
+                                    y: point.pnl,
+                                    position: positionData?.position
+                                  }
+                                }),
+                                stroke: getChartColor(marketIndex),
+                                name: market.question
+                              }))}
+                          />
                         </div>
                       </div>
                     )}
