@@ -1,4 +1,4 @@
-import { Calendar, ExternalLink, X } from 'lucide-react'
+import { ExternalLink, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { Event, LeaderboardEntry } from '../api'
@@ -31,15 +31,15 @@ export function EventDetail({ event, leaderboard }: EventDetailProps) {
   // Function to convert URLs in text to clickable links
   const linkify = (text: string | null | undefined) => {
     if (!text) return null
-    
+
     const urlRegex = /(https?:\/\/[^\s]+)/g
-    
+
     return text.split(urlRegex).map((part, index) => {
       if (urlRegex.test(part)) {
         // Remove trailing punctuation from the URL
         const cleanUrl = part.replace(/[.,;:!?\)\]]+$/, '')
         const trailingPunct = part.slice(cleanUrl.length)
-        
+
         return (
           <span key={index}>
             <a
@@ -141,7 +141,7 @@ export function EventDetail({ event, leaderboard }: EventDetailProps) {
                 <div className="flex-1">
                   <CardTitle className="text-xl mb-2">{event.title}</CardTitle>
                   <div className="text-muted-foreground text-base mb-4 leading-relaxed">{linkify(event.description)}</div>
-                  <a 
+                  <a
                     href={`https://polymarket.com/event/${event.slug}`}
                     target="_blank"
                     rel="noopener noreferrer"
