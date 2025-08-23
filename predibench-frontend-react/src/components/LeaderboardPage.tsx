@@ -129,6 +129,17 @@ export function LeaderboardPage({ leaderboard, events, loading = false }: Leader
                       stroke: getChartColor(index),
                       name: model.model
                     }))}
+                    yDomain={(() => {
+                      const allValues = leaderboard.slice(0, 3).flatMap(model => 
+                        (model.pnl_history || []).map(point => point.value)
+                      )
+                      if (allValues.length === 0) return [0, 1]
+                      const min = Math.min(...allValues)
+                      const max = Math.max(...allValues)
+                      const range = max - min
+                      const padding = Math.max(range * 0.25, 0.02) // 25% padding or minimum 0.02
+                      return [min - padding, max + padding]
+                    })()}
                   />
                 )}
               </div>
