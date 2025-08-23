@@ -8,7 +8,92 @@ interface ModelsPageProps {
   leaderboard: LeaderboardEntry[]
 }
 
-// No utility functions needed - backend now provides unified chart data
+// Utility function to merge market data for charts
+function mergeMarketData(markets: any[], dataType: 'prices' | 'pnl_data') {
+  const allDates = new Set<string>()
+  const dataMap = new Map<string, any>()
+
+  // Collect all unique dates and create a map for each market's data
+  markets.forEach((market) => {
+    const data = market[dataType] || []
+    data.forEach((point: any) => {
+      allDates.add(point.date)
+      if (!dataMap.has(point.date)) {
+        dataMap.set(point.date, { date: point.date })
+      }
+      const key = dataType === 'prices' ? `price_${market.market_id}` : `pnl_${market.market_id}`
+      const value = dataType === 'prices' ? point.price : point.pnl
+      dataMap.get(point.date)[key] = value
+
+      // For PnL data, also include position information
+      if (dataType === 'pnl_data') {
+        const positionData = market.positions?.find((p: any) => p.date === point.date)
+        if (positionData) {
+          dataMap.get(point.date)[`position_${market.market_id}`] = positionData.position
+        }
+      }
+    })
+  })
+
+  // Convert to array and sort by date
+  return Array.from(dataMap.values()).sort((a, b) =>
+    new Date(a.date).getTime() - new Date(b.date).getTime()
+  )
+}
+
+const CustomPnLDot = (props: any) => {
+  const { cx, cy, dataKey, payload } = props;
+
+  // Extract market_id from dataKey (format: pnl_{market_id})
+  const marketId = dataKey.split('_')[1];
+  const positionKey = `position_${marketId}`;
+  const position = payload[positionKey];
+
+  // Return null if no position data
+  if (position === undefined || position === null) {
+    return null;
+  }
+
+  const size = 6;
+
+  if (position > 0) {
+    // Triangle up for positive position
+    return (
+      <svg>
+        <polygon
+          points={`${cx},${cy - size} ${cx - size},${cy + size} ${cx + size},${cy + size}`}
+          fill={props.stroke}
+          stroke={props.stroke}
+          strokeWidth={1}
+        />
+      </svg>
+    );
+  } else if (position < 0) {
+    // Triangle down for negative position
+    return (
+      <svg>
+        <polygon
+          points={`${cx},${cy + size} ${cx - size},${cy - size} ${cx + size},${cy - size}`}
+          fill={props.stroke}
+          stroke={props.stroke}
+          strokeWidth={1}
+        />
+      </svg>
+    );
+  } else {
+    // Empty circle for zero position
+    return (
+      <svg>
+        <circle
+          cx={cx}
+          cy={cy}
+          r={size}
+          fill={props.stroke}
+        />
+      </svg>
+    );
+  }
+};
 
 export function ModelsPage({ leaderboard }: ModelsPageProps) {
   const [selectedModel, setSelectedModel] = useState<string>(leaderboard[0]?.id || '')
@@ -35,16 +120,6 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
 
   const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00c49f', '#ffbb28', '#ff8042']
 
-  // Debug logging
-  if (marketDetails && marketDetails.markets.length > 0) {
-    console.log('Market details:', {
-      marketCount: marketDetails.markets.length,
-      pnlCount: marketDetails.market_pnls.length,
-      priceDataPoints: marketDetails.price_chart_data?.length,
-      pnlDataPoints: marketDetails.pnl_chart_data?.length,
-      marketInfo: marketDetails.market_info
-    })
-  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -67,19 +142,17 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
                   <button
                     key={model.id}
                     onClick={() => setSelectedModel(model.id)}
-                    className={`w-full text-left p-3 rounded-lg border transition-all ${
-                      selectedModel === model.id
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-primary/50'
-                    }`}
+                    className={`w-full text-left p-3 rounded-lg border transition-all ${selectedModel === model.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50'
+                      }`}
                   >
                     <div className="flex items-center space-x-3">
-                      <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
-                        index === 0 ? 'bg-yellow-100 text-yellow-800' :
+                      <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-800' :
                         index === 1 ? 'bg-slate-100 text-slate-800' :
-                        index === 2 ? 'bg-orange-100 text-orange-800' :
-                        'bg-muted text-muted-foreground'
-                      }`}>
+                          index === 2 ? 'bg-orange-100 text-orange-800' :
+                            'bg-muted text-muted-foreground'
+                        }`}>
                         {index + 1}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -158,25 +231,21 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
               </div>
 
               {/* Market Charts - Combined Price Evolution and PnL */}
-              {marketDetails && marketDetails.price_chart_data && marketDetails.price_chart_data.length > 0 && (
+              {marketDetails && Object.keys(marketDetails).length > 0 && (
                 <Card className="mb-8">
-                  <CardHeader>
-                    <CardTitle>Market Analysis</CardTitle>
-                    <CardDescription>Price evolution (top) and cumulative PnL (bottom) for each market. Charts replicate the plot_pnl logic from predibench-core.</CardDescription>
-                  </CardHeader>
                   <CardContent>
                     {/* Price Evolution Chart */}
                     <div className="mb-8">
                       <h3 className="text-lg font-semibold mb-4">Price Evolution</h3>
                       <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={marketDetails.price_chart_data}>
+                          <LineChart data={mergeMarketData(Object.values(marketDetails), 'prices')}>
                             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                            <XAxis 
-                              dataKey="date" 
+                            <XAxis
+                              dataKey="date"
                               stroke="hsl(var(--muted-foreground))"
                             />
-                            <YAxis 
+                            <YAxis
                               stroke="hsl(var(--muted-foreground))"
                               domain={[0, 1]}
                               label={{ value: 'Price', angle: -90, position: 'insideLeft' }}
@@ -185,33 +254,34 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
                               contentStyle={{
                                 backgroundColor: 'hsl(var(--card))',
                                 border: '1px solid hsl(var(--border))',
-                                borderRadius: '8px'
+                                borderRadius: '8px',
+                                fontSize: '12px',
+                                padding: '8px',
+                                lineHeight: '1.2'
                               }}
                               labelFormatter={(value) => `Date: ${value}`}
                               formatter={(value: unknown, name: string) => {
-                                if (value === null || value === undefined) return ['-', 'No data']
-                                const marketId = name.replace('price_', '')
-                                const marketInfo = marketDetails.market_info?.find(m => m.market_id === marketId)
-                                const marketName = marketInfo ? marketInfo.short_name : marketId
+                                if (value === null || value === undefined || value === 0.0) return null
                                 return [
                                   typeof value === 'number' ? value.toFixed(3) : String(value),
-                                  marketName
+                                  name
                                 ]
                               }}
                             />
-                            {marketDetails.market_info?.map((marketInfo, index) => {
-                              const color = colors[index % colors.length]
-                              const dataKey = `price_${marketInfo.market_id}`
+                            {Object.values(marketDetails).map((market, marketIndex) => {
+                              const color = colors[marketIndex % colors.length]
+                              const dataKey = `price_${market.market_id}`
                               return (
                                 <Line
-                                  key={marketInfo.market_id}
+                                  key={`price_line_${market.market_id}`}
                                   type="monotone"
                                   dataKey={dataKey}
                                   stroke={color}
                                   strokeWidth={2}
                                   dot={false}
                                   connectNulls={false}
-                                  name={marketInfo.short_name}
+                                  name={market.question}
+                                  activeDot={{ r: 6, strokeWidth: 2 }}
                                 />
                               )
                             })}
@@ -221,18 +291,18 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
                     </div>
 
                     {/* PnL Chart */}
-                    {marketDetails.pnl_chart_data && marketDetails.pnl_chart_data.length > 0 && (
+                    {Object.values(marketDetails).some(market => market.pnl_data && market.pnl_data.length > 0) && (
                       <div>
                         <h3 className="text-lg font-semibold mb-4">Cumulative PnL</h3>
                         <div className="h-80">
                           <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={marketDetails.pnl_chart_data}>
+                            <LineChart data={mergeMarketData(Object.values(marketDetails).filter(m => m.pnl_data && m.pnl_data.length > 0), 'pnl_data')}>
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                              <XAxis 
-                                dataKey="date" 
+                              <XAxis
+                                dataKey="date"
                                 stroke="hsl(var(--muted-foreground))"
                               />
-                              <YAxis 
+                              <YAxis
                                 stroke="hsl(var(--muted-foreground))"
                                 label={{ value: 'Cumulative PnL', angle: -90, position: 'insideLeft' }}
                               />
@@ -240,33 +310,35 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
                                 contentStyle={{
                                   backgroundColor: 'hsl(var(--card))',
                                   border: '1px solid hsl(var(--border))',
-                                  borderRadius: '8px'
+                                  borderRadius: '8px',
+                                  fontSize: '12px',
+                                  padding: '8px',
+                                  lineHeight: '1.2'
                                 }}
                                 labelFormatter={(value) => `Date: ${value}`}
                                 formatter={(value: unknown, name: string) => {
-                                  if (value === null || value === undefined) return ['-', 'No data']
-                                  const marketId = name.replace('pnl_', '')
-                                  const marketInfo = marketDetails.market_info?.find(m => m.market_id === marketId)
-                                  const marketName = marketInfo ? marketInfo.short_name : marketId
+                                  if (value === null || value === undefined || value === 0.0) return null
                                   return [
                                     typeof value === 'number' ? value.toFixed(3) : String(value),
-                                    marketName
+                                    name
                                   ]
                                 }}
                               />
-                              {marketDetails.market_info?.map((marketInfo, index) => {
-                                const color = colors[index % colors.length]
-                                const dataKey = `pnl_${marketInfo.market_id}`
+                              {Object.values(marketDetails).map((market, marketIndex) => {
+                                if (!market.pnl_data || market.pnl_data.length === 0) return null
+                                const color = colors[marketIndex % colors.length]
+                                const dataKey = `pnl_${market.market_id}`
                                 return (
                                   <Line
-                                    key={marketInfo.market_id}
+                                    key={`pnl_line_${market.market_id}`}
                                     type="monotone"
                                     dataKey={dataKey}
                                     stroke={color}
                                     strokeWidth={2}
-                                    dot={{ r: 3 }}
+                                    dot={(props) => <CustomPnLDot {...props} dataKey={dataKey} stroke={color} />}
                                     connectNulls={false}
-                                    name={marketInfo.short_name}
+                                    name={market.question}
+                                    activeDot={{ r: 6, strokeWidth: 2 }}
                                   />
                                 )
                               })}
@@ -279,40 +351,6 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
                   </CardContent>
                 </Card>
               )}
-
-              {/* Overall Performance Chart */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>{selectedModelData.model} Overall Performance</CardTitle>
-                  <CardDescription>Historical performance trend over time</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-96">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={selectedModelData.performanceHistory}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
-                        <YAxis stroke="hsl(var(--muted-foreground))" />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'hsl(var(--card))',
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px'
-                          }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="cumulative_pnl"
-                          stroke="hsl(var(--primary))"
-                          strokeWidth={3}
-                          dot={{ r: 4 }}
-                          activeDot={{ r: 6 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
             </>
           )}
         </div>

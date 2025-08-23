@@ -2,7 +2,14 @@ from typing import Generator, Type, TypeVar
 
 from smolagents import ChatMessage, ChatMessageStreamDelta, Tool
 from smolagents.models import ApiModel, InferenceClientModel, LiteLLMModel, OpenAIModel
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed, before_sleep_log, after_log
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_fixed,
+    before_sleep_log,
+    after_log,
+)
 
 from predibench.logger_config import get_logger
 

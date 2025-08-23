@@ -6,7 +6,7 @@ import typer
 from predibench.common import DATA_PATH
 from predibench.invest import run_investments_for_specific_date
 from predibench.logger_config import get_logger
-from predibench.retry_models import InferenceClientModelWithRetry, OpenAIModelWithRetry
+from predibench.retry_models import InferenceClientModelWithRetry
 
 logger = get_logger(__name__)
 
@@ -14,9 +14,11 @@ app = typer.Typer()
 
 MODEL_MAP = {
     "huggingface/openai/gpt-oss-120b": InferenceClientModelWithRetry(
-        model_id="openai/gpt-oss-120b", token=os.getenv("HF_TOKEN")),
+        model_id="openai/gpt-oss-120b", token=os.getenv("HF_TOKEN")
+    ),
     "huggingface/openai/gpt-oss-20b": InferenceClientModelWithRetry(
-        model_id="openai/gpt-oss-20b", token=os.getenv("HF_TOKEN")),
+        model_id="openai/gpt-oss-20b", token=os.getenv("HF_TOKEN")
+    ),
 }
 
 

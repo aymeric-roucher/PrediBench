@@ -17,5 +17,8 @@ dependencies = [
     "requests>=2.31.0",
     "tenacity>=8.0.0",
     "coloredlogs>=15.0.0",
-    "predibench @ git+https://github.com/aymeric-roucher/PrediBench#subdirectory=predibench-core",
+    "predibench",
 ]
+
+[tool.uv.sources]
+predibench = { git = "https://github.com/aymeric-roucher/PrediBench", subdirectory = "predibench-core" }
