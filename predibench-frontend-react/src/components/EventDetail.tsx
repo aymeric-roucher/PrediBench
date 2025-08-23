@@ -1,11 +1,12 @@
 import { ExternalLink, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import type { Event } from '../api'
+import type { Event, LeaderboardEntry } from '../api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 
 interface EventDetailProps {
   event: Event
+  leaderboard: LeaderboardEntry[]
 }
 
 interface PriceData {
