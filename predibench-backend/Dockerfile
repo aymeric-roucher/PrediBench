@@ -2,7 +2,8 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-# Install uv for faster Python package management
+# Install git and uv for faster Python package management
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/
 
 # Copy and install dependencies
