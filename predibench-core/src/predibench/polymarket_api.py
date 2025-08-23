@@ -87,7 +87,7 @@ class Market(BaseModel, arbitrary_types_allowed=True):
         """
         if self.outcomes and len(self.outcomes) == 2 and self.outcomes[0].clob_token_id:
             ts_request = _HistoricalTimeSeriesRequestParameters(
-                market_id=self.outcomes[0].clob_token_id,
+                clob_token_id=self.outcomes[0].clob_token_id,
                 end_datetime=end_datetime,
             )
             self.prices = ts_request.get_token_daily_timeseries()
@@ -252,23 +252,23 @@ class MarketsRequestParameters(_RequestParameters):
 
 
 class _HistoricalTimeSeriesRequestParameters(BaseModel):
-    market_id: str
+    clob_token_id: str
     end_datetime: datetime | None = None
 
     @polymarket_retry
     def get_token_daily_timeseries(self) -> pd.Series | None:
         """Make a single API request for timeseries data."""
         url = "https://clob.polymarket.com/prices-history"
-        assert self.market_id is not None
+        assert self.clob_token_id is not None
 
         set_of_params = [
             {
-                "market": self.market_id,
+                "market": self.clob_token_id,
                 "interval": "max",
                 "fidelity": "1440",
             },
             {
-                "market": self.market_id,
+                "market": self.clob_token_id,
                 "interval": "max",
             },
         ]
@@ -296,6 +296,10 @@ class _HistoricalTimeSeriesRequestParameters(BaseModel):
         # Filter timeseries to only include dates between start_datetime and end_datetime
         if self.end_datetime is not None:
             timeseries = timeseries.loc[timeseries.index <= self.end_datetime.date()]
+
+        # assert len(timeseries) > 0, (
+        #     f"No timeseries data found for market {self.clob_token_id}"
+        # )
 
         return timeseries
 
