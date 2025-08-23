@@ -1,12 +1,14 @@
 import json
 import os
+import secrets
 from datetime import datetime
 from functools import lru_cache
+from typing import List
 
 import numpy as np
 import pandas as pd
 from datasets import load_dataset
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from predibench.pnl import get_pnls
 from predibench.polymarket_api import (
@@ -15,6 +17,13 @@ from predibench.polymarket_api import (
     _HistoricalTimeSeriesRequestParameters,
 )
 from pydantic import BaseModel
+
+# Import our auth and models
+from auth import get_current_user, firebase_auth, verify_agent_token_dependency
+from models import (
+    Agent, AgentCreate, AgentResponse, PredictionSubmission, 
+    SubmissionResponse, AgentTokenUpdate
+)
 
 print("Successfully imported predibench modules")
 
@@ -476,6 +485,169 @@ async def get_event_investment_decisions(event_id: str):
             )
     return market_investments
 
+
+# Agent Management Endpoints
+
+def generate_agent_token() -> str:
+    """Generate a unique agent token"""
+    return f"agent_{secrets.token_urlsafe(16)}_{int(datetime.now().timestamp())}"
+
+@app.get("/api/agents", response_model=List[AgentResponse])
+async def get_user_agents(current_user: dict = Depends(get_current_user)):
+    """Get all agents for the authenticated user"""
+    try:
+        user_id = current_user["uid"]
+        agents_ref = firebase_auth.db.collection("users").document(user_id).collection("agents")
+        docs = agents_ref.stream()
+        
+        agents = []
+        for doc in docs:
+            agent_data = doc.to_dict()
+            agents.append(AgentResponse(
+                id=doc.id,
+                name=agent_data["name"],
+                token=agent_data["token"],
+                created_at=agent_data["createdAt"].replace(tzinfo=None) if agent_data.get("createdAt") else datetime.now(),
+                last_used=agent_data.get("lastUsed")
+            ))
+        
+        return agents
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching agents: {str(e)}")
+
+@app.post("/api/agents", response_model=AgentResponse)
+async def create_agent(agent_data: AgentCreate, current_user: dict = Depends(get_current_user)):
+    """Create a new agent for the authenticated user"""
+    try:
+        user_id = current_user["uid"]
+        agent_token = generate_agent_token()
+        
+        # Create agent document in Firestore
+        agent_doc = {
+            "name": agent_data.name,
+            "token": agent_token,
+            "createdAt": datetime.now(),
+            "lastUsed": None
+        }
+        
+        agents_ref = firebase_auth.db.collection("users").document(user_id).collection("agents")
+        doc_ref = agents_ref.add(agent_doc)[1]  # Get the document reference
+        
+        return AgentResponse(
+            id=doc_ref.id,
+            name=agent_data.name,
+            token=agent_token,
+            created_at=datetime.now(),
+            last_used=None
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating agent: {str(e)}")
+
+@app.put("/api/agents/{agent_id}/regenerate-token", response_model=AgentResponse)
+async def regenerate_agent_token(agent_id: str, current_user: dict = Depends(get_current_user)):
+    """Regenerate token for a specific agent"""
+    try:
+        user_id = current_user["uid"]
+        agent_ref = firebase_auth.db.collection("users").document(user_id).collection("agents").document(agent_id)
+        
+        # Check if agent exists and belongs to user
+        agent_doc = agent_ref.get()
+        if not agent_doc.exists:
+            raise HTTPException(status_code=404, detail="Agent not found")
+        
+        # Generate new token and update
+        new_token = generate_agent_token()
+        agent_ref.update({
+            "token": new_token,
+            "lastUpdated": datetime.now()
+        })
+        
+        # Get updated agent data
+        updated_doc = agent_ref.get()
+        agent_data = updated_doc.to_dict()
+        
+        return AgentResponse(
+            id=agent_id,
+            name=agent_data["name"],
+            token=new_token,
+            created_at=agent_data["createdAt"].replace(tzinfo=None) if agent_data.get("createdAt") else datetime.now(),
+            last_used=agent_data.get("lastUsed")
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error regenerating token: {str(e)}")
+
+@app.delete("/api/agents/{agent_id}")
+async def delete_agent(agent_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a specific agent"""
+    try:
+        user_id = current_user["uid"]
+        agent_ref = firebase_auth.db.collection("users").document(user_id).collection("agents").document(agent_id)
+        
+        # Check if agent exists and belongs to user
+        agent_doc = agent_ref.get()
+        if not agent_doc.exists:
+            raise HTTPException(status_code=404, detail="Agent not found")
+        
+        # Delete the agent
+        agent_ref.delete()
+        
+        return {"message": "Agent deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting agent: {str(e)}")
+
+# Prediction Submission Endpoint
+@app.post("/api/submit", response_model=SubmissionResponse)
+async def submit_prediction(
+    submission: PredictionSubmission,
+    authorization: str = Header(..., description="Bearer token with agent token")
+):
+    """Submit predictions using agent token"""
+    try:
+        # Extract token from Authorization header
+        if not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Invalid authorization header format")
+        
+        agent_token = authorization.split(" ", 1)[1]
+        
+        # Verify agent token
+        agent_info = await firebase_auth.verify_agent_token(agent_token)
+        if not agent_info:
+            raise HTTPException(status_code=401, detail="Invalid agent token")
+        
+        # Update last used timestamp
+        user_id = agent_info["user_id"]
+        agent_id = agent_info["agent_id"]
+        agent_ref = firebase_auth.db.collection("users").document(user_id).collection("agents").document(agent_id)
+        agent_ref.update({"lastUsed": datetime.now()})
+        
+        # Store submission (you might want to store this for tracking)
+        submission_doc = {
+            "agent_id": agent_id,
+            "user_id": user_id,
+            "agent_name": agent_info["agent_name"],
+            "event_id": submission.event_id,
+            "market_decisions": submission.market_decisions,
+            "rationale": submission.rationale,
+            "submitted_at": datetime.now()
+        }
+        
+        # Store in submissions collection
+        firebase_auth.db.collection("submissions").add(submission_doc)
+        
+        return SubmissionResponse(
+            success=True,
+            message="Prediction submitted successfully",
+            agent_name=agent_info["agent_name"]
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error submitting prediction: {str(e)}")
 
 @app.get("/api/health")
 async def health_check():
