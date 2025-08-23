@@ -11,7 +11,8 @@
         "source": "/api/**",
         "run": {
           "serviceId": "predibench",
-          "region": "us-east1"
+          "region": "us-east1",
+          "identity": "oidc"
         }
       },
       {
