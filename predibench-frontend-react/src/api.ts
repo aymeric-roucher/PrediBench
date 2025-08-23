@@ -128,7 +128,7 @@ class ApiService {
   }
 
   async getModelMarketDetails(modelId: string): Promise<ModelMarketDetails> {
-    const response = await this.fetchWithTimeout(`${API_BASE_URL}/model/${modelId}/markets`)
+    const response = await this.fetchWithTimeout(`${API_BASE_URL}/model/${modelId}/pnl`)
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
@@ -144,7 +144,7 @@ class ApiService {
   }
 
   async getEventMarketPrices(eventId: string): Promise<{ [marketId: string]: { date: string; price: number }[] }> {
-    const response = await this.fetchWithTimeout(`${API_BASE_URL}/event/${eventId}/markets/prices`)
+    const response = await this.fetchWithTimeout(`${API_BASE_URL}/event/${eventId}/market_prices`)
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }

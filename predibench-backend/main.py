@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import date, datetime
+from datetime import datetime
 from functools import lru_cache
 
 import numpy as np
@@ -8,7 +8,6 @@ import pandas as pd
 from datasets import load_dataset
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from predibench.agent.dataclasses import MarketInvestmentDecision, SingleModelDecision
 from predibench.pnl import get_pnls
 from predibench.polymarket_api import (
     Event,
@@ -319,7 +318,8 @@ def get_all_markets_pnls():
     return pnl_calculators
 
 
-@app.get("/api/model/{agent_id}/markets")
+@lru_cache(maxsize=16)
+@app.get("/api/model/{agent_id}/pnl")
 async def get_model_investment_details(agent_id: str):
     """Get market-level position and PnL data for a specific model"""
 
@@ -414,7 +414,7 @@ async def get_event_details(event_id: str):
     return events_list[0]
 
 
-@app.get("/api/event/{event_id}/markets/prices")
+@app.get("/api/event/{event_id}/market_prices")
 async def get_event_market_prices(event_id: str):
     """Get price history for all markets in an event"""
     events_list = get_events_by_ids((event_id,))
@@ -427,38 +427,30 @@ async def get_event_market_prices(event_id: str):
 
     # Get prices for each market in the event
     for market in event.markets:
-        market_id = market.id
+        clob_token_id = market.outcomes[0].clob_token_id
         price_data = _HistoricalTimeSeriesRequestParameters(
-            market_id=market_id,
+            clob_token_id=clob_token_id,
         ).get_token_daily_timeseries()
 
-        if price_data:
-            market_prices[market_id] = price_data
+        market_prices[market.id] = price_data
 
     return market_prices
 
 
 @app.get(
-    "/api/event/{event_id}/investments", response_model=list[MarketInvestmentDecision]
+    "/api/event/{event_id}/investment_decisions",
+    response_model=list[dict],
 )
-async def get_event_investments(event_id: str):
+async def get_event_investment_decisions(event_id: str):
     """Get real investment choices for a specific event"""
     # Load agent choices data like in gradio app
     df = load_agent_choices()
-
-    # Apply same filtering as gradio app
     df["timestamp_uploaded"] = pd.to_datetime(df["timestamp_uploaded"])
-    cutoff_date = pd.to_datetime("2025-08-18")
-    df = df[df["timestamp_uploaded"] < cutoff_date]
-    df = df.loc[df["date"] > date(2025, 7, 19)]
 
-    # Look for predictions for this specific event ID
-    event_predictions = df[df["event_id"] == event_id].copy()
-
-    if event_predictions.empty:
-        # If no direct match, get recent predictions from all events for the agents
-        latest_predictions = df.groupby("agent_name").tail(1)
-        event_predictions = latest_predictions
+    # Look for the latest prediction for each agent for this specific event ID
+    event_predictions = (
+        df.loc[df["event_id"] == event_id].groupby("agent_name").tail(1).copy()
+    )
 
     # Process predictions and extract market decisions
     market_investments = []
@@ -470,19 +462,18 @@ async def get_event_investments(event_id: str):
         for market_decision in decisions:
             market_id = market_decision["market_id"]
             model_decision = market_decision["model_decision"]
-            # Create betting result
-            betting_result = SingleModelDecision(
-                bet=model_decision["bet"],
-                odds=model_decision["odds"],
-                rationale=model_decision["rationale"],
-            )
 
             # Create market investment result
-            market_investment = MarketInvestmentDecision(
-                market_id=market_id,
-                model_decision=betting_result,
+            market_investments.append(
+                {
+                    "market_id": market_id,
+                    "agent_name": row["agent_name"],
+                    "bet": model_decision["bet"],
+                    "odds": model_decision["odds"],
+                    "rationale": model_decision["rationale"],
+                    "date": row["date"],
+                }
             )
-            market_investments.append(market_investment)
     return market_investments
 
 
