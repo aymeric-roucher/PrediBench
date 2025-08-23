@@ -16,16 +16,19 @@ interface PriceData {
   marketName?: string
 }
 
-interface Prediction {
-  model: string
-  prediction: string
-  confidence: number
-  lastUpdated: string
+
+
+interface MarketInvestmentDecision {
+  market_id: string
+  agent_name: string
+  bet: number
+  odds: number
+  rationale: string
 }
 
-export function EventDetail({ event, leaderboard }: EventDetailProps) {
+export function EventDetail({ event }: EventDetailProps) {
   const [marketPricesData, setMarketPricesData] = useState<{ [marketId: string]: PriceData[] }>({})
-  const [predictions, setPredictions] = useState<Prediction[]>([])
+  const [investmentDecisions, setInvestmentDecisions] = useState<MarketInvestmentDecision[]>([])
   const [loading, setLoading] = useState(false)
 
   // Function to convert URLs in text to clickable links
@@ -61,54 +64,30 @@ export function EventDetail({ event, leaderboard }: EventDetailProps) {
   const loadEventDetails = async (eventId: string) => {
     setLoading(true)
     try {
-      const [marketPrices, predictionsData] = await Promise.all([
-        fetch(`http://localhost:8080/api/event/${eventId}/markets/prices`).then(r => r.json()),
-        fetch(`http://localhost:8080/api/event/${eventId}/predictions`).then(r => r.json())
+      const [marketPrices, investmentDecisions] = await Promise.all([
+        fetch(`http://localhost:8080/api/event/${eventId}/market_prices`).then(r => r.json()),
+        fetch(`http://localhost:8080/api/event/${eventId}/investment_decisions`).then(r => r.json())
       ])
-      setMarketPricesData(marketPrices)
-      setPredictions(predictionsData)
+
+      // Transform market prices data from {marketId: {date: price}} to {marketId: [{date, price}]}
+      const transformedPrices: { [marketId: string]: PriceData[] } = {}
+      Object.entries(marketPrices).forEach(([marketId, pricesByDate]) => {
+        transformedPrices[marketId] = Object.entries(pricesByDate as Record<string, number>).map(([date, price]) => ({
+          date,
+          price,
+          marketId
+        }))
+      })
+
+      setMarketPricesData(transformedPrices)
+      setInvestmentDecisions(investmentDecisions)
     } catch (error) {
       console.error('Error loading event details:', error)
-      // Fallback to mock data
-      const mockData: { [key: string]: PriceData[] } = {}
-      event?.markets?.forEach((market) => {
-        mockData[market.id] = mockPriceHistory(market.question)
-      })
-      setMarketPricesData(mockData)
-      setPredictions(mockModelPredictions())
     } finally {
       setLoading(false)
     }
   }
 
-  const mockModelPredictions = () => {
-    return leaderboard.slice(0, 4).map(model => ({
-      model: model.model,
-      prediction: Math.random() > 0.5 ? 'Yes' : 'No',
-      confidence: parseFloat((Math.random() * 0.4 + 0.6).toFixed(2)),
-      lastUpdated: '2 hours ago'
-    }))
-  }
-
-  const mockPriceHistory = (marketName?: string) => {
-    const days = 30
-    const data = []
-    let price = Math.random() * 0.4 + 0.3
-
-    for (let i = 0; i < days; i++) {
-      const date = new Date()
-      date.setDate(date.getDate() - (days - i))
-      price += (Math.random() - 0.5) * 0.1
-      price = Math.max(0.1, Math.min(0.9, price))
-
-      data.push({
-        date: date.toISOString().split('T')[0],
-        price: parseFloat(price.toFixed(3)),
-        marketName: marketName
-      })
-    }
-    return data
-  }
 
   useEffect(() => {
     if (event) {
@@ -199,7 +178,7 @@ export function EventDetail({ event, leaderboard }: EventDetailProps) {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
               ) : (
-                <div className="h-96">
+                <div className="w-full">
                   {/* Market Legend */}
                   <div className="mb-4 flex flex-wrap gap-2">
                     {event?.markets?.map((market, index) => (
@@ -210,65 +189,66 @@ export function EventDetail({ event, leaderboard }: EventDetailProps) {
                             backgroundColor: `hsl(${index * 360 / (event.markets?.length || 1)}, 70%, 50%)`
                           }}
                         ></div>
-                        <span className="text-sm text-muted-foreground line-clamp-1">
+                        <span className="text-sm text-muted-foreground">
                           {market.question.length > 50 ? market.question.substring(0, 47) + '...' : market.question}
                         </span>
                       </div>
                     ))}
                   </div>
 
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis
-                        dataKey="date"
-                        stroke="hsl(var(--muted-foreground))"
-                        type="category"
-                        allowDuplicatedCategory={false}
-                      />
-                      <YAxis stroke="hsl(var(--muted-foreground))" domain={[0, 1]} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px'
-                        }}
-                        formatter={(value: any, name: string) => [
-                          `${(Number(value) * 100).toFixed(1)}%`,
-                          name
-                        ]}
-                      />
+                  <div className="w-full h-96">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis
+                          dataKey="date"
+                          stroke="hsl(var(--muted-foreground))"
+                          type="category"
+                          allowDuplicatedCategory={false}
+                        />
+                        <YAxis stroke="hsl(var(--muted-foreground))" domain={[0, 1]} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--card))',
+                            border: '1px solid hsl(var(--border))',
+                            borderRadius: '8px'
+                          }}
+                          formatter={(value: any, name: string) => [
+                            `${(Number(value) * 100).toFixed(1)}%`,
+                            name
+                          ]}
+                        />
 
-                      {/* Create a line for each market */}
-                      {event?.markets?.map((market, index) => {
-                        const marketData = marketPricesData[market.id] || []
-                        return (
-                          <Line
-                            key={market.id}
-                            type="monotone"
-                            dataKey="price"
-                            data={marketData}
-                            stroke={`hsl(${index * 360 / (event.markets?.length || 1)}, 70%, 50%)`}
-                            strokeWidth={2}
-                            dot={false}
-                            name={market.question.length > 30 ? market.question.substring(0, 27) + '...' : market.question}
-                          />
-                        )
-                      })}
-                    </LineChart>
-                  </ResponsiveContainer>
+                        {/* Create a line for each market */}
+                        {event?.markets?.map((market, index) => {
+                          const marketData = marketPricesData[market.id] || []
+                          return (
+                            <Line
+                              key={market.id}
+                              type="monotone"
+                              dataKey="price"
+                              data={marketData}
+                              stroke={`hsl(${index * 360 / (event.markets?.length || 1)}, 70%, 50%)`}
+                              strokeWidth={2}
+                              dot={false}
+                              name={market.question.length > 30 ? market.question.substring(0, 27) + '...' : market.question}
+                            />
+                          )
+                        })}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Model Predictions */}
+        {/* Latest Model Predictions */}
         <div className="lg:col-span-1">
           <Card>
             <CardHeader>
-              <CardTitle>Model Predictions</CardTitle>
-              <CardDescription>Latest predictions from LLM models</CardDescription>
+              <CardTitle>LatestModel Predictions</CardTitle>
             </CardHeader>
             <CardContent>
               {loading ? (
@@ -276,24 +256,32 @@ export function EventDetail({ event, leaderboard }: EventDetailProps) {
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {predictions.map((prediction, index) => (
-                    <div key={index} className="p-4 rounded-lg border border-border">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium">{prediction.model}</h4>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${prediction.prediction === 'Yes'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                          }`}>
-                          {prediction.prediction}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>Confidence: {prediction.confidence}</span>
-                        <span>{prediction.lastUpdated}</span>
-                      </div>
-                    </div>
-                  ))}
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-2 px-3 text-sm font-medium text-muted-foreground">Model</th>
+                        <th className="text-left py-2 px-3 text-sm font-medium text-muted-foreground">Bet</th>
+                        <th className="text-left py-2 px-3 text-sm font-medium text-muted-foreground">Confidence</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {investmentDecisions.map((investmentDecision, index) => (
+                        <tr key={index} className={`${index % 2 === 1 ? 'bg-muted/50' : ''}`}>
+                          <td className="py-3 px-3 font-medium">{investmentDecision.agent_name}</td>
+                          <td className="py-3 px-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${investmentDecision.bet < 0
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                              }`}>
+                              {investmentDecision.bet.toFixed(2)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-muted-foreground">{(investmentDecision.odds * 100).toFixed(0)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </CardContent>
