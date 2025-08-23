@@ -36,15 +36,15 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
   const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00c49f', '#ffbb28', '#ff8042']
 
   // Debug logging
-  if (marketDetails && marketDetails.markets.length > 0) {
-    console.log('Market details:', {
-      marketCount: marketDetails.markets.length,
-      pnlCount: marketDetails.market_pnls.length,
-      priceDataPoints: marketDetails.price_chart_data?.length,
-      pnlDataPoints: marketDetails.pnl_chart_data?.length,
-      marketInfo: marketDetails.market_info
-    })
-  }
+  // if (marketDetails && marketDetails.markets.length > 0) {
+  //   console.log('Market details:', {
+  //     marketCount: marketDetails.markets.length,
+  //     pnlCount: marketDetails.market_pnls.length,
+  //     priceDataPoints: marketDetails.price_chart_data?.length,
+  //     pnlDataPoints: marketDetails.pnl_chart_data?.length,
+  //     marketInfo: marketDetails.market_info
+  //   })
+  // }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -67,19 +67,17 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
                   <button
                     key={model.id}
                     onClick={() => setSelectedModel(model.id)}
-                    className={`w-full text-left p-3 rounded-lg border transition-all ${
-                      selectedModel === model.id
+                    className={`w-full text-left p-3 rounded-lg border transition-all ${selectedModel === model.id
                         ? 'border-primary bg-primary/5'
                         : 'border-border hover:border-primary/50'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center space-x-3">
-                      <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
-                        index === 0 ? 'bg-yellow-100 text-yellow-800' :
-                        index === 1 ? 'bg-slate-100 text-slate-800' :
-                        index === 2 ? 'bg-orange-100 text-orange-800' :
-                        'bg-muted text-muted-foreground'
-                      }`}>
+                      <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-800' :
+                          index === 1 ? 'bg-slate-100 text-slate-800' :
+                            index === 2 ? 'bg-orange-100 text-orange-800' :
+                              'bg-muted text-muted-foreground'
+                        }`}>
                         {index + 1}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -172,11 +170,11 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={marketDetails.price_chart_data}>
                             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                            <XAxis 
-                              dataKey="date" 
+                            <XAxis
+                              dataKey="date"
                               stroke="hsl(var(--muted-foreground))"
                             />
-                            <YAxis 
+                            <YAxis
                               stroke="hsl(var(--muted-foreground))"
                               domain={[0, 1]}
                               label={{ value: 'Price', angle: -90, position: 'insideLeft' }}
@@ -228,11 +226,11 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={marketDetails.pnl_chart_data}>
                               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                              <XAxis 
-                                dataKey="date" 
+                              <XAxis
+                                dataKey="date"
                                 stroke="hsl(var(--muted-foreground))"
                               />
-                              <YAxis 
+                              <YAxis
                                 stroke="hsl(var(--muted-foreground))"
                                 label={{ value: 'Cumulative PnL', angle: -90, position: 'insideLeft' }}
                               />

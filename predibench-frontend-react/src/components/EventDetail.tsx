@@ -1,4 +1,4 @@
-import { Calendar } from 'lucide-react'
+import { Calendar, ExternalLink } from 'lucide-react'
 import type { Event, LeaderboardEntry } from '../api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 
@@ -8,6 +8,35 @@ interface EventDetailProps {
 }
 
 export function EventDetail({ event, leaderboard }: EventDetailProps) {
+  // Function to convert URLs in text to clickable links
+  const linkify = (text: string | null | undefined) => {
+    if (!text) return null
+    
+    const urlRegex = /(https?:\/\/[^\s]+)/g
+    
+    return text.split(urlRegex).map((part, index) => {
+      if (urlRegex.test(part)) {
+        // Remove trailing punctuation from the URL
+        const cleanUrl = part.replace(/[.,;:!?\)\]]+$/, '')
+        const trailingPunct = part.slice(cleanUrl.length)
+        
+        return (
+          <span key={index}>
+            <a
+              href={cleanUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 underline"
+            >
+              {cleanUrl}
+            </a>
+            {trailingPunct}
+          </span>
+        )
+      }
+      return part
+    })
+  }
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
@@ -18,7 +47,16 @@ export function EventDetail({ event, leaderboard }: EventDetailProps) {
           ← Back to Events
         </button>
         <h1 className="text-3xl font-bold mb-2">{event.title}</h1>
-        <p className="text-muted-foreground text-lg">{event.description}</p>
+        <p className="text-muted-foreground text-lg">{linkify(event.description)}</p>
+        <a 
+          href={`https://polymarket.com/event/${event.slug}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm mt-3 transition-colors"
+        >
+          See the event on Polymarket
+          <ExternalLink className="h-4 w-4 ml-1" />
+        </a>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
