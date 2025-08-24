@@ -1,14 +1,15 @@
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { Route, BrowserRouter as Router, Routes, useLocation } from 'react-router-dom'
 import type { Event, LeaderboardEntry, Stats } from './api'
 import { apiService } from './api'
-import { Layout } from './components/Layout'
+import { EventDetail } from './components/EventDetail'
 import { HomePage } from './components/HomePage'
+import { Layout } from './components/Layout'
 import { LeaderboardPage } from './components/LeaderboardPage'
 import { ModelsPage } from './components/ModelsPage'
 import { QuestionsPage } from './components/QuestionsPage'
-import { EventDetail } from './components/EventDetail'
 import { ThemeProvider } from './contexts/ThemeContext'
+import { useAnalytics } from './hooks/useAnalytics'
 
 function AppContent() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
@@ -17,6 +18,7 @@ function AppContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const location = useLocation()
+  const { trackPageView } = useAnalytics()
 
   const loadData = async () => {
     try {
@@ -53,6 +55,10 @@ function AppContent() {
     loadData()
   }, [])
 
+  useEffect(() => {
+    trackPageView(getCurrentPage())
+  }, [location, trackPageView])
+
   const getCurrentPage = () => {
     if (location.pathname === '/') return 'home'
     if (location.pathname === '/leaderboard') return 'leaderboard'
@@ -68,7 +74,7 @@ function AppContent() {
         <div className="container mx-auto px-6 py-12 text-center">
           <h2 className="text-xl font-bold text-red-600 mb-2">Error Loading Data</h2>
           <p className="text-muted-foreground mb-4">{error}</p>
-          <button 
+          <button
             onClick={() => {
               setError(null)
               setLoading(true)
@@ -94,11 +100,11 @@ function AppContent() {
         <Route path="/leaderboard" element={<LeaderboardPage leaderboard={leaderboard} loading={loading} />} />
         <Route path="/events" element={<QuestionsPage events={events} leaderboard={leaderboard} loading={loading} />} />
         <Route path="/models" element={<ModelsPage leaderboard={leaderboard} />} />
-        <Route 
-          path="/events/:eventId" 
+        <Route
+          path="/events/:eventId"
           element={
             <EventDetailWrapper events={events} leaderboard={leaderboard} />
-          } 
+          }
         />
       </Routes>
     </Layout>
@@ -109,7 +115,7 @@ function EventDetailWrapper({ events, leaderboard }: { events: Event[], leaderbo
   const location = useLocation()
   const eventId = location.pathname.split('/events/')[1]
   const event = events.find(e => e.id === eventId)
-  
+
   if (!event) {
     return (
       <div className="container mx-auto px-6 py-12 text-center">
@@ -118,7 +124,7 @@ function EventDetailWrapper({ events, leaderboard }: { events: Event[], leaderbo
       </div>
     )
   }
-  
+
   return <EventDetail event={event} leaderboard={leaderboard} />
 }
 
