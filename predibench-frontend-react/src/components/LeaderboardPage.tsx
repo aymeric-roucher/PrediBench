@@ -1,3 +1,4 @@
+import { ArrowRight } from 'lucide-react'
 import type { LeaderboardEntry } from '../api'
 import { LeaderboardTable } from './LeaderboardTable'
 import { getChartColor } from './ui/chart-colors'
@@ -19,9 +20,9 @@ export function LeaderboardPage({ leaderboard, loading = false }: LeaderboardPag
 
       {/* Leaderboard Table */}
       <div className="mb-16">
-        <LeaderboardTable 
-          leaderboard={leaderboard} 
-          loading={loading} 
+        <LeaderboardTable
+          leaderboard={leaderboard}
+          loading={loading}
           showTitle={false}
         />
       </div>
@@ -78,10 +79,10 @@ export function LeaderboardPage({ leaderboard, loading = false }: LeaderboardPag
           <div className="bg-card rounded-xl border border-border/30 p-8">
             <div className="prose prose-gray max-w-none">
               <p className="text-muted-foreground mb-4">
-                PrediBench evaluates language models through their ability to make profitable predictions in real market scenarios. 
+                PrediBench evaluates language models through their ability to make profitable predictions in real market scenarios.
                 Our comprehensive methodology ensures fair and accurate assessment of model performance across multiple dimensions.
               </p>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
                 <div>
                   <h3 className="text-lg font-semibold mb-3">Evaluation Metrics</h3>
@@ -92,7 +93,7 @@ export function LeaderboardPage({ leaderboard, loading = false }: LeaderboardPag
                     <li>• <strong>Calibration</strong>: How well probabilities match outcomes</li>
                   </ul>
                 </div>
-                
+
                 <div>
                   <h3 className="text-lg font-semibold mb-3">Trading Framework</h3>
                   <ul className="text-sm text-muted-foreground space-y-2">
@@ -103,11 +104,16 @@ export function LeaderboardPage({ leaderboard, loading = false }: LeaderboardPag
                   </ul>
                 </div>
               </div>
-              
-              <p className="text-muted-foreground mt-6">
-                More detailed methodology documentation and research papers will be published soon. 
-                Stay tuned for comprehensive insights into our evaluation framework and findings.
-              </p>
+
+              <div className="text-center">
+                <a
+                  href="/about"
+                  className="inline-flex items-center space-x-2 text-foreground hover:shadow-lg transition-all duration-200 font-medium border border-border rounded-lg px-6 py-3 hover:border-primary/50"
+                >
+                  <span>More detail on the benchmark</span>
+                  <ArrowRight className="h-4 w-4" />
+                </a>
+              </div>
             </div>
           </div>
         </div>
