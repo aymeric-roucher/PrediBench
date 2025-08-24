@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { LeaderboardEntry, ModelMarketDetails } from '../api'
 import { apiService } from '../api'
+import { getChartColor } from './ui/chart-colors'
 import { VisxLineChart } from './ui/visx-line-chart'
 import { VisxPnLChart } from './ui/visx-pnl-chart'
-import { getChartColor } from './ui/chart-colors'
 
 interface ModelsPageProps {
   leaderboard: LeaderboardEntry[]
@@ -23,7 +23,7 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search)
     const selectedFromUrl = urlParams.get('selected')
-    
+
     if (selectedFromUrl && leaderboard.find(m => m.id === selectedFromUrl)) {
       setSelectedModel(selectedFromUrl)
     } else if (!selectedModel && leaderboard.length > 0) {
@@ -60,45 +60,43 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
         {/* Model Selection Sidebar */}
         <div className="lg:col-span-1">
           <div className="space-y-2">
-                {leaderboard.map((model, index) => {
-                  const handleModelSelect = (modelId: string) => {
-                    setSelectedModel(modelId)
-                    navigate(`/models?selected=${modelId}`, { replace: true })
-                  }
-                  
-                  return (
-                    <button
-                      key={model.id}
-                      onClick={() => handleModelSelect(model.id)}
-                      className={`group w-full text-left p-4 rounded-xl border transition-all duration-200 ${selectedModel === model.id
-                        ? 'border-gray-400 shadow-lg bg-card'
-                        : 'border-border/30 hover:border-gray-300 hover:shadow-md bg-card'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div className={`flex items-center justify-center w-10 h-10 rounded-full text-xs font-bold transition-transform group-hover:scale-105 ${
-                          index === 0 ? 'bg-gradient-to-br from-yellow-100 to-yellow-50 text-yellow-800 shadow-md shadow-yellow-200/50' :
-                          index === 1 ? 'bg-gradient-to-br from-slate-100 to-slate-50 text-slate-800 shadow-md shadow-slate-200/50' :
-                          index === 2 ? 'bg-gradient-to-br from-amber-100 to-amber-50 text-amber-800 shadow-md shadow-amber-200/50' :
+            {leaderboard.map((model, index) => {
+              const handleModelSelect = (modelId: string) => {
+                setSelectedModel(modelId)
+                navigate(`/models?selected=${modelId}`, { replace: true })
+              }
+
+              return (
+                <button
+                  key={model.id}
+                  onClick={() => handleModelSelect(model.id)}
+                  className={`group w-full text-left p-4 rounded-xl border transition-all duration-200 ${selectedModel === model.id
+                    ? 'border-primary-400 shadow-lg bg-card'
+                    : 'border-border/30 hover:border-primary-300 hover:shadow-md bg-card'
+                    }`}
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className={`flex items-center justify-center w-10 h-10 rounded-full text-xs font-bold transition-transform group-hover:scale-105 ${index === 0 ? 'bg-gradient-to-br from-yellow-100 to-yellow-50 text-yellow-800 shadow-md shadow-yellow-200/50' :
+                      index === 1 ? 'bg-gradient-to-br from-slate-100 to-slate-50 text-slate-800 shadow-md shadow-slate-200/50' :
+                        index === 2 ? 'bg-gradient-to-br from-amber-100 to-amber-50 text-amber-800 shadow-md shadow-amber-200/50' :
                           'bg-gradient-to-br from-muted to-muted/70 text-muted-foreground shadow-sm'
-                        }`}>
-                          {index + 1}
-                        </div>
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <p className={`font-semibold truncate transition-colors ${
-                            selectedModel === model.id ? 'text-gray-700' : 'text-foreground group-hover:text-gray-600'
-                          }`}>{model.model}</p>
-                          <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mt-1">
-                            <div>Total PnL: {model.final_cumulative_pnl.toFixed(1)}</div>
-                            <div>Accuracy: {((model.accuracy || 0) * 100).toFixed(0)}%</div>
-                            <div>Trades: {model.trades}</div>
-                            <div>Brier Score: ${Math.round(model.final_cumulative_pnl * 1000).toLocaleString()}</div>
-                          </div>
-                        </div>
+                      }`}>
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <p className={`font-semibold truncate transition-colors ${selectedModel === model.id ? 'text-primary-700' : 'text-foreground group-hover:text-primary-600'
+                        }`}>{model.model}</p>
+                      <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mt-1">
+                        <div>Total PnL: {model.final_cumulative_pnl.toFixed(1)}</div>
+                        <div>Accuracy: {((model.accuracy || 0) * 100).toFixed(0)}%</div>
+                        <div>Trades: {model.trades}</div>
+                        <div>Brier Score: ${Math.round(model.final_cumulative_pnl * 1000).toLocaleString()}</div>
                       </div>
-                    </button>
-                  )
-                })}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
           </div>
         </div>
 
