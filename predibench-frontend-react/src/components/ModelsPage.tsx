@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import type { LeaderboardEntry, ModelMarketDetails } from '../api'
 import { apiService } from '../api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
@@ -12,6 +13,8 @@ interface ModelsPageProps {
 
 
 export function ModelsPage({ leaderboard }: ModelsPageProps) {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [selectedModel, setSelectedModel] = useState<string>(leaderboard[0]?.id || '')
   const [marketDetails, setMarketDetails] = useState<ModelMarketDetails | null>(null)
   const [loading, setLoading] = useState(false)
@@ -19,10 +22,15 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
   const selectedModelData = leaderboard.find(m => m.id === selectedModel)
 
   useEffect(() => {
-    if (!selectedModel && leaderboard.length > 0) {
+    const urlParams = new URLSearchParams(location.search)
+    const selectedFromUrl = urlParams.get('selected')
+    
+    if (selectedFromUrl && leaderboard.find(m => m.id === selectedFromUrl)) {
+      setSelectedModel(selectedFromUrl)
+    } else if (!selectedModel && leaderboard.length > 0) {
       setSelectedModel(leaderboard[0].id)
     }
-  }, [leaderboard, selectedModel])
+  }, [leaderboard, selectedModel, location.search])
 
   useEffect(() => {
     if (selectedModel) {
@@ -63,30 +71,40 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {leaderboard.map((model, index) => (
-                  <button
-                    key={model.id}
-                    onClick={() => setSelectedModel(model.id)}
-                    className={`w-full text-left p-3 rounded-lg border transition-all ${selectedModel === model.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
+                {leaderboard.map((model, index) => {
+                  const handleModelSelect = (modelId: string) => {
+                    setSelectedModel(modelId)
+                    navigate(`/models?selected=${modelId}`, { replace: true })
+                  }
+                  
+                  return (
+                    <button
+                      key={model.id}
+                      onClick={() => handleModelSelect(model.id)}
+                      className={`group w-full text-left p-4 rounded-xl border transition-all duration-200 ${selectedModel === model.id
+                        ? 'border-primary/30 bg-gradient-to-r from-primary/[0.02] to-background shadow-lg shadow-primary/5'
+                        : 'border-border/50 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 hover:bg-gradient-to-r hover:from-primary/[0.02] hover:to-background'
                       }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-800' :
-                        index === 1 ? 'bg-slate-100 text-slate-800' :
-                          index === 2 ? 'bg-orange-100 text-orange-800' :
-                            'bg-muted text-muted-foreground'
+                    >
+                      <div className="flex items-center space-x-4">
+                        <div className={`flex items-center justify-center w-10 h-10 rounded-full text-xs font-bold transition-transform group-hover:scale-105 ${
+                          index === 0 ? 'bg-gradient-to-br from-yellow-100 to-yellow-50 text-yellow-800 shadow-md shadow-yellow-200/50' :
+                          index === 1 ? 'bg-gradient-to-br from-slate-100 to-slate-50 text-slate-800 shadow-md shadow-slate-200/50' :
+                          index === 2 ? 'bg-gradient-to-br from-amber-100 to-amber-50 text-amber-800 shadow-md shadow-amber-200/50' :
+                          'bg-gradient-to-br from-muted to-muted/70 text-muted-foreground shadow-sm'
                         }`}>
-                        {index + 1}
+                          {index + 1}
+                        </div>
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <p className={`font-semibold truncate transition-colors ${
+                            selectedModel === model.id ? 'text-primary' : 'text-foreground group-hover:text-primary'
+                          }`}>{model.model}</p>
+                          <p className="text-sm text-muted-foreground">Score: {model.final_cumulative_pnl.toFixed(1)}</p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{model.model}</p>
-                        <p className="text-sm text-muted-foreground">Score: {model.final_cumulative_pnl.toFixed(1)}</p>
-                      </div>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  )
+                })}
               </div>
             </CardContent>
           </Card>
