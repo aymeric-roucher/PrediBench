@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { LeaderboardEntry, ModelMarketDetails } from '../api'
 import { apiService } from '../api'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { VisxLineChart } from './ui/visx-line-chart'
 import { VisxPnLChart } from './ui/visx-pnl-chart'
 import { getChartColor } from './ui/chart-colors'
@@ -56,21 +55,11 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Model Performance</h1>
-        <p className="text-muted-foreground">Detailed analysis of individual model performance</p>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-0">
         {/* Model Selection Sidebar */}
         <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle>Select Model</CardTitle>
-              <CardDescription>Choose a model to view detailed performance</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
+          <div className="space-y-2">
                 {leaderboard.map((model, index) => {
                   const handleModelSelect = (modelId: string) => {
                     setSelectedModel(modelId)
@@ -82,8 +71,8 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
                       key={model.id}
                       onClick={() => handleModelSelect(model.id)}
                       className={`group w-full text-left p-4 rounded-xl border transition-all duration-200 ${selectedModel === model.id
-                        ? 'border-primary/30 bg-gradient-to-r from-primary/[0.02] to-background shadow-lg shadow-primary/5'
-                        : 'border-border/50 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 hover:bg-gradient-to-r hover:from-primary/[0.02] hover:to-background'
+                        ? 'border-gray-400 shadow-lg bg-card'
+                        : 'border-border/30 hover:border-gray-300 hover:shadow-md bg-card'
                       }`}
                     >
                       <div className="flex items-center space-x-4">
@@ -97,86 +86,33 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
                         </div>
                         <div className="flex-1 min-w-0 space-y-1">
                           <p className={`font-semibold truncate transition-colors ${
-                            selectedModel === model.id ? 'text-primary' : 'text-foreground group-hover:text-primary'
+                            selectedModel === model.id ? 'text-gray-700' : 'text-foreground group-hover:text-gray-600'
                           }`}>{model.model}</p>
-                          <p className="text-sm text-muted-foreground">Score: {model.final_cumulative_pnl.toFixed(1)}</p>
+                          <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mt-1">
+                            <div>Total PnL: {model.final_cumulative_pnl.toFixed(1)}</div>
+                            <div>Accuracy: {((model.accuracy || 0) * 100).toFixed(0)}%</div>
+                            <div>Trades: {model.trades}</div>
+                            <div>Brier Score: ${Math.round(model.final_cumulative_pnl * 1000).toLocaleString()}</div>
+                          </div>
                         </div>
                       </div>
                     </button>
                   )
                 })}
-              </div>
-            </CardContent>
-          </Card>
+          </div>
         </div>
 
         {/* Model Details */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-3 relative">
+          {/* Border overlay that hides at selected model intersection */}
+          <div className="absolute inset-0 border rounded-xl border-border/30 pointer-events-none" />
           {selectedModelData && (
             <>
-              {/* Model Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Score</p>
-                        <p className="text-2xl font-bold">{selectedModelData.final_cumulative_pnl.toFixed(1)}</p>
-                      </div>
-                      <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                        <span className="text-primary">🎯</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Accuracy</p>
-                        <p className="text-2xl font-bold">{((selectedModelData.accuracy || 0) * 100).toFixed(0)}%</p>
-                      </div>
-                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                        <span className="text-green-600">✓</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Trades</p>
-                        <p className="text-2xl font-bold">{selectedModelData.trades}</p>
-                      </div>
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-blue-600">📊</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Profit</p>
-                        <p className="text-2xl font-bold text-green-600">${Math.round(selectedModelData.final_cumulative_pnl * 1000).toLocaleString()}</p>
-                      </div>
-                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                        <span className="text-green-600">💰</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
 
               {/* Market Charts - Combined Price Evolution and PnL */}
               {marketDetails && Object.keys(marketDetails).length > 0 && (
-                <Card className="mb-8">
-                  <CardContent>
+                <div className="p-6 bg-card rounded-xl relative z-10">
+                  <div>
                     {/* Price Evolution Chart */}
                     <div className="mb-8">
                       <h3 className="text-lg font-semibold mb-4">Price Evolution</h3>
@@ -226,8 +162,8 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
                       </div>
                     )}
                     {loading && <div className="text-center py-4">Loading market data...</div>}
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               )}
             </>
           )}
