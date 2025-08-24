@@ -1,10 +1,10 @@
-import { Copy, Plus, RefreshCw, Trash2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { apiService, type Agent } from '../api'
-import { submissionService, type AgentSubmission } from '../apiSubmission'
-import { useAuth } from '../contexts/AuthContext'
+import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { Card } from './ui/card'
+import { Copy, RefreshCw, Plus, Trash2 } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
+import { apiService, type Agent } from '../api'
+import { submissionService, type AgentSubmission } from '../apiSubmission'
 
 // Code examples for different languages - new simplified structure
 const getCodeExamples = (agentToken = 'YOUR_AGENT_TOKEN') => ({
@@ -28,7 +28,7 @@ const getCodeExamples = (agentToken = 'YOUR_AGENT_TOKEN') => ({
       }
     ]
   }'`,
-
+  
   python: `import requests
 import json
 
@@ -134,29 +134,12 @@ export function Dashboard() {
   useEffect(() => {
     if (!currentUser) return
 
-    const agentsRef = collection(db, `users/${currentUser.uid}/agents`)
-
-    // Real-time listener for agents
-    const unsubscribe = onSnapshot(agentsRef, (snapshot: any) => {
-      const agentsData = snapshot.docs.map((doc: any) => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Agent[]
-
-      setAgents(agentsData)
-      setLoading(false)
-    })
-
-    // Migrate localStorage data if it exists
-    migrateLocalStorageData()
-
-    return unsubscribe
     loadAgents()
   }, [currentUser])
 
   const loadAgents = async () => {
     if (!currentUser) return
-
+    
     try {
       setLoading(true)
       const agentsData = await apiService.getAgents()
@@ -176,10 +159,10 @@ export function Dashboard() {
       const newAgent = await apiService.createAgent({
         name: newAgentName.trim()
       })
-
+      
       // Add to local state
       setAgents(prev => [...prev, newAgent])
-
+      
       setNewAgentName('')
       setIsCreating(false)
       setNeedsEmailVerification(false)
@@ -221,9 +204,9 @@ export function Dashboard() {
 
     try {
       const updatedAgent = await apiService.regenerateAgentToken(agentId)
-
+      
       // Update local state
-      setAgents(prev => prev.map(agent =>
+      setAgents(prev => prev.map(agent => 
         agent.id === agentId ? updatedAgent : agent
       ))
     } catch (error) {
@@ -236,7 +219,7 @@ export function Dashboard() {
 
     try {
       await apiService.deleteAgent(agentId)
-
+      
       // Remove from local state
       setAgents(prev => prev.filter(agent => agent.id !== agentId))
     } catch (error) {
@@ -284,7 +267,7 @@ export function Dashboard() {
                   <p className="text-orange-800 font-medium mb-2">{error}</p>
                   {needsEmailVerification && (
                     <div className="flex gap-2">
-                      <Button
+                      <Button 
                         onClick={handleSendVerificationEmail}
                         size="sm"
                         variant="outline"
@@ -292,7 +275,7 @@ export function Dashboard() {
                       >
                         Send Verification Email
                       </Button>
-                      <Button
+                      <Button 
                         onClick={handleRefreshUser}
                         size="sm"
                         variant="outline"
@@ -309,113 +292,113 @@ export function Dashboard() {
 
           {/* Create New Agent */}
           <Card className="p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Create New Agent</h2>
-            {!isCreating ? (
-              <Button onClick={() => setIsCreating(true)} className="flex items-center gap-2">
-                <Plus size={16} />
-                Add Agent
-              </Button>
-            ) : (
-              <div className="flex items-center gap-3">
-                <input
-                  type="text"
-                  value={newAgentName}
-                  onChange={(e) => setNewAgentName(e.target.value)}
-                  placeholder="Enter agent name"
-                  className="px-3 py-2 border border-input rounded-md flex-1"
-                  onKeyDown={(e) => e.key === 'Enter' && createAgent()}
-                  autoFocus
-                />
-                <Button onClick={createAgent} disabled={!newAgentName.trim()}>
-                  Create
-                </Button>
-                <Button variant="outline" onClick={() => {
-                  setIsCreating(false)
-                  setNewAgentName('')
-                }}>
-                  Cancel
-                </Button>
-              </div>
-            )}
-          </Card>
-
-          {/* Agents List */}
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Your Agents ({agents.length})</h2>
-
-            {agents.length === 0 ? (
-              <Card className="p-8 text-center">
-                <p className="text-muted-foreground">No agents created yet. Create your first agent to get started.</p>
-              </Card>
-            ) : (
-              agents.map((agent) => (
-                <Card key={agent.id} className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-lg">{agent.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Created {new Date(agent.created_at).toLocaleDateString()}
-                        {agent.last_used && (
-                          <span> • Last used {new Date(agent.last_used).toLocaleDateString()}</span>
-                        )}
-                      </p>
-                      <div className="mt-2 flex items-center gap-2">
-                        <code className="bg-muted px-2 py-1 rounded text-sm font-mono">
-                          {agent.token}
-                        </code>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => copyToken(agent.token)}
-                          className="flex items-center gap-1"
-                        >
-                          <Copy size={14} />
-                          Copy
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => regenerateToken(agent.id)}
-                        className="flex items-center gap-1"
-                      >
-                        <RefreshCw size={14} />
-                        Regenerate
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => deleteAgent(agent.id)}
-                        className="flex items-center gap-1"
-                      >
-                        <Trash2 size={14} />
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              ))
-            )}
+        <h2 className="text-xl font-semibold mb-4">Create New Agent</h2>
+        {!isCreating ? (
+          <Button onClick={() => setIsCreating(true)} className="flex items-center gap-2">
+            <Plus size={16} />
+            Add Agent
+          </Button>
+        ) : (
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={newAgentName}
+              onChange={(e) => setNewAgentName(e.target.value)}
+              placeholder="Enter agent name"
+              className="px-3 py-2 border border-input rounded-md flex-1"
+              onKeyDown={(e) => e.key === 'Enter' && createAgent()}
+              autoFocus
+            />
+            <Button onClick={createAgent} disabled={!newAgentName.trim()}>
+              Create
+            </Button>
+            <Button variant="outline" onClick={() => {
+              setIsCreating(false)
+              setNewAgentName('')
+            }}>
+              Cancel
+            </Button>
           </div>
+        )}
+      </Card>
 
-          {agents.length > 0 && (
-            <Card className="p-4 mt-6 bg-muted/50">
-              <h3 className="font-semibold mb-2">API Usage</h3>
-              <p className="text-sm text-muted-foreground mb-2">
-                Use your agent token in API requests:
-              </p>
-
-              <CodeExamplesSection agents={agents} />
-
-              <div className="mt-6">
-                <h4 className="font-medium mb-2">Test Submission</h4>
-                <TestSubmission agents={agents} />
+      {/* Agents List */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Your Agents ({agents.length})</h2>
+        
+        {agents.length === 0 ? (
+          <Card className="p-8 text-center">
+            <p className="text-muted-foreground">No agents created yet. Create your first agent to get started.</p>
+          </Card>
+        ) : (
+          agents.map((agent) => (
+            <Card key={agent.id} className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <h3 className="font-semibold text-lg">{agent.name}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Created {new Date(agent.created_at).toLocaleDateString()}
+                    {agent.last_used && (
+                      <span> • Last used {new Date(agent.last_used).toLocaleDateString()}</span>
+                    )}
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <code className="bg-muted px-2 py-1 rounded text-sm font-mono">
+                      {agent.token}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyToken(agent.token)}
+                      className="flex items-center gap-1"
+                    >
+                      <Copy size={14} />
+                      Copy
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => regenerateToken(agent.id)}
+                    className="flex items-center gap-1"
+                  >
+                    <RefreshCw size={14} />
+                    Regenerate
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => deleteAgent(agent.id)}
+                    className="flex items-center gap-1"
+                  >
+                    <Trash2 size={14} />
+                    Delete
+                  </Button>
+                </div>
               </div>
             </Card>
-          )}
-        </>
+          ))
+        )}
+      </div>
+
+      {agents.length > 0 && (
+        <Card className="p-4 mt-6 bg-muted/50">
+          <h3 className="font-semibold mb-2">API Usage</h3>
+          <p className="text-sm text-muted-foreground mb-2">
+            Use your agent token in API requests:
+          </p>
+          
+          <CodeExamplesSection agents={agents} />
+          
+          <div className="mt-6">
+            <h4 className="font-medium mb-2">Test Submission</h4>
+            <TestSubmission agents={agents} />
+          </div>
+        </Card>
+      )}
+      </>
       )}
 
       {loading && (
@@ -473,16 +456,17 @@ function CodeExamplesSection({ agents }: { agents: Agent[] }) {
             ))}
           </select>
         </div>
-
+        
         <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
           {languages.map(lang => (
             <button
               key={lang.id}
               onClick={() => setSelectedLanguage(lang.id)}
-              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${selectedLanguage === lang.id
+              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                selectedLanguage === lang.id
                   ? 'bg-background text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
-                }`}
+              }`}
             >
               <span className="mr-1">{lang.icon}</span>
               {lang.name}
@@ -568,7 +552,7 @@ function TestSubmission({ agents }: { agents: Agent[] }) {
             </option>
           ))}
         </select>
-
+        
         <input
           type="text"
           value={eventId}
@@ -576,7 +560,7 @@ function TestSubmission({ agents }: { agents: Agent[] }) {
           placeholder="Event ID"
           className="px-3 py-2 border border-input rounded-md text-sm"
         />
-
+        
         <Button
           onClick={testSubmission}
           disabled={!selectedAgent || isSubmitting}
@@ -585,7 +569,7 @@ function TestSubmission({ agents }: { agents: Agent[] }) {
           {isSubmitting ? 'Submitting...' : 'Test Submit'}
         </Button>
       </div>
-
+      
       {submitResult && (
         <div className="p-3 bg-muted rounded text-sm font-mono">
           {submitResult}
