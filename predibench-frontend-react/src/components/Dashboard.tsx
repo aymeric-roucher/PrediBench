@@ -6,6 +6,106 @@ import { useAuth } from '../contexts/AuthContext'
 import { apiService, type Agent } from '../api'
 import { submissionService, type PredictionSubmission } from '../apiSubmission'
 
+// Code examples for different languages
+const getCodeExamples = (agentToken = 'YOUR_AGENT_TOKEN') => ({
+  curl: `curl -X POST http://localhost:8080/api/submit \\
+  -H "Authorization: Bearer ${agentToken}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "event_id": "event_123",
+    "market_decisions": [
+      {
+        "market_id": "market_456",
+        "bet": 0.7,
+        "odds": 1.5,
+        "rationale": "Analysis shows positive trend"
+      }
+    ],
+    "rationale": "Overall market conditions look favorable"
+  }'`,
+  
+  python: `import requests
+import json
+
+# Your agent token
+token = "${agentToken}"
+
+# Prediction data
+prediction = {
+    "event_id": "event_123",
+    "market_decisions": [
+        {
+            "market_id": "market_456",
+            "bet": 0.7,
+            "odds": 1.5,
+            "rationale": "Analysis shows positive trend"
+        }
+    ],
+    "rationale": "Overall market conditions look favorable"
+}
+
+# Make the request
+response = requests.post(
+    "http://localhost:8080/api/submit",
+    headers={
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    },
+    json=prediction
+)
+
+# Check response
+if response.status_code == 200:
+    result = response.json()
+    print(f"Success: {result['message']}")
+else:
+    print(f"Error: {response.text}")`,
+
+  javascript: `// Your agent token
+const token = "${agentToken}";
+
+// Prediction data
+const prediction = {
+  event_id: "event_123",
+  market_decisions: [
+    {
+      market_id: "market_456",
+      bet: 0.7,
+      odds: 1.5,
+      rationale: "Analysis shows positive trend"
+    }
+  ],
+  rationale: "Overall market conditions look favorable"
+};
+
+// Make the request
+async function submitPrediction() {
+  try {
+    const response = await fetch("http://localhost:8080/api/submit", {
+      method: "POST",
+      headers: {
+        "Authorization": \`Bearer \${token}\`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(prediction)
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log(\`Success: \${result.message}\`);
+    } else {
+      const error = await response.text();
+      console.error(\`Error: \${error}\`);
+    }
+  } catch (error) {
+    console.error("Request failed:", error);
+  }
+}
+
+// Call the function
+submitPrediction();`
+})
+
 
 export function Dashboard() {
   const [agents, setAgents] = useState<Agent[]>([])
@@ -210,25 +310,10 @@ export function Dashboard() {
           <p className="text-sm text-muted-foreground mb-2">
             Use your agent token in API requests:
           </p>
-          <code className="block bg-background p-3 rounded text-sm whitespace-pre">
-{`curl -X POST http://localhost:8080/api/submit \\
-  -H "Authorization: Bearer YOUR_AGENT_TOKEN" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "event_id": "event_123",
-    "market_decisions": [
-      {
-        "market_id": "market_456",
-        "bet": 0.7,
-        "odds": 1.5,
-        "rationale": "Analysis shows positive trend"
-      }
-    ],
-    "rationale": "Overall market conditions look favorable"
-  }'`}
-          </code>
           
-          <div className="mt-4">
+          <CodeExamplesSection agents={agents} />
+          
+          <div className="mt-6">
             <h4 className="font-medium mb-2">Test Submission</h4>
             <TestSubmission agents={agents} />
           </div>
@@ -242,6 +327,90 @@ export function Dashboard() {
           <p className="text-muted-foreground">Loading your agents...</p>
         </div>
       )}
+    </div>
+  )
+}
+
+function CodeExamplesSection({ agents }: { agents: Agent[] }) {
+  const [selectedLanguage, setSelectedLanguage] = useState<'curl' | 'python' | 'javascript'>('curl')
+  const [selectedAgent, setSelectedAgent] = useState('')
+
+  const languages = [
+    { id: 'curl' as const, name: 'cURL', icon: '$' },
+    { id: 'python' as const, name: 'Python', icon: '🐍' },
+    { id: 'javascript' as const, name: 'JavaScript', icon: '🟨' }
+  ]
+
+  const getTokenForExample = () => {
+    if (!selectedAgent) return 'YOUR_AGENT_TOKEN'
+    const agent = agents.find(a => a.id === selectedAgent)
+    return agent?.token || 'YOUR_AGENT_TOKEN'
+  }
+
+  const codeExamples = getCodeExamples(getTokenForExample())
+
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(codeExamples[selectedLanguage])
+      // Could add a toast notification here
+    } catch (err) {
+      console.error('Failed to copy code:', err)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Agent and Language Selectors */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium">Agent:</label>
+          <select
+            value={selectedAgent}
+            onChange={(e) => setSelectedAgent(e.target.value)}
+            className="px-3 py-1 border border-input rounded text-sm"
+          >
+            <option value="">Select Agent for Token</option>
+            {agents.map(agent => (
+              <option key={agent.id} value={agent.id}>
+                {agent.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+          {languages.map(lang => (
+            <button
+              key={lang.id}
+              onClick={() => setSelectedLanguage(lang.id)}
+              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                selectedLanguage === lang.id
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <span className="mr-1">{lang.icon}</span>
+              {lang.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Code Block */}
+      <div className="relative">
+        <code className="block bg-background p-4 rounded text-sm whitespace-pre overflow-x-auto">
+          {codeExamples[selectedLanguage]}
+        </code>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={copyCode}
+          className="absolute top-2 right-2 flex items-center gap-1"
+        >
+          <Copy size={14} />
+          Copy
+        </Button>
+      </div>
     </div>
   )
 }
