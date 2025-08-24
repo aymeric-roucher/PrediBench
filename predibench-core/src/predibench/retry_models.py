@@ -5,7 +5,6 @@ from smolagents import ChatMessage, ChatMessageStreamDelta, Tool
 from smolagents.models import ApiModel, InferenceClientModel, LiteLLMModel, OpenAIModel
 from tenacity import (
     retry,
-    retry_if_exception_type,
     stop_after_attempt,
     wait_fixed,
     before_sleep_log,
@@ -13,6 +12,25 @@ from tenacity import (
 )
 
 from predibench.logger_config import get_logger
+
+import openai
+import litellm
+
+
+def is_rate_limit_error(exception: Exception) -> bool:
+    """Check if an exception is a rate limit error from any provider."""
+    # Check specific rate limit errors
+    if isinstance(exception, (openai.RateLimitError, litellm.RateLimitError)):
+        return True
+    
+    # Check for common rate limit messages in exception strings
+    error_message = str(exception).lower()
+    rate_limit_indicators = [
+        'rate limit', 'rate_limit', 'too many requests', 
+        'quota exceeded', 'throttled', '429'
+    ]
+    
+    return any(indicator in error_message for indicator in rate_limit_indicators)
 
 logger = get_logger(__name__)
 
@@ -26,7 +44,7 @@ def add_retry_logic(base_class: Type[T]) -> Type[T]:
         @retry(
             stop=stop_after_attempt(5),
             wait=wait_fixed(61),
-            retry=retry_if_exception_type((Exception,)),
+            retry=is_rate_limit_error,
             reraise=True,
             before_sleep=before_sleep_log(logger, logging.INFO),
             after=after_log(logger, logging.INFO),
@@ -50,7 +68,7 @@ def add_retry_logic(base_class: Type[T]) -> Type[T]:
         @retry(
             stop=stop_after_attempt(5),
             wait=wait_fixed(61),
-            retry=retry_if_exception_type((Exception,)),
+            retry=is_rate_limit_error,
             reraise=True,
             before_sleep=before_sleep_log(logger, logging.INFO),
             after=after_log(logger, logging.INFO),
