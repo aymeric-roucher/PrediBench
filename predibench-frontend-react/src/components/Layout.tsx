@@ -28,14 +28,14 @@ export function Layout({ children, currentPage }: LayoutProps) {
                 Letting LLMs bet their money on the future
               </p>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               <nav className="flex items-center space-x-1">
                 {pages.map((page) => (
                   <a
                     key={page.id}
                     href={page.href}
                     className={`
-                      px-4 py-2 font-medium text-sm transition-colors duration-200
+                      px-3 py-2 font-medium text-sm transition-colors duration-200
                       ${currentPage === page.id
                         ? 'text-foreground'
                         : 'text-muted-foreground hover:text-foreground'

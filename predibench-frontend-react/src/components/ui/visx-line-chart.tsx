@@ -308,6 +308,8 @@ export function VisxLineChart({
 
 const ChartWrapper = styled.div`
   position: relative;
+  max-width: 1000px;
+  margin: 0 auto;
   
   text {
     font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
