@@ -74,25 +74,6 @@ export interface AgentCreate {
   name: string
 }
 
-export interface PredictionSubmission {
-  event_id: string
-  market_decisions: MarketDecision[]
-  rationale?: string
-}
-
-export interface MarketDecision {
-  market_id: string
-  bet: number
-  odds: number
-  rationale: string
-}
-
-export interface SubmissionResponse {
-  success: boolean
-  message: string
-  submission_id?: string
-  agent_name?: string
-}
 
 class ApiService {
   private async fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 30000): Promise<Response> {
@@ -252,22 +233,6 @@ class ApiService {
     return await response.json()
   }
 
-  // Prediction Submission
-  async submitPrediction(submission: PredictionSubmission, agentToken: string): Promise<SubmissionResponse> {
-    const response = await this.fetchWithTimeout(`${API_BASE_URL}/submit`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${agentToken}`,
-      },
-      body: JSON.stringify(submission),
-    })
-    if (!response.ok) {
-      const error = await response.text()
-      throw new Error(`HTTP error! status: ${response.status}, message: ${error}`)
-    }
-    return await response.json()
-  }
 }
 
 export const apiService = new ApiService()

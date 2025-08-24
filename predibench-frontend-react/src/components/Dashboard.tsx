@@ -3,7 +3,8 @@ import { Button } from './ui/button'
 import { Card } from './ui/card'
 import { Copy, RefreshCw, Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { apiService, type Agent, type PredictionSubmission } from '../api'
+import { apiService, type Agent } from '../api'
+import { submissionService, type PredictionSubmission } from '../apiSubmission'
 
 
 export function Dashboard() {
@@ -274,7 +275,7 @@ function TestSubmission({ agents }: { agents: Agent[] }) {
         rationale: 'This is a test submission from the dashboard'
       }
 
-      const result = await apiService.submitPrediction(submission, agent.token)
+      const result = await submissionService.submitPrediction(submission, agent.token)
       setSubmitResult(`✅ Success: ${result.message}`)
     } catch (error) {
       setSubmitResult(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
