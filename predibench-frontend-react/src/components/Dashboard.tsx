@@ -127,7 +127,9 @@ export function Dashboard() {
   const [newAgentName, setNewAgentName] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [loading, setLoading] = useState(true)
-  const { currentUser } = useAuth()
+  const [error, setError] = useState<string | null>(null)
+  const [needsEmailVerification, setNeedsEmailVerification] = useState(false)
+  const { currentUser, sendVerificationEmail, refreshUser } = useAuth()
 
   useEffect(() => {
     if (!currentUser) return
@@ -153,6 +155,7 @@ export function Dashboard() {
     if (!newAgentName.trim() || !currentUser) return
 
     try {
+      setError(null)
       const newAgent = await apiService.createAgent({
         name: newAgentName.trim()
       })
@@ -162,8 +165,37 @@ export function Dashboard() {
       
       setNewAgentName('')
       setIsCreating(false)
-    } catch (error) {
+      setNeedsEmailVerification(false)
+    } catch (error: any) {
       console.error('Error creating agent:', error)
+      if (error.message && error.message.includes('Email verification required')) {
+        setNeedsEmailVerification(true)
+        setError('Email verification required. Please verify your email before creating agents.')
+      } else {
+        setError('Failed to create agent. Please try again.')
+      }
+    }
+  }
+
+  const handleSendVerificationEmail = async () => {
+    try {
+      await sendVerificationEmail()
+      setError('Verification email sent! Please check your inbox and then refresh this page.')
+    } catch (error) {
+      console.error('Error sending verification email:', error)
+      setError('Failed to send verification email. Please try again.')
+    }
+  }
+
+  const handleRefreshUser = async () => {
+    try {
+      await refreshUser()
+      if (currentUser?.emailVerified) {
+        setNeedsEmailVerification(false)
+        setError(null)
+      }
+    } catch (error) {
+      console.error('Error refreshing user:', error)
     }
   }
 
@@ -226,6 +258,38 @@ export function Dashboard() {
 
       {!loading && (
         <>
+          {/* Email Verification Warning */}
+          {error && (
+            <Card className="p-4 mb-6 border-orange-200 bg-orange-50">
+              <div className="flex items-start gap-3">
+                <div className="text-orange-600 mt-1">⚠️</div>
+                <div>
+                  <p className="text-orange-800 font-medium mb-2">{error}</p>
+                  {needsEmailVerification && (
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={handleSendVerificationEmail}
+                        size="sm"
+                        variant="outline"
+                        className="border-orange-300 text-orange-700 hover:bg-orange-100"
+                      >
+                        Send Verification Email
+                      </Button>
+                      <Button 
+                        onClick={handleRefreshUser}
+                        size="sm"
+                        variant="outline"
+                        className="border-orange-300 text-orange-700 hover:bg-orange-100"
+                      >
+                        I've Verified - Refresh
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* Create New Agent */}
           <Card className="p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Create New Agent</h2>

@@ -19,6 +19,7 @@ from predibench.polymarket_api import (
 from pydantic import BaseModel
 
 # Import our auth and models
+from firebase_admin import auth
 from auth import get_current_user, firebase_auth, verify_agent_token_dependency
 from models import (
     Agent, AgentCreate, AgentResponse, AgentSubmission, 
@@ -517,9 +518,18 @@ async def get_user_agents(current_user: dict = Depends(get_current_user)):
 
 @app.post("/api/agents", response_model=AgentResponse)
 async def create_agent(agent_data: AgentCreate, current_user: dict = Depends(get_current_user)):
-    """Create a new agent for the authenticated user"""
+    """Create a new agent for the authenticated user (requires verified email)"""
     try:
         user_id = current_user["uid"]
+        
+        # Check if user's email is verified
+        user_record = auth.get_user(user_id)
+        if not user_record.email_verified:
+            raise HTTPException(
+                status_code=403, 
+                detail="Email verification required. Please verify your email before creating agents."
+            )
+        
         agent_token = generate_agent_token()
         
         # Create agent document in Firestore
