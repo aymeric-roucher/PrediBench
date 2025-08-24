@@ -177,9 +177,10 @@ export function VisxLineChart({
             rows={true}
             numTicks={numTicks}
             lineStyle={{
-              stroke: '#e1e1e1',
+              stroke: 'hsl(var(--border))',
               strokeLinecap: 'round',
-              strokeWidth: 1
+              strokeWidth: 1,
+              strokeOpacity: 0.5
             }}
           />
         )}
@@ -308,6 +309,8 @@ export function VisxLineChart({
 
 const ChartWrapper = styled.div`
   position: relative;
+  max-width: 1000px;
+  margin: 0 auto;
   
   text {
     font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;

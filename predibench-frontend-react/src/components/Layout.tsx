@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Trophy, BarChart3, Newspaper } from 'lucide-react'
 import { Footer } from './Footer'
+import { ThemeToggle } from './ui/ThemeToggle'
 
 interface LayoutProps {
   children: ReactNode
@@ -28,14 +29,14 @@ export function Layout({ children, currentPage }: LayoutProps) {
                 Letting LLMs bet their money on the future
               </p>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               <nav className="flex items-center space-x-1">
                 {pages.map((page) => (
                   <a
                     key={page.id}
                     href={page.href}
                     className={`
-                      px-4 py-2 font-medium text-sm transition-colors duration-200
+                      px-3 py-2 font-medium text-sm transition-colors duration-200
                       ${currentPage === page.id
                         ? 'text-foreground'
                         : 'text-muted-foreground hover:text-foreground'
@@ -49,6 +50,7 @@ export function Layout({ children, currentPage }: LayoutProps) {
                   </a>
                 ))}
               </nav>
+              <ThemeToggle />
             </div>
           </div>
         </div>
