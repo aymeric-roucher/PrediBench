@@ -31,6 +31,37 @@ export function EventDetail({ event }: EventDetailProps) {
   const [investmentDecisions, setInvestmentDecisions] = useState<MarketInvestmentDecision[]>([])
   const [loading, setLoading] = useState(false)
 
+  // Function to convert URLs in text to clickable links
+  const linkify = (text: string | null | undefined) => {
+    if (!text) return null
+
+    const urlRegex = /(https?:\/\/[^\s]+)/g
+
+    return text.split(urlRegex).map((part, index) => {
+      // Check if this part is a URL by testing against a fresh regex
+      if (/^https?:\/\//.test(part)) {
+        // Remove trailing punctuation from the URL
+        const cleanUrl = part.replace(/[.,;:!?)\]]+$/, '')
+        const trailingPunct = part.slice(cleanUrl.length)
+
+        return (
+          <span key={index}>
+            <a
+              href={cleanUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 underline"
+            >
+              {cleanUrl}
+            </a>
+            {trailingPunct}
+          </span>
+        )
+      }
+      return part
+    })
+  }
+
   const loadEventDetails = async (eventId: string) => {
     setLoading(true)
     try {
@@ -111,7 +142,6 @@ export function EventDetail({ event }: EventDetailProps) {
         {/* Market Price Charts - Superposed */}
         <div>
           <h2 className="text-lg font-semibold mb-2">Market Price History</h2>
-          <p className="text-sm text-muted-foreground mb-4">30-day price movements for all markets in this event</p>
 
           {loading ? (
             <div className="h-64 flex items-center justify-center">
@@ -156,9 +186,18 @@ export function EventDetail({ event }: EventDetailProps) {
           )}
         </div>
 
+        {/* Event Description */}
+        <div className="mt-8 mb-8">
+          <h2 className="text-xl font-bold mb-4">Event Description</h2>
+          <div className="text-muted-foreground text-base leading-relaxed">
+            {linkify(event.description)}
+          </div>
+        </div>
+
         {/* Latest Model Predictions */}
         <div className="mt-8">
           <h2 className="text-2xl font-bold mb-6">Latest Predictions</h2>
+          <p className="text-sm text-muted-foreground mb-4">Latest predictions from models</p>
 
           {loading ? (
             <div className="flex items-center justify-center py-8">
