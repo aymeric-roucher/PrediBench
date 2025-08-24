@@ -17,7 +17,7 @@ def initialize_firebase():
             
         firebase_admin.initialize_app(cred)
     
-    return firestore.client()
+    return firestore.client(database_id='predibench-db')
 
 # HTTP Bearer token security
 security = HTTPBearer()
