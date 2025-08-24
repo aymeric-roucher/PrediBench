@@ -7,7 +7,9 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  sendEmailVerification,
+  reload
 } from 'firebase/auth'
 import { auth } from '../lib/firebase'
 
@@ -18,6 +20,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>
   loginWithGoogle: () => Promise<void>
   logout: () => Promise<void>
+  sendVerificationEmail: () => Promise<void>
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -39,7 +43,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true)
 
   async function signup(email: string, password: string) {
-    await createUserWithEmailAndPassword(auth, email, password)
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+    // Automatically send verification email after signup
+    await sendEmailVerification(userCredential.user)
   }
 
   async function login(email: string, password: string) {
@@ -53,6 +59,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   async function logout() {
     await signOut(auth)
+  }
+
+  async function sendVerificationEmail() {
+    if (!currentUser) {
+      throw new Error('No user logged in')
+    }
+    await sendEmailVerification(currentUser)
+  }
+
+  async function refreshUser() {
+    if (currentUser) {
+      await reload(currentUser)
+      // Trigger a state update by setting the current user again
+      setCurrentUser({ ...currentUser })
+    }
   }
 
   useEffect(() => {
@@ -70,7 +91,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     signup,
     login,
     loginWithGoogle,
-    logout
+    logout,
+    sendVerificationEmail,
+    refreshUser
   }
 
   return (

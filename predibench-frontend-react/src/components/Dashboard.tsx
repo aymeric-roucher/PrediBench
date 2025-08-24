@@ -1,46 +1,148 @@
-import { useState, useEffect } from 'react'
-import { 
-  collection, 
-  doc, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc,
-  serverTimestamp,
-  onSnapshot
-} from 'firebase/firestore'
+import { Copy, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { apiService, type Agent } from '../api'
+import { submissionService, type AgentSubmission } from '../apiSubmission'
+import { useAuth } from '../contexts/AuthContext'
 import { Button } from './ui/button'
 import { Card } from './ui/card'
-import { Copy, RefreshCw, Plus, Trash2 } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext'
-import { db } from '../lib/firebase'
 
-interface Agent {
-  id: string
-  name: string
-  token: string
-  createdAt: string
+// Code examples for different languages - new simplified structure
+const getCodeExamples = (agentToken = 'YOUR_AGENT_TOKEN') => ({
+  curl: `curl -X POST http://localhost:8080/api/submit \\
+  -H "Authorization: Bearer ${agentToken}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "event_decisions": [
+      {
+        "event_id": "event_123",
+        "market_decisions": [
+          {
+            "market_id": "market_456",
+            "bet": 0.7
+          },
+          {
+            "market_id": "market_789",
+            "bet": -0.3
+          }
+        ]
+      }
+    ]
+  }'`,
+
+  python: `import requests
+import json
+
+# Your agent token
+token = "${agentToken}"
+
+# Prediction data - simplified structure
+prediction = {
+    "event_decisions": [
+        {
+            "event_id": "event_123",
+            "market_decisions": [
+                {
+                    "market_id": "market_456",
+                    "bet": 0.7  # Bet value between -1.0 and 1.0
+                },
+                {
+                    "market_id": "market_789", 
+                    "bet": -0.3
+                }
+            ]
+        }
+    ]
 }
+
+# Make the request
+response = requests.post(
+    "http://localhost:8080/api/submit",
+    headers={
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    },
+    json=prediction
+)
+
+# Check response
+if response.status_code == 200:
+    result = response.json()
+    print(f"Success: {result['message']}")
+else:
+    print(f"Error: {response.text}")`,
+
+  javascript: `// Your agent token
+const token = "${agentToken}";
+
+// Prediction data - simplified structure
+const prediction = {
+  event_decisions: [
+    {
+      event_id: "event_123",
+      market_decisions: [
+        {
+          market_id: "market_456",
+          bet: 0.7  // Bet value between -1.0 and 1.0
+        },
+        {
+          market_id: "market_789",
+          bet: -0.3
+        }
+      ]
+    }
+  ]
+};
+
+// Make the request
+async function submitPrediction() {
+  try {
+    const response = await fetch("http://localhost:8080/api/submit", {
+      method: "POST",
+      headers: {
+        "Authorization": \`Bearer \${token}\`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(prediction)
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log(\`Success: \${result.message}\`);
+    } else {
+      const error = await response.text();
+      console.error(\`Error: \${error}\`);
+    }
+  } catch (error) {
+    console.error("Request failed:", error);
+  }
+}
+
+// Call the function
+submitPrediction();`
+})
+
 
 export function Dashboard() {
   const [agents, setAgents] = useState<Agent[]>([])
   const [newAgentName, setNewAgentName] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [loading, setLoading] = useState(true)
-  const { currentUser } = useAuth()
+  const [error, setError] = useState<string | null>(null)
+  const [needsEmailVerification, setNeedsEmailVerification] = useState(false)
+  const { currentUser, sendVerificationEmail, refreshUser } = useAuth()
 
   useEffect(() => {
     if (!currentUser) return
 
     const agentsRef = collection(db, `users/${currentUser.uid}/agents`)
-    
+
     // Real-time listener for agents
     const unsubscribe = onSnapshot(agentsRef, (snapshot: any) => {
       const agentsData = snapshot.docs.map((doc: any) => ({
         id: doc.id,
         ...doc.data()
       })) as Agent[]
-      
+
       setAgents(agentsData)
       setLoading(false)
     })
@@ -49,58 +151,68 @@ export function Dashboard() {
     migrateLocalStorageData()
 
     return unsubscribe
+    loadAgents()
   }, [currentUser])
 
-  const migrateLocalStorageData = async () => {
+  const loadAgents = async () => {
     if (!currentUser) return
-    
-    const localAgents = localStorage.getItem('agents')
-    if (localAgents) {
-      try {
-        const parsedAgents = JSON.parse(localAgents) as Agent[]
-        const agentsRef = collection(db, `users/${currentUser.uid}/agents`)
-        
-        // Check if user already has agents in Firestore
-        const existingAgents = await getDocs(agentsRef)
-        if (existingAgents.empty && parsedAgents.length > 0) {
-          // Migrate each agent to Firestore
-          for (const agent of parsedAgents) {
-            await addDoc(agentsRef, {
-              name: agent.name,
-              token: agent.token,
-              createdAt: new Date(agent.createdAt)
-            })
-          }
-          
-          // Clear localStorage after successful migration
-          localStorage.removeItem('agents')
-          console.log('Migrated agents from localStorage to Firestore')
-        }
-      } catch (error) {
-        console.error('Error migrating localStorage data:', error)
-      }
-    }
-  }
 
-  const generateToken = () => {
-    return 'agent_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36)
+    try {
+      setLoading(true)
+      const agentsData = await apiService.getAgents()
+      setAgents(agentsData)
+    } catch (error) {
+      console.error('Error loading agents:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const createAgent = async () => {
     if (!newAgentName.trim() || !currentUser) return
 
     try {
-      const agentsRef = collection(db, `users/${currentUser.uid}/agents`)
-      await addDoc(agentsRef, {
-        name: newAgentName.trim(),
-        token: generateToken(),
-        createdAt: serverTimestamp()
+      setError(null)
+      const newAgent = await apiService.createAgent({
+        name: newAgentName.trim()
       })
-      
+
+      // Add to local state
+      setAgents(prev => [...prev, newAgent])
+
       setNewAgentName('')
       setIsCreating(false)
-    } catch (error) {
+      setNeedsEmailVerification(false)
+    } catch (error: any) {
       console.error('Error creating agent:', error)
+      if (error.message && error.message.includes('Email verification required')) {
+        setNeedsEmailVerification(true)
+        setError('Email verification required. Please verify your email before creating agents.')
+      } else {
+        setError('Failed to create agent. Please try again.')
+      }
+    }
+  }
+
+  const handleSendVerificationEmail = async () => {
+    try {
+      await sendVerificationEmail()
+      setError('Verification email sent! Please check your inbox and then refresh this page.')
+    } catch (error) {
+      console.error('Error sending verification email:', error)
+      setError('Failed to send verification email. Please try again.')
+    }
+  }
+
+  const handleRefreshUser = async () => {
+    try {
+      await refreshUser()
+      if (currentUser?.emailVerified) {
+        setNeedsEmailVerification(false)
+        setError(null)
+      }
+    } catch (error) {
+      console.error('Error refreshing user:', error)
     }
   }
 
@@ -108,11 +220,12 @@ export function Dashboard() {
     if (!currentUser) return
 
     try {
-      const agentRef = doc(db, `users/${currentUser.uid}/agents`, agentId)
-      await updateDoc(agentRef, {
-        token: generateToken(),
-        lastUpdated: serverTimestamp()
-      })
+      const updatedAgent = await apiService.regenerateAgentToken(agentId)
+
+      // Update local state
+      setAgents(prev => prev.map(agent =>
+        agent.id === agentId ? updatedAgent : agent
+      ))
     } catch (error) {
       console.error('Error regenerating token:', error)
     }
@@ -122,8 +235,10 @@ export function Dashboard() {
     if (!currentUser) return
 
     try {
-      const agentRef = doc(db, `users/${currentUser.uid}/agents`, agentId)
-      await deleteDoc(agentRef)
+      await apiService.deleteAgent(agentId)
+
+      // Remove from local state
+      setAgents(prev => prev.filter(agent => agent.id !== agentId))
     } catch (error) {
       console.error('Error deleting agent:', error)
     }
@@ -160,116 +275,320 @@ export function Dashboard() {
 
       {!loading && (
         <>
-          {/* Create New Agent */}
-          <Card className="p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">Create New Agent</h2>
-        {!isCreating ? (
-          <Button onClick={() => setIsCreating(true)} className="flex items-center gap-2">
-            <Plus size={16} />
-            Add Agent
-          </Button>
-        ) : (
-          <div className="flex items-center gap-3">
-            <input
-              type="text"
-              value={newAgentName}
-              onChange={(e) => setNewAgentName(e.target.value)}
-              placeholder="Enter agent name"
-              className="px-3 py-2 border border-input rounded-md flex-1"
-              onKeyDown={(e) => e.key === 'Enter' && createAgent()}
-              autoFocus
-            />
-            <Button onClick={createAgent} disabled={!newAgentName.trim()}>
-              Create
-            </Button>
-            <Button variant="outline" onClick={() => {
-              setIsCreating(false)
-              setNewAgentName('')
-            }}>
-              Cancel
-            </Button>
-          </div>
-        )}
-      </Card>
-
-      {/* Agents List */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Your Agents ({agents.length})</h2>
-        
-        {agents.length === 0 ? (
-          <Card className="p-8 text-center">
-            <p className="text-muted-foreground">No agents created yet. Create your first agent to get started.</p>
-          </Card>
-        ) : (
-          agents.map((agent) => (
-            <Card key={agent.id} className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-lg">{agent.name}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Created {new Date(agent.createdAt).toLocaleDateString()}
-                  </p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <code className="bg-muted px-2 py-1 rounded text-sm font-mono">
-                      {agent.token}
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToken(agent.token)}
-                      className="flex items-center gap-1"
-                    >
-                      <Copy size={14} />
-                      Copy
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => regenerateToken(agent.id)}
-                    className="flex items-center gap-1"
-                  >
-                    <RefreshCw size={14} />
-                    Regenerate
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => deleteAgent(agent.id)}
-                    className="flex items-center gap-1"
-                  >
-                    <Trash2 size={14} />
-                    Delete
-                  </Button>
+          {/* Email Verification Warning */}
+          {error && (
+            <Card className="p-4 mb-6 border-orange-200 bg-orange-50">
+              <div className="flex items-start gap-3">
+                <div className="text-orange-600 mt-1">⚠️</div>
+                <div>
+                  <p className="text-orange-800 font-medium mb-2">{error}</p>
+                  {needsEmailVerification && (
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleSendVerificationEmail}
+                        size="sm"
+                        variant="outline"
+                        className="border-orange-300 text-orange-700 hover:bg-orange-100"
+                      >
+                        Send Verification Email
+                      </Button>
+                      <Button
+                        onClick={handleRefreshUser}
+                        size="sm"
+                        variant="outline"
+                        className="border-orange-300 text-orange-700 hover:bg-orange-100"
+                      >
+                        I've Verified - Refresh
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </Card>
-          ))
-        )}
-      </div>
+          )}
 
-      {agents.length > 0 && (
-        <Card className="p-4 mt-6 bg-muted/50">
-          <h3 className="font-semibold mb-2">API Usage</h3>
-          <p className="text-sm text-muted-foreground mb-2">
-            Use your agent token in API requests:
-          </p>
-          <code className="block bg-background p-3 rounded text-sm whitespace-pre">
-{`curl -X POST https://api.predibench.com/submit \\
-  -H "Authorization: Bearer YOUR_AGENT_TOKEN" \\
-  -H "Content-Type: application/json" \\
-  -d '{"prediction": "your_prediction_data"}'`}
-          </code>
-        </Card>
-      )}
-      </>
+          {/* Create New Agent */}
+          <Card className="p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4">Create New Agent</h2>
+            {!isCreating ? (
+              <Button onClick={() => setIsCreating(true)} className="flex items-center gap-2">
+                <Plus size={16} />
+                Add Agent
+              </Button>
+            ) : (
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={newAgentName}
+                  onChange={(e) => setNewAgentName(e.target.value)}
+                  placeholder="Enter agent name"
+                  className="px-3 py-2 border border-input rounded-md flex-1"
+                  onKeyDown={(e) => e.key === 'Enter' && createAgent()}
+                  autoFocus
+                />
+                <Button onClick={createAgent} disabled={!newAgentName.trim()}>
+                  Create
+                </Button>
+                <Button variant="outline" onClick={() => {
+                  setIsCreating(false)
+                  setNewAgentName('')
+                }}>
+                  Cancel
+                </Button>
+              </div>
+            )}
+          </Card>
+
+          {/* Agents List */}
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">Your Agents ({agents.length})</h2>
+
+            {agents.length === 0 ? (
+              <Card className="p-8 text-center">
+                <p className="text-muted-foreground">No agents created yet. Create your first agent to get started.</p>
+              </Card>
+            ) : (
+              agents.map((agent) => (
+                <Card key={agent.id} className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-lg">{agent.name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Created {new Date(agent.created_at).toLocaleDateString()}
+                        {agent.last_used && (
+                          <span> • Last used {new Date(agent.last_used).toLocaleDateString()}</span>
+                        )}
+                      </p>
+                      <div className="mt-2 flex items-center gap-2">
+                        <code className="bg-muted px-2 py-1 rounded text-sm font-mono">
+                          {agent.token}
+                        </code>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => copyToken(agent.token)}
+                          className="flex items-center gap-1"
+                        >
+                          <Copy size={14} />
+                          Copy
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => regenerateToken(agent.id)}
+                        className="flex items-center gap-1"
+                      >
+                        <RefreshCw size={14} />
+                        Regenerate
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteAgent(agent.id)}
+                        className="flex items-center gap-1"
+                      >
+                        <Trash2 size={14} />
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
+
+          {agents.length > 0 && (
+            <Card className="p-4 mt-6 bg-muted/50">
+              <h3 className="font-semibold mb-2">API Usage</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Use your agent token in API requests:
+              </p>
+
+              <CodeExamplesSection agents={agents} />
+
+              <div className="mt-6">
+                <h4 className="font-medium mb-2">Test Submission</h4>
+                <TestSubmission agents={agents} />
+              </div>
+            </Card>
+          )}
+        </>
       )}
 
       {loading && (
         <div className="text-center py-8">
           <p className="text-muted-foreground">Loading your agents...</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CodeExamplesSection({ agents }: { agents: Agent[] }) {
+  const [selectedLanguage, setSelectedLanguage] = useState<'curl' | 'python' | 'javascript'>('curl')
+  const [selectedAgent, setSelectedAgent] = useState('')
+
+  const languages = [
+    { id: 'curl' as const, name: 'cURL', icon: '$' },
+    { id: 'python' as const, name: 'Python', icon: '🐍' },
+    { id: 'javascript' as const, name: 'JavaScript', icon: '🟨' }
+  ]
+
+  const getTokenForExample = () => {
+    if (!selectedAgent) return 'YOUR_AGENT_TOKEN'
+    const agent = agents.find(a => a.id === selectedAgent)
+    return agent?.token || 'YOUR_AGENT_TOKEN'
+  }
+
+  const codeExamples = getCodeExamples(getTokenForExample())
+
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(codeExamples[selectedLanguage])
+      // Could add a toast notification here
+    } catch (err) {
+      console.error('Failed to copy code:', err)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Agent and Language Selectors */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium">Agent:</label>
+          <select
+            value={selectedAgent}
+            onChange={(e) => setSelectedAgent(e.target.value)}
+            className="px-3 py-1 border border-input rounded text-sm"
+          >
+            <option value="">Select Agent for Token</option>
+            {agents.map(agent => (
+              <option key={agent.id} value={agent.id}>
+                {agent.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+          {languages.map(lang => (
+            <button
+              key={lang.id}
+              onClick={() => setSelectedLanguage(lang.id)}
+              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${selectedLanguage === lang.id
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+                }`}
+            >
+              <span className="mr-1">{lang.icon}</span>
+              {lang.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Code Block */}
+      <div className="relative">
+        <code className="block bg-background p-4 rounded text-sm whitespace-pre overflow-x-auto">
+          {codeExamples[selectedLanguage]}
+        </code>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={copyCode}
+          className="absolute top-2 right-2 flex items-center gap-1"
+        >
+          <Copy size={14} />
+          Copy
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function TestSubmission({ agents }: { agents: Agent[] }) {
+  const [selectedAgent, setSelectedAgent] = useState('')
+  const [eventId, setEventId] = useState('test_event_123')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitResult, setSubmitResult] = useState<string | null>(null)
+
+  const testSubmission = async () => {
+    if (!selectedAgent) return
+
+    const agent = agents.find(a => a.id === selectedAgent)
+    if (!agent) return
+
+    setIsSubmitting(true)
+    setSubmitResult(null)
+
+    try {
+      const submission: AgentSubmission = {
+        event_decisions: [
+          {
+            event_id: eventId,
+            market_decisions: [
+              {
+                market_id: 'test_market_456',
+                bet: 0.7
+              },
+              {
+                market_id: 'test_market_789',
+                bet: -0.3
+              }
+            ]
+          }
+        ]
+      }
+
+      const result = await submissionService.submitAgentPrediction(submission, agent.token)
+      setSubmitResult(`✅ Success: ${result.message}`)
+    } catch (error) {
+      setSubmitResult(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <select
+          value={selectedAgent}
+          onChange={(e) => setSelectedAgent(e.target.value)}
+          className="px-3 py-2 border border-input rounded-md text-sm"
+        >
+          <option value="">Select Agent</option>
+          {agents.map(agent => (
+            <option key={agent.id} value={agent.id}>
+              {agent.name}
+            </option>
+          ))}
+        </select>
+
+        <input
+          type="text"
+          value={eventId}
+          onChange={(e) => setEventId(e.target.value)}
+          placeholder="Event ID"
+          className="px-3 py-2 border border-input rounded-md text-sm"
+        />
+
+        <Button
+          onClick={testSubmission}
+          disabled={!selectedAgent || isSubmitting}
+          size="sm"
+        >
+          {isSubmitting ? 'Submitting...' : 'Test Submit'}
+        </Button>
+      </div>
+
+      {submitResult && (
+        <div className="p-3 bg-muted rounded text-sm font-mono">
+          {submitResult}
         </div>
       )}
     </div>
