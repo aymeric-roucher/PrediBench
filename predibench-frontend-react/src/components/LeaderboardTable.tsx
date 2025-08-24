@@ -5,14 +5,12 @@ import type { LeaderboardEntry } from '../api'
 interface LeaderboardTableProps {
   leaderboard: LeaderboardEntry[]
   loading?: boolean
-  showTitle?: boolean
   initialVisibleModels?: number
 }
 
 export function LeaderboardTable({
   leaderboard,
   loading = false,
-  showTitle = false,
   initialVisibleModels = 10
 }: LeaderboardTableProps) {
   const [visibleModels, setVisibleModels] = useState(initialVisibleModels)
@@ -60,9 +58,9 @@ export function LeaderboardTable({
                         className="flex items-center space-x-4"
                       >
                         <div className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold ${index === 0 ? 'bg-gradient-to-br from-yellow-100 to-yellow-50 text-yellow-800 shadow-md shadow-yellow-200/50' :
-                            index === 1 ? 'bg-gradient-to-br from-slate-100 to-slate-50 text-slate-800 shadow-md shadow-slate-200/50' :
-                              index === 2 ? 'bg-gradient-to-br from-amber-100 to-amber-50 text-amber-800 shadow-md shadow-amber-200/50' :
-                                'bg-gradient-to-br from-muted to-muted/70 text-muted-foreground shadow-sm'
+                          index === 1 ? 'bg-gradient-to-br from-slate-100 to-slate-50 text-slate-800 shadow-md shadow-slate-200/50' :
+                            index === 2 ? 'bg-gradient-to-br from-amber-100 to-amber-50 text-amber-800 shadow-md shadow-amber-200/50' :
+                              'bg-gradient-to-br from-muted to-muted/70 text-muted-foreground shadow-sm'
                           }`}>
                           {index + 1}
                         </div>

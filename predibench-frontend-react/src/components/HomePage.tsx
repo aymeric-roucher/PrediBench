@@ -23,7 +23,6 @@ export function HomePage({ leaderboard, events, loading = false }: HomePageProps
         <LeaderboardTable
           leaderboard={leaderboard}
           loading={loading}
-          showTitle={true}
           initialVisibleModels={10}
         />
         <div className="text-center mt-6">
