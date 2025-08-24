@@ -7,9 +7,12 @@ from tenacity import (
     retry_if_exception_type,
     stop_after_attempt,
     wait_fixed,
+    wait_chain,
     before_sleep_log,
     after_log,
 )
+import logging
+
 
 from predibench.logger_config import get_logger
 
@@ -24,11 +27,11 @@ def add_retry_logic(base_class: Type[T]) -> Type[T]:
     class ModelWithRetry(base_class):
         @retry(
             stop=stop_after_attempt(5),
-            wait=wait_fixed(61),
+            wait=wait_chain(*[wait_fixed(1) for _ in range(4)] + [wait_fixed(61)]),
             retry=retry_if_exception_type((Exception,)),
             reraise=True,
-            before_sleep=before_sleep_log(logger, "INFO"),
-            after=after_log(logger, "INFO"),
+            before_sleep=before_sleep_log(logger, logging.INFO),
+            after=after_log(logger, logging.INFO),
         )
         def generate(
             self,
@@ -48,11 +51,11 @@ def add_retry_logic(base_class: Type[T]) -> Type[T]:
 
         @retry(
             stop=stop_after_attempt(5),
-            wait=wait_fixed(61),
+            wait=wait_chain(*[wait_fixed(1) for _ in range(4)] + [wait_fixed(61)]),
             retry=retry_if_exception_type((Exception,)),
             reraise=True,
-            before_sleep=before_sleep_log(logger, "INFO"),
-            after=after_log(logger, "INFO"),
+            before_sleep=before_sleep_log(logger, logging.INFO),
+            after=after_log(logger, logging.INFO),
         )
         def generate_stream(
             self,
