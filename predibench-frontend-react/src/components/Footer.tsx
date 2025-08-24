@@ -1,3 +1,5 @@
+import { Github } from 'lucide-react'
+
 export function Footer() {
   const links = [
     { name: 'Home', href: '/' },
@@ -24,9 +26,18 @@ export function Footer() {
             ))}
           </nav>
 
-          <p className="text-sm text-gray-500">
-            © 2025 PrediBench. All rights reserved.
-          </p>
+          <div className="flex items-center space-x-4 text-sm text-gray-500">
+            <p>© 2025 PrediBench. All rights reserved.</p>
+            <a
+              href="https://github.com/aymeric-roucher/PrediBench"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center space-x-1 text-blue-500 hover:text-blue-600 transition-colors"
+            >
+              <Github size={16} />
+              <span>PrediBench</span>
+            </a>
+          </div>
         </div>
       </div>
     </footer>
