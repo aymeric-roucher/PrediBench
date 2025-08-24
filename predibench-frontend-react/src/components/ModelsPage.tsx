@@ -67,7 +67,7 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
         <h1 className="text-3xl font-bold">Inspect model performance</h1>
         
         <Select.Root value={selectedModel} onValueChange={handleModelSelect}>
-          <Select.Trigger className="inline-flex items-center justify-between gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 min-w-[300px]">
+          <Select.Trigger className="inline-flex items-center justify-between gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 min-w-[300px]">
             <Select.Value placeholder="Select a model">
               {selectedModelData?.model || 'Select a model'}
             </Select.Value>
@@ -77,27 +77,27 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
           </Select.Trigger>
 
           <Select.Portal>
-            <Select.Content className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-lg">
+            <Select.Content className="overflow-hidden rounded-lg border border-border bg-popover shadow-lg">
               <Select.Viewport className="p-1">
                 {leaderboard.map((model, index) => (
                   <Select.Item
                     key={model.id}
                     value={model.id}
-                    className="relative flex cursor-pointer items-center rounded-md px-3 py-2 text-sm text-gray-900 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-900"
+                    className="relative flex cursor-pointer items-center rounded-md px-3 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none data-[state=checked]:bg-accent data-[state=checked]:text-accent-foreground"
                   >
                     <Select.ItemText>
                       <div className="flex items-center space-x-3">
                         <div className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold ${
-                          index === 0 ? 'bg-gradient-to-br from-yellow-100 to-yellow-50 text-yellow-800' :
-                          index === 1 ? 'bg-gradient-to-br from-slate-100 to-slate-50 text-slate-800' :
-                          index === 2 ? 'bg-gradient-to-br from-amber-100 to-amber-50 text-amber-800' :
-                          'bg-gradient-to-br from-gray-100 to-gray-50 text-gray-800'
+                          index === 0 ? 'bg-gradient-to-br from-yellow-100 to-yellow-50 text-yellow-800 dark:from-yellow-900/20 dark:to-yellow-800/20 dark:text-yellow-300' :
+                          index === 1 ? 'bg-gradient-to-br from-slate-100 to-slate-50 text-slate-800 dark:from-slate-900/20 dark:to-slate-800/20 dark:text-slate-300' :
+                          index === 2 ? 'bg-gradient-to-br from-amber-100 to-amber-50 text-amber-800 dark:from-amber-900/20 dark:to-amber-800/20 dark:text-amber-300' :
+                          'bg-gradient-to-br from-gray-100 to-gray-50 text-gray-800 dark:from-gray-900/20 dark:to-gray-800/20 dark:text-gray-300'
                         }`}>
                           {index + 1}
                         </div>
                         <div>
                           <div className="font-medium">{model.model}</div>
-                          <div className="text-xs text-gray-500 grid grid-cols-2 gap-2 mt-1">
+                          <div className="text-xs text-muted-foreground grid grid-cols-2 gap-2 mt-1">
                             <span>PnL: {model.final_cumulative_pnl.toFixed(1)}</span>
                             <span>Acc: {((model.accuracy || 0) * 100).toFixed(0)}%</span>
                           </div>
@@ -119,7 +119,7 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
       {selectedModelData && (
         <div className="space-y-8">
           {marketDetails && Object.keys(marketDetails).length > 0 && (
-            <div className="p-6 bg-card rounded-xl border border-gray-200">
+            <div className="p-6 bg-card rounded-xl border border-border">
               {/* Price Evolution Chart */}
               <div className="mb-8">
                 <h3 className="text-lg font-semibold mb-4">Price Evolution</h3>

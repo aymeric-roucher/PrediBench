@@ -11,7 +11,7 @@ export function Footer() {
   ]
 
   return (
-    <footer className="mt-auto border-t border-gray-300 bg-background">
+    <footer className="mt-auto border-t border-border bg-background">
       <div className="container mx-auto px-6 py-6">
         <div className="flex flex-col items-center space-y-4">
           <nav className="flex items-center space-x-8">
@@ -19,7 +19,7 @@ export function Footer() {
               <a
                 key={index}
                 href={link.href}
-                className="text-blue-500 hover:text-blue-600 text-sm font-medium transition-colors"
+                className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
               >
                 {link.name}
               </a>
@@ -32,7 +32,7 @@ export function Footer() {
               href="https://github.com/aymeric-roucher/PrediBench"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center space-x-1 text-blue-500 hover:text-blue-600 transition-colors"
+              className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors"
             >
               <Github size={16} />
               <span>PrediBench</span>

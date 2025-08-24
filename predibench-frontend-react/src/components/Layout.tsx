@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Trophy, BarChart3, Newspaper } from 'lucide-react'
 import { Footer } from './Footer'
+import { ThemeToggle } from './ui/ThemeToggle'
 
 interface LayoutProps {
   children: ReactNode
@@ -49,6 +50,7 @@ export function Layout({ children, currentPage }: LayoutProps) {
                   </a>
                 ))}
               </nav>
+              <ThemeToggle />
             </div>
           </div>
         </div>

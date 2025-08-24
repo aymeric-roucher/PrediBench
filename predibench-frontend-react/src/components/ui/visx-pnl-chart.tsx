@@ -173,9 +173,10 @@ export function VisxPnLChart({
             rows={true}
             numTicks={numTicks}
             lineStyle={{
-              stroke: '#e1e1e1',
+              stroke: 'hsl(var(--border))',
               strokeLinecap: 'round',
-              strokeWidth: 1
+              strokeWidth: 1,
+              strokeOpacity: 0.5
             }}
           />
         )}
