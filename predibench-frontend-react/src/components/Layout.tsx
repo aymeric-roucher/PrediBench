@@ -9,7 +9,7 @@ interface LayoutProps {
 
 export function Layout({ children, currentPage }: LayoutProps) {
   const pages = [
-    { id: 'leaderboard', name: 'Leaderboard', href: '/', icon: Trophy },
+    { id: 'leaderboard', name: 'Leaderboard', href: '/leaderboard', icon: Trophy },
     { id: 'models', name: 'Models', href: '/models', icon: BarChart3 },
     { id: 'events', name: 'Events', href: '/events', icon: Newspaper }
   ]
@@ -21,9 +21,9 @@ export function Layout({ children, currentPage }: LayoutProps) {
         <div className="container mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
-              <h1 className="text-3xl font-bold tracking-tight">
+              <a href="/" className="text-3xl font-bold tracking-tight hover:text-muted-foreground transition-colors">
                 PrediBench
-              </h1>
+              </a>
               <p className="text-sm text-muted-foreground">
                 Letting LLMs bet their money on the future
               </p>

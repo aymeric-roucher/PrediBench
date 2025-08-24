@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { Event, LeaderboardEntry, Stats } from './api'
 import { apiService } from './api'
 import { Layout } from './components/Layout'
+import { HomePage } from './components/HomePage'
 import { LeaderboardPage } from './components/LeaderboardPage'
 import { ModelsPage } from './components/ModelsPage'
 import { QuestionsPage } from './components/QuestionsPage'
@@ -52,11 +53,12 @@ function AppContent() {
   }, [])
 
   const getCurrentPage = () => {
-    if (location.pathname === '/') return 'leaderboard'
+    if (location.pathname === '/') return 'home'
+    if (location.pathname === '/leaderboard') return 'leaderboard'
     if (location.pathname === '/events') return 'events'
     if (location.pathname === '/models') return 'models'
     if (location.pathname.startsWith('/events/')) return 'events'
-    return 'leaderboard'
+    return 'home'
   }
 
   if (error) {
@@ -87,7 +89,8 @@ function AppContent() {
   return (
     <Layout currentPage={getCurrentPage()}>
       <Routes>
-        <Route path="/" element={<LeaderboardPage leaderboard={leaderboard} events={events} loading={loading} />} />
+        <Route path="/" element={<HomePage leaderboard={leaderboard} events={events} loading={loading} />} />
+        <Route path="/leaderboard" element={<LeaderboardPage leaderboard={leaderboard} loading={loading} />} />
         <Route path="/events" element={<QuestionsPage events={events} leaderboard={leaderboard} loading={loading} />} />
         <Route path="/models" element={<ModelsPage leaderboard={leaderboard} />} />
         <Route 
