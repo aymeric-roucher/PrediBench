@@ -61,6 +61,39 @@ export interface Stats {
   totalProfit: number
 }
 
+// Agent Management Types
+export interface Agent {
+  id: string
+  name: string
+  token: string
+  created_at: string
+  last_used?: string
+}
+
+export interface AgentCreate {
+  name: string
+}
+
+export interface PredictionSubmission {
+  event_id: string
+  market_decisions: MarketDecision[]
+  rationale?: string
+}
+
+export interface MarketDecision {
+  market_id: string
+  bet: number
+  odds: number
+  rationale: string
+}
+
+export interface SubmissionResponse {
+  success: boolean
+  message: string
+  submission_id?: string
+  agent_name?: string
+}
+
 class ApiService {
   private async fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 30000): Promise<Response> {
     const controller = new AbortController()
@@ -77,6 +110,31 @@ class ApiService {
       clearTimeout(timeoutId)
       throw error
     }
+  }
+
+  private async getAuthToken(): Promise<string | null> {
+    // Get Firebase user token
+    const { auth } = await import('./lib/firebase')
+    const user = auth.currentUser
+    if (!user) return null
+    
+    return await user.getIdToken()
+  }
+
+  private async fetchAuthenticated(url: string, options: RequestInit = {}): Promise<Response> {
+    const token = await this.getAuthToken()
+    if (!token) {
+      throw new Error('User not authenticated')
+    }
+
+    return this.fetchWithTimeout(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        ...options.headers,
+      },
+    })
   }
 
   async getLeaderboard(): Promise<LeaderboardEntry[]> {
@@ -147,6 +205,66 @@ class ApiService {
     const response = await this.fetchWithTimeout(`${API_BASE_URL}/event/${eventId}/market_prices`)
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    return await response.json()
+  }
+
+  // Agent Management Methods
+  async getAgents(): Promise<Agent[]> {
+    const response = await this.fetchAuthenticated(`${API_BASE_URL}/agents`)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    return await response.json()
+  }
+
+  async createAgent(agentData: AgentCreate): Promise<Agent> {
+    const response = await this.fetchAuthenticated(`${API_BASE_URL}/agents`, {
+      method: 'POST',
+      body: JSON.stringify(agentData),
+    })
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`HTTP error! status: ${response.status}, message: ${error}`)
+    }
+    return await response.json()
+  }
+
+  async regenerateAgentToken(agentId: string): Promise<Agent> {
+    const response = await this.fetchAuthenticated(`${API_BASE_URL}/agents/${agentId}/regenerate-token`, {
+      method: 'PUT',
+    })
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`HTTP error! status: ${response.status}, message: ${error}`)
+    }
+    return await response.json()
+  }
+
+  async deleteAgent(agentId: string): Promise<{ message: string }> {
+    const response = await this.fetchAuthenticated(`${API_BASE_URL}/agents/${agentId}`, {
+      method: 'DELETE',
+    })
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`HTTP error! status: ${response.status}, message: ${error}`)
+    }
+    return await response.json()
+  }
+
+  // Prediction Submission
+  async submitPrediction(submission: PredictionSubmission, agentToken: string): Promise<SubmissionResponse> {
+    const response = await this.fetchWithTimeout(`${API_BASE_URL}/submit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${agentToken}`,
+      },
+      body: JSON.stringify(submission),
+    })
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`HTTP error! status: ${response.status}, message: ${error}`)
     }
     return await response.json()
   }
