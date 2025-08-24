@@ -8,6 +8,7 @@ import { LeaderboardPage } from './components/LeaderboardPage'
 import { ModelsPage } from './components/ModelsPage'
 import { QuestionsPage } from './components/QuestionsPage'
 import { EventDetail } from './components/EventDetail'
+import { useAnalytics } from './hooks/useAnalytics'
 
 function AppContent() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
@@ -16,6 +17,7 @@ function AppContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const location = useLocation()
+  const { trackPageView } = useAnalytics()
 
   const loadData = async () => {
     try {
@@ -51,6 +53,10 @@ function AppContent() {
   useEffect(() => {
     loadData()
   }, [])
+
+  useEffect(() => {
+    trackPageView(getCurrentPage())
+  }, [location, trackPageView])
 
   const getCurrentPage = () => {
     if (location.pathname === '/') return 'home'

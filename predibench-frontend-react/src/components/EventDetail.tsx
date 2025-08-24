@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { Event, LeaderboardEntry } from '../api'
 import { getChartColor } from './ui/chart-colors'
 import { VisxLineChart } from './ui/visx-line-chart'
+import { useAnalytics } from '../hooks/useAnalytics'
 
 interface EventDetailProps {
   event: Event
@@ -28,6 +29,7 @@ interface MarketInvestmentDecision {
 
 export function EventDetail({ event }: EventDetailProps) {
   const [marketPricesData, setMarketPricesData] = useState<{ [marketId: string]: PriceData[] }>({})
+  const { trackEvent, trackUserAction } = useAnalytics()
   const [investmentDecisions, setInvestmentDecisions] = useState<MarketInvestmentDecision[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -93,13 +95,20 @@ export function EventDetail({ event }: EventDetailProps) {
   useEffect(() => {
     if (event) {
       loadEventDetails(event.id)
+      trackEvent('event_view', {
+        event_id: event.id,
+        event_title: event.title
+      })
     }
-  }, [event])
+  }, [event, trackEvent])
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
         <button
-          onClick={() => window.history.back()}
+          onClick={() => {
+            trackUserAction('back_button_click', 'navigation', 'event_detail')
+            window.history.back()
+          }}
           className="flex items-center text-muted-foreground hover:text-foreground transition-colors"
         >
           ← Back to events
@@ -108,6 +117,7 @@ export function EventDetail({ event }: EventDetailProps) {
           href={`https://polymarket.com/event/${event.slug}`}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => trackUserAction('external_link_click', 'engagement', 'polymarket')}
           className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
         >
           Visit on Polymarket
