@@ -97,8 +97,7 @@ export function EventDetail({ event }: EventDetailProps) {
       loadEventDetails(event.id)
       trackEvent('event_view', {
         event_id: event.id,
-        event_title: event.title,
-        event_status: event.status
+        event_title: event.title
       })
     }
   }, [event, trackEvent])
