@@ -4,24 +4,29 @@ import { Card } from './ui/card'
 import { Copy, RefreshCw, Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { apiService, type Agent } from '../api'
-import { submissionService, type PredictionSubmission } from '../apiSubmission'
+import { submissionService, type AgentSubmission } from '../apiSubmission'
 
-// Code examples for different languages
+// Code examples for different languages - new simplified structure
 const getCodeExamples = (agentToken = 'YOUR_AGENT_TOKEN') => ({
   curl: `curl -X POST http://localhost:8080/api/submit \\
   -H "Authorization: Bearer ${agentToken}" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "event_id": "event_123",
-    "market_decisions": [
+    "event_decisions": [
       {
-        "market_id": "market_456",
-        "bet": 0.7,
-        "odds": 1.5,
-        "rationale": "Analysis shows positive trend"
+        "event_id": "event_123",
+        "market_decisions": [
+          {
+            "market_id": "market_456",
+            "bet": 0.7
+          },
+          {
+            "market_id": "market_789",
+            "bet": -0.3
+          }
+        ]
       }
-    ],
-    "rationale": "Overall market conditions look favorable"
+    ]
   }'`,
   
   python: `import requests
@@ -30,18 +35,23 @@ import json
 # Your agent token
 token = "${agentToken}"
 
-# Prediction data
+# Prediction data - simplified structure
 prediction = {
-    "event_id": "event_123",
-    "market_decisions": [
+    "event_decisions": [
         {
-            "market_id": "market_456",
-            "bet": 0.7,
-            "odds": 1.5,
-            "rationale": "Analysis shows positive trend"
+            "event_id": "event_123",
+            "market_decisions": [
+                {
+                    "market_id": "market_456",
+                    "bet": 0.7  # Bet value between -1.0 and 1.0
+                },
+                {
+                    "market_id": "market_789", 
+                    "bet": -0.3
+                }
+            ]
         }
-    ],
-    "rationale": "Overall market conditions look favorable"
+    ]
 }
 
 # Make the request
@@ -64,18 +74,23 @@ else:
   javascript: `// Your agent token
 const token = "${agentToken}";
 
-// Prediction data
+// Prediction data - simplified structure
 const prediction = {
-  event_id: "event_123",
-  market_decisions: [
+  event_decisions: [
     {
-      market_id: "market_456",
-      bet: 0.7,
-      odds: 1.5,
-      rationale: "Analysis shows positive trend"
+      event_id: "event_123",
+      market_decisions: [
+        {
+          market_id: "market_456",
+          bet: 0.7  // Bet value between -1.0 and 1.0
+        },
+        {
+          market_id: "market_789",
+          bet: -0.3
+        }
+      ]
     }
-  ],
-  rationale: "Overall market conditions look favorable"
+  ]
 };
 
 // Make the request
@@ -431,20 +446,25 @@ function TestSubmission({ agents }: { agents: Agent[] }) {
     setSubmitResult(null)
 
     try {
-      const submission: PredictionSubmission = {
-        event_id: eventId,
-        market_decisions: [
+      const submission: AgentSubmission = {
+        event_decisions: [
           {
-            market_id: 'test_market_456',
-            bet: 0.7,
-            odds: 1.5,
-            rationale: 'Test prediction from dashboard'
+            event_id: eventId,
+            market_decisions: [
+              {
+                market_id: 'test_market_456',
+                bet: 0.7
+              },
+              {
+                market_id: 'test_market_789',
+                bet: -0.3
+              }
+            ]
           }
-        ],
-        rationale: 'This is a test submission from the dashboard'
+        ]
       }
 
-      const result = await submissionService.submitPrediction(submission, agent.token)
+      const result = await submissionService.submitAgentPrediction(submission, agent.token)
       setSubmitResult(`✅ Success: ${result.message}`)
     } catch (error) {
       setSubmitResult(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`)

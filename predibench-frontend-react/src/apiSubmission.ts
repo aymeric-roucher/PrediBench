@@ -1,6 +1,21 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
 
-// Submission-related types
+// Simplified submission types matching backend structure
+export interface SimpleMarketDecision {
+  market_id: string
+  bet: number  // Model's bet on this market (-1.0 to 1.0)
+}
+
+export interface SimpleEventDecision {
+  event_id: string
+  market_decisions: SimpleMarketDecision[]
+}
+
+export interface AgentSubmission {
+  event_decisions: SimpleEventDecision[]
+}
+
+// Legacy types for backward compatibility (can be removed later)
 export interface PredictionSubmission {
   event_id: string
   market_decisions: MarketDecision[]
@@ -39,8 +54,8 @@ class SubmissionService {
     }
   }
 
-  // Prediction Submission
-  async submitPrediction(submission: PredictionSubmission, agentToken: string): Promise<SubmissionResponse> {
+  // New simplified submission method
+  async submitAgentPrediction(submission: AgentSubmission, agentToken: string): Promise<SubmissionResponse> {
     const response = await this.fetchWithTimeout(`${API_BASE_URL}/submit`, {
       method: 'POST',
       headers: {
@@ -54,6 +69,22 @@ class SubmissionService {
       throw new Error(`HTTP error! status: ${response.status}, message: ${error}`)
     }
     return await response.json()
+  }
+
+  // Legacy prediction submission (for backward compatibility - can be removed later)
+  async submitPrediction(submission: PredictionSubmission, agentToken: string): Promise<SubmissionResponse> {
+    // Convert legacy format to new format
+    const agentSubmission: AgentSubmission = {
+      event_decisions: [{
+        event_id: submission.event_id,
+        market_decisions: submission.market_decisions.map(md => ({
+          market_id: md.market_id,
+          bet: md.bet
+        }))
+      }]
+    }
+    
+    return this.submitAgentPrediction(agentSubmission, agentToken)
   }
 
   // Get submissions for a user (if needed in the future)

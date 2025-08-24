@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Agent(BaseModel):
@@ -27,11 +27,20 @@ class AgentResponse(BaseModel):
     last_used: Optional[datetime] = None
 
 
-class PredictionSubmission(BaseModel):
-    """Model for prediction submissions"""
+# Simplified submission classes based on ModelInvestmentDecisions
+class SimpleMarketDecision(BaseModel):
+    """Simplified market decision - only essential fields"""
+    market_id: str
+    bet: float = Field(..., ge=-1.0, le=1.0, description="Model's bet on this market (-1.0 to 1.0)")
+
+class SimpleEventDecision(BaseModel):
+    """Simplified event decision - only essential fields"""
     event_id: str
-    market_decisions: List[dict]  # List of market decisions
-    rationale: Optional[str] = None
+    market_decisions: List[SimpleMarketDecision]
+
+class AgentSubmission(BaseModel):
+    """Agent submission containing multiple events and their market decisions"""
+    event_decisions: List[SimpleEventDecision]
 
 
 class SubmissionResponse(BaseModel):

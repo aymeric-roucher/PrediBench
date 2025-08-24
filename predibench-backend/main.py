@@ -21,7 +21,7 @@ from pydantic import BaseModel
 # Import our auth and models
 from auth import get_current_user, firebase_auth, verify_agent_token_dependency
 from models import (
-    Agent, AgentCreate, AgentResponse, PredictionSubmission, 
+    Agent, AgentCreate, AgentResponse, AgentSubmission, 
     SubmissionResponse, AgentTokenUpdate
 )
 
@@ -602,7 +602,7 @@ async def delete_agent(agent_id: str, current_user: dict = Depends(get_current_u
 # Prediction Submission Endpoint
 @app.post("/api/submit", response_model=SubmissionResponse)
 async def submit_prediction(
-    submission: PredictionSubmission,
+    submission: AgentSubmission,
     authorization: str = Header(..., description="Bearer token with agent token")
 ):
     """Submit predictions using agent token"""
@@ -629,9 +629,19 @@ async def submit_prediction(
             "agent_id": agent_id,
             "user_id": user_id,
             "agent_name": agent_info["agent_name"],
-            "event_id": submission.event_id,
-            "market_decisions": submission.market_decisions,
-            "rationale": submission.rationale,
+            "event_decisions": [
+                {
+                    "event_id": event_decision.event_id,
+                    "market_decisions": [
+                        {
+                            "market_id": market_decision.market_id,
+                            "bet": market_decision.bet
+                        }
+                        for market_decision in event_decision.market_decisions
+                    ]
+                }
+                for event_decision in submission.event_decisions
+            ],
             "submitted_at": datetime.now()
         }
         
