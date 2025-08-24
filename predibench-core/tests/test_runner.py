@@ -1,7 +1,7 @@
-from datetime import date
 import json
-from datasets import load_dataset
+from datetime import date
 
+from datasets import load_dataset
 from predibench.agent.dataclasses import (
     EventInvestmentDecisions,
     MarketInvestmentDecision,

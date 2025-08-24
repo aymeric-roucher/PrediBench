@@ -38,12 +38,13 @@ export function QuestionsPage({ events, loading: initialLoading = false }: Quest
         case 'volume':
           comparison = (a.volume || 0) - (b.volume || 0)
           break
-        case 'probability':
+        case 'probability': {
           // Use average probability of markets
-          const aAvgProb = a.markets?.reduce((sum, m) => sum + (m.outcomes?.[0]?.price || 0), 0) / (a.markets?.length || 1)
-          const bAvgProb = b.markets?.reduce((sum, m) => sum + (m.outcomes?.[0]?.price || 0), 0) / (b.markets?.length || 1)
-          comparison = (aAvgProb || 0) - (bAvgProb || 0)
+          const aAvgProb = a.markets?.reduce((sum, m) => sum + (m.outcomes[0].price), 0) / (a.markets.length)
+          const bAvgProb = b.markets?.reduce((sum, m) => sum + (m.outcomes[0].price), 0) / (b.markets.length)
+          comparison = (aAvgProb) - (bAvgProb)
           break
+        }
         case 'endDate':
           comparison = new Date(a.end_datetime || '').getTime() - new Date(b.end_datetime || '').getTime()
           break
@@ -178,7 +179,7 @@ export function QuestionsPage({ events, loading: initialLoading = false }: Quest
                     <CardTitle className="text-lg line-clamp-2 flex-1">{event.title}</CardTitle>
                     <div className="flex items-center space-x-2 ml-2">
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {event.markets?.length || 0} Markets
+                        {event.markets.length} Markets
                       </span>
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                         <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
@@ -199,14 +200,14 @@ export function QuestionsPage({ events, loading: initialLoading = false }: Quest
                             <span className="text-muted-foreground line-clamp-1 flex-1">{market.question}</span>
                             <div className="flex items-center space-x-2 ml-2">
                               <span className="font-medium text-xs">
-                                {market.outcomes?.[0]?.price ? `${(market.outcomes[0].price * 100).toFixed(0)}%` : 'N/A'}
+                                {market.outcomes[0].price ? `${(market.outcomes[0].price * 100).toFixed(0)}%` : 'N/A'}
                               </span>
                             </div>
                           </div>
                         ))}
-                        {(event.markets?.length || 0) > 3 && (
+                        {(event.markets.length) > 3 && (
                           <div className="text-xs text-muted-foreground">
-                            +{(event.markets?.length || 0) - 3} more markets
+                            +{(event.markets.length) - 3} more markets
                           </div>
                         )}
                       </div>

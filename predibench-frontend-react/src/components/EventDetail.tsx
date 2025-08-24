@@ -1,8 +1,9 @@
 import { ExternalLink, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { Event, LeaderboardEntry } from '../api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
+import { VisxLineChart } from './ui/visx-line-chart'
+import { getChartColor } from './ui/chart-colors'
 
 interface EventDetailProps {
   event: Event
@@ -40,7 +41,7 @@ export function EventDetail({ event }: EventDetailProps) {
     return text.split(urlRegex).map((part, index) => {
       if (urlRegex.test(part)) {
         // Remove trailing punctuation from the URL
-        const cleanUrl = part.replace(/[.,;:!?\)\]]+$/, '')
+        const cleanUrl = part.replace(/[.,;:!?)\\]]+$/, '')
         const trailingPunct = part.slice(cleanUrl.length)
 
         return (
@@ -126,7 +127,7 @@ export function EventDetail({ event }: EventDetailProps) {
                     rel="noopener noreferrer"
                     className="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm mt-3 transition-colors"
                   >
-                    See the event on Polymarket
+                    Visit on Polymarket
                     <ExternalLink className="h-4 w-4 ml-1" />
                   </a>
                 </div>
@@ -186,7 +187,7 @@ export function EventDetail({ event }: EventDetailProps) {
                         <div
                           className="w-3 h-3 rounded-full"
                           style={{
-                            backgroundColor: `hsl(${index * 360 / (event.markets?.length || 1)}, 70%, 50%)`
+                            backgroundColor: getChartColor(index)
                           }}
                         ></div>
                         <span className="text-sm text-muted-foreground">
@@ -197,46 +198,20 @@ export function EventDetail({ event }: EventDetailProps) {
                   </div>
 
                   <div className="w-full h-96">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis
-                          dataKey="date"
-                          stroke="hsl(var(--muted-foreground))"
-                          type="category"
-                          allowDuplicatedCategory={false}
-                        />
-                        <YAxis stroke="hsl(var(--muted-foreground))" domain={[0, 1]} />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'hsl(var(--card))',
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px'
-                          }}
-                          formatter={(value: any, name: string) => [
-                            `${(Number(value) * 100).toFixed(1)}%`,
-                            name
-                          ]}
-                        />
-
-                        {/* Create a line for each market */}
-                        {event?.markets?.map((market, index) => {
-                          const marketData = marketPricesData[market.id] || []
-                          return (
-                            <Line
-                              key={market.id}
-                              type="monotone"
-                              dataKey="price"
-                              data={marketData}
-                              stroke={`hsl(${index * 360 / (event.markets?.length || 1)}, 70%, 50%)`}
-                              strokeWidth={2}
-                              dot={false}
-                              name={market.question.length > 30 ? market.question.substring(0, 27) + '...' : market.question}
-                            />
-                          )
-                        })}
-                      </LineChart>
-                    </ResponsiveContainer>
+                    <VisxLineChart
+                      height={384}
+                      margin={{ left: 60, top: 35, bottom: 38, right: 27 }}
+                      yDomain={[0, 1]}
+                      series={event?.markets?.map((market, index) => ({
+                        dataKey: `market_${market.id}`,
+                        data: (marketPricesData[market.id] || []).map(point => ({
+                          x: point.date,
+                          y: point.price
+                        })),
+                        stroke: getChartColor(index),
+                        name: market.question.length > 30 ? market.question.substring(0, 27) + '...' : market.question
+                      })) || []}
+                    />
                   </div>
                 </div>
               )}
