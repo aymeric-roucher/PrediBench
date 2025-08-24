@@ -1,4 +1,5 @@
 import { Activity, Calendar, DollarSign, TrendingUp } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import type { Event, LeaderboardEntry } from '../api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { VisxLineChart } from './ui/visx-line-chart'
@@ -11,6 +12,8 @@ interface LeaderboardPageProps {
 }
 
 export function LeaderboardPage({ leaderboard, events, loading = false }: LeaderboardPageProps) {
+  const navigate = useNavigate()
+  
   const getTrendIcon = (trend: 'up' | 'down' | 'stable') => {
     switch (trend) {
       case 'up':
@@ -20,6 +23,10 @@ export function LeaderboardPage({ leaderboard, events, loading = false }: Leader
       default:
         return <Activity className="h-4 w-4 text-gray-500" />
     }
+  }
+  
+  const handleModelClick = (modelId: string) => {
+    navigate(`/models?selected=${modelId}`)
   }
 
 
@@ -64,39 +71,42 @@ export function LeaderboardPage({ leaderboard, events, loading = false }: Leader
                   leaderboard.map((entry, index) => (
                     <div
                       key={entry.id}
-                      className="p-4 rounded-lg border border-border hover:border-primary/50 transition-all hover:shadow-md"
+                      className="group relative p-6 rounded-xl border border-border/50 hover:border-primary/30 transition-all duration-200 hover:shadow-lg hover:shadow-primary/5 cursor-pointer bg-gradient-to-r from-background to-background hover:from-primary/[0.02] hover:to-background"
+                      onClick={() => handleModelClick(entry.id)}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-800' :
-                            index === 1 ? 'bg-slate-100 text-slate-800' :
-                              index === 2 ? 'bg-orange-100 text-orange-800' :
-                                'bg-muted text-muted-foreground'
-                            }`}>
+                        <div className="flex items-center space-x-5">
+                          <div className={`flex items-center justify-center w-12 h-12 rounded-full text-sm font-bold transition-transform group-hover:scale-105 ${
+                            index === 0 ? 'bg-gradient-to-br from-yellow-100 to-yellow-50 text-yellow-800 shadow-md shadow-yellow-200/50' :
+                            index === 1 ? 'bg-gradient-to-br from-slate-100 to-slate-50 text-slate-800 shadow-md shadow-slate-200/50' :
+                            index === 2 ? 'bg-gradient-to-br from-amber-100 to-amber-50 text-amber-800 shadow-md shadow-amber-200/50' :
+                            'bg-gradient-to-br from-muted to-muted/70 text-muted-foreground shadow-sm'
+                          }`}>
                             {index + 1}
                           </div>
-                          <div>
-                            <h3 className="font-semibold">{entry.model}</h3>
+                          <div className="space-y-1">
+                            <h3 className="font-semibold text-lg text-foreground group-hover:text-primary transition-colors">{entry.model}</h3>
                             <p className="text-sm text-muted-foreground">
                               {entry.trades} trades • Updated {entry.lastUpdated}
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center space-x-6">
-                          <div className="text-right">
-                            <p className="text-sm text-muted-foreground">Final PnL</p>
-                            <p className="text-lg font-bold">{entry.final_cumulative_pnl.toFixed(1)}</p>
+                        <div className="flex items-center space-x-8">
+                          <div className="text-right space-y-1">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Score</p>
+                            <p className="text-xl font-bold text-foreground">{entry.final_cumulative_pnl.toFixed(1)}</p>
                           </div>
-                          <div className="text-right">
-                            <p className="text-sm text-muted-foreground">Brier score</p>
-                            <p className="text-lg font-semibold text-green-600">${Math.round(entry.final_cumulative_pnl * 1000).toLocaleString()}</p>
+                          <div className="text-right space-y-1">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Value</p>
+                            <p className="text-xl font-bold text-emerald-600">${Math.round(entry.final_cumulative_pnl * 1000).toLocaleString()}</p>
                           </div>
                           <div className="flex items-center">
                             {getTrendIcon(entry.trend)}
                           </div>
                         </div>
                       </div>
+                      <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
                     </div>
                   ))
                 )}

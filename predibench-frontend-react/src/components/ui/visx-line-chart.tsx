@@ -61,7 +61,7 @@ export function VisxLineChart({
   xAccessor = defaultAccessors.xAccessor,
   yAccessor = defaultAccessors.yAccessor,
   yDomain,
-  formatTooltipX = (value: Date) => format(value, 'MMM d'),
+  formatTooltipX = (value: Date) => format(value, 'MMM d, yyyy'),
   showGrid = true,
   numTicks = 4
 }: VisxLineChartProps) {
@@ -232,6 +232,24 @@ export function VisxLineChart({
             }}
           />
           
+          {/* Date label on top of vertical line */}
+          <div
+            style={{
+              position: 'absolute',
+              left: hoverState.xPosition,
+              top: margin.top - 20,
+              transform: 'translateX(-50%)',
+              pointerEvents: 'none',
+              zIndex: 1000,
+              color: '#9ca3af',
+              fontSize: '11px',
+              fontWeight: '500',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {hoverState.tooltips.length > 0 && formatTooltipX(xAccessor(hoverState.tooltips[0].datum))}
+          </div>
+          
           {/* Tooltips and hover points */}
           {hoverState.tooltips.map((tooltip, index) => {
             // Check if this Y position already has a tooltip (to avoid duplicates)
@@ -276,7 +294,7 @@ export function VisxLineChart({
                       boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                     }}
                   >
-                    {formatTooltipX(xAccessor(tooltip.datum))} <strong>{yAccessor(tooltip.datum).toFixed(2)}</strong> - {(tooltip.lineConfig.name || tooltip.lineConfig.dataKey).substring(0, 20)}
+                    <strong>{yAccessor(tooltip.datum).toFixed(2)}</strong> - {(tooltip.lineConfig.name || tooltip.lineConfig.dataKey).substring(0, 20)}
                   </div>
                 )}
               </div>
