@@ -141,8 +141,6 @@ export function EventDetail({ event }: EventDetailProps) {
 
         {/* Market Price Charts - Superposed */}
         <div>
-          <h2 className="text-lg font-semibold mb-2">Market Price History</h2>
-
           {loading ? (
             <div className="h-64 flex items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -188,7 +186,7 @@ export function EventDetail({ event }: EventDetailProps) {
 
         {/* Event Description */}
         <div className="mt-8 mb-8">
-          <h2 className="text-xl font-bold mb-4">Event Description</h2>
+          <h3 className="text-lg font-bold mb-4">Description</h3>
           <div className="text-muted-foreground text-base leading-relaxed">
             {linkify(event.description)}
           </div>

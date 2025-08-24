@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Trophy, BarChart3, Newspaper } from 'lucide-react'
+import { Footer } from './Footer'
 
 interface LayoutProps {
   children: ReactNode
@@ -14,7 +15,7 @@ export function Layout({ children, currentPage }: LayoutProps) {
   ]
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header and Navigation */}
       <header className="border-b border-border bg-card shadow-sm">
         <div className="container mx-auto px-6 py-6">
@@ -54,7 +55,12 @@ export function Layout({ children, currentPage }: LayoutProps) {
       </header>
 
       {/* Page Content */}
-      {children}
+      <main className="flex-1">
+        {children}
+      </main>
+
+      {/* Footer */}
+      <Footer />
     </div>
   )
 }
