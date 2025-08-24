@@ -7,8 +7,6 @@ import { LeaderboardPage } from './components/LeaderboardPage'
 import { ModelsPage } from './components/ModelsPage'
 import { QuestionsPage } from './components/QuestionsPage'
 import { EventDetail } from './components/EventDetail'
-import { Dashboard } from './components/Dashboard'
-import { AuthProvider } from './contexts/AuthContext'
 
 function AppContent() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
@@ -57,7 +55,6 @@ function AppContent() {
     if (location.pathname === '/') return 'leaderboard'
     if (location.pathname === '/events') return 'events'
     if (location.pathname === '/models') return 'models'
-    if (location.pathname === '/dashboard') return 'dashboard'
     if (location.pathname.startsWith('/events/')) return 'events'
     return 'leaderboard'
   }
@@ -93,7 +90,6 @@ function AppContent() {
         <Route path="/" element={<LeaderboardPage leaderboard={leaderboard} events={events} loading={loading} />} />
         <Route path="/events" element={<QuestionsPage events={events} leaderboard={leaderboard} loading={loading} />} />
         <Route path="/models" element={<ModelsPage leaderboard={leaderboard} />} />
-        <Route path="/dashboard" element={<Dashboard />} />
         <Route 
           path="/events/:eventId" 
           element={
@@ -125,9 +121,7 @@ function EventDetailWrapper({ events, leaderboard }: { events: Event[], leaderbo
 function App() {
   return (
     <Router>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
+      <AppContent />
     </Router>
   )
 }

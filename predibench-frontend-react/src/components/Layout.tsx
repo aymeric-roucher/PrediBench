@@ -1,9 +1,5 @@
 import type { ReactNode } from 'react'
-import { useState } from 'react'
-import { Trophy, BarChart3, Newspaper, LogOut } from 'lucide-react'
-import { Button } from './ui/button'
-import { useAuth } from '../contexts/AuthContext'
-import { AuthModal } from './AuthModal'
+import { Trophy, BarChart3, Newspaper } from 'lucide-react'
 
 interface LayoutProps {
   children: ReactNode
@@ -11,22 +7,11 @@ interface LayoutProps {
 }
 
 export function Layout({ children, currentPage }: LayoutProps) {
-  const [showAuthModal, setShowAuthModal] = useState(false)
-  const { currentUser, logout } = useAuth()
-  
   const pages = [
     { id: 'leaderboard', name: 'Leaderboard', href: '/', icon: Trophy },
     { id: 'models', name: 'Models', href: '/models', icon: BarChart3 },
     { id: 'events', name: 'Events', href: '/events', icon: Newspaper }
   ]
-
-  const handleLogout = async () => {
-    try {
-      await logout()
-    } catch (error) {
-      console.error('Failed to log out:', error)
-    }
-  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -63,36 +48,6 @@ export function Layout({ children, currentPage }: LayoutProps) {
                   </a>
                 ))}
               </nav>
-              
-              {currentUser ? (
-                <div className="flex items-center space-x-3">
-                  <span className="text-sm text-muted-foreground">
-                    {currentUser.email}
-                  </span>
-                  <Button 
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                    onClick={() => window.location.href = '/dashboard'}
-                  >
-                    Submit
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={handleLogout}
-                    className="flex items-center gap-1"
-                  >
-                    <LogOut size={14} />
-                    Logout
-                  </Button>
-                </div>
-              ) : (
-                <Button 
-                  onClick={() => setShowAuthModal(true)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  Login
-                </Button>
-              )}
             </div>
           </div>
         </div>
@@ -100,12 +55,6 @@ export function Layout({ children, currentPage }: LayoutProps) {
 
       {/* Page Content */}
       {children}
-      
-      {/* Auth Modal */}
-      <AuthModal 
-        isOpen={showAuthModal} 
-        onClose={() => setShowAuthModal(false)} 
-      />
     </div>
   )
 }
