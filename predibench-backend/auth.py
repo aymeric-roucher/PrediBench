@@ -12,10 +12,14 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 def initialize_firebase():
     """Initialize Firebase Admin SDK with service account"""
     if not firebase_admin._apps:
-
-        cred = credentials.Certificate('/Users/charlesazam/charloupioupiou/market-bench/predibench-backend/serviceAccountKey.json')
-            
-        firebase_admin.initialize_app(cred)
+        service_account_path = '/Users/charlesazam/charloupioupiou/market-bench/predibench-backend/serviceAccountKey.json'
+        
+        if os.path.exists(service_account_path):
+            cred = credentials.Certificate(service_account_path)
+            firebase_admin.initialize_app(cred)
+        else:
+            # Initialize without service account credentials (will use default credentials or environment)
+            firebase_admin.initialize_app()
     
     return firestore.client(database_id='predibench-db')
 
