@@ -1,8 +1,8 @@
-import { ExternalLink, X } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { Event, LeaderboardEntry } from '../api'
-import { VisxLineChart } from './ui/visx-line-chart'
 import { getChartColor } from './ui/chart-colors'
+import { VisxLineChart } from './ui/visx-line-chart'
 
 interface EventDetailProps {
   event: Event
@@ -30,36 +30,6 @@ export function EventDetail({ event }: EventDetailProps) {
   const [marketPricesData, setMarketPricesData] = useState<{ [marketId: string]: PriceData[] }>({})
   const [investmentDecisions, setInvestmentDecisions] = useState<MarketInvestmentDecision[]>([])
   const [loading, setLoading] = useState(false)
-
-  // Function to convert URLs in text to clickable links
-  const linkify = (text: string | null | undefined) => {
-    if (!text) return null
-
-    const urlRegex = /(https?:\/\/[^\s]+)/g
-
-    return text.split(urlRegex).map((part, index) => {
-      if (urlRegex.test(part)) {
-        // Remove trailing punctuation from the URL
-        const cleanUrl = part.replace(/[.,;:!?)\\]]+$/, '')
-        const trailingPunct = part.slice(cleanUrl.length)
-
-        return (
-          <span key={index}>
-            <a
-              href={cleanUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800 underline"
-            >
-              {cleanUrl}
-            </a>
-            {trailingPunct}
-          </span>
-        )
-      }
-      return part
-    })
-  }
 
   const loadEventDetails = async (eventId: string) => {
     setLoading(true)
@@ -115,81 +85,81 @@ export function EventDetail({ event }: EventDetailProps) {
       </div>
 
       <div>
-          {/* Title */}
-          <div className="mb-4">
-            <h1 className="text-4xl font-bold mb-4">{event.title}</h1>
-            
-            {/* Status indicators and info */}
-            <div className="flex items-center space-x-4">
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
-                {event.end_datetime && new Date(event.end_datetime) > new Date() ? 'LIVE' : 'CLOSED'}
-              </span>
-              
-              <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-blue-50 text-blue-900 border border-blue-200">
-                <span className="font-medium">Volume:</span> 
-                <span className="ml-1">{event.volume ? `$${(event.volume / 1000).toFixed(0)}K` : 'N/A'}</span>
-              </div>
-              
-              <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-gray-50 text-gray-900 border border-gray-200">
-                <span className="font-medium">Ends:</span> 
-                <span className="ml-1">{event.end_datetime ? new Date(event.end_datetime).toLocaleDateString() : 'N/A'}</span>
-              </div>
+        {/* Title */}
+        <div className="mb-4">
+          <h1 className="text-4xl font-bold mb-4">{event.title}</h1>
+
+          {/* Status indicators and info */}
+          <div className="flex items-center space-x-4">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+              <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+              {event.end_datetime && new Date(event.end_datetime) > new Date() ? 'LIVE' : 'CLOSED'}
+            </span>
+
+            <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-blue-50 text-blue-900 border border-blue-200">
+              <span className="font-medium">Volume:</span>
+              <span className="ml-1">{event.volume ? `$${(event.volume / 1000).toFixed(0)}K` : 'N/A'}</span>
+            </div>
+
+            <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-gray-50 text-gray-900 border border-gray-200">
+              <span className="font-medium">Ends:</span>
+              <span className="ml-1">{event.end_datetime ? new Date(event.end_datetime).toLocaleDateString() : 'N/A'}</span>
             </div>
           </div>
+        </div>
 
-          {/* Market Price Charts - Superposed */}
-          <div>
-            <h2 className="text-lg font-semibold mb-2">Market Price History</h2>
-            <p className="text-sm text-muted-foreground mb-4">30-day price movements for all markets in this event</p>
-            
-            {loading ? (
-              <div className="h-64 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : (
-              <div className="w-full">
-                {/* Market Legend */}
-                <div className="mb-4 flex flex-wrap gap-2">
-                  {event?.markets?.map((market, index) => (
-                    <div key={market.id} className="flex items-center space-x-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{
-                          backgroundColor: getChartColor(index)
-                        }}
-                      ></div>
-                      <span className="text-sm text-muted-foreground">
-                        {market.question.length > 50 ? market.question.substring(0, 47) + '...' : market.question}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+        {/* Market Price Charts - Superposed */}
+        <div>
+          <h2 className="text-lg font-semibold mb-2">Market Price History</h2>
+          <p className="text-sm text-muted-foreground mb-4">30-day price movements for all markets in this event</p>
 
-                <div className="w-full h-96">
-                  <VisxLineChart
-                    height={384}
-                    margin={{ left: 60, top: 35, bottom: 38, right: 27 }}
-                    yDomain={[0, 1]}
-                    series={event?.markets?.map((market, index) => ({
-                      dataKey: `market_${market.id}`,
-                      data: (marketPricesData[market.id] || []).map(point => ({
-                        x: point.date,
-                        y: point.price
-                      })),
-                      stroke: getChartColor(index),
-                      name: market.question.length > 30 ? market.question.substring(0, 27) + '...' : market.question
-                    })) || []}
-                  />
-                </div>
+          {loading ? (
+            <div className="h-64 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <div className="w-full">
+              {/* Market Legend */}
+              <div className="mb-4 flex flex-wrap gap-2">
+                {event?.markets?.map((market, index) => (
+                  <div key={market.id} className="flex items-center space-x-2">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{
+                        backgroundColor: getChartColor(index)
+                      }}
+                    ></div>
+                    <span className="text-sm text-muted-foreground">
+                      {market.question.length > 50 ? market.question.substring(0, 47) + '...' : market.question}
+                    </span>
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
+
+              <div className="w-full h-96">
+                <VisxLineChart
+                  height={384}
+                  margin={{ left: 60, top: 35, bottom: 38, right: 27 }}
+                  yDomain={[0, 1]}
+                  series={event?.markets?.map((market, index) => ({
+                    dataKey: `market_${market.id}`,
+                    data: (marketPricesData[market.id] || []).map(point => ({
+                      x: point.date,
+                      y: point.price
+                    })),
+                    stroke: getChartColor(index),
+                    name: market.question.length > 30 ? market.question.substring(0, 27) + '...' : market.question
+                  })) || []}
+                />
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Latest Model Predictions */}
         <div className="mt-8">
           <h2 className="text-2xl font-bold mb-6">Latest Predictions</h2>
-          
+
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
@@ -217,11 +187,10 @@ export function EventDetail({ event }: EventDetailProps) {
                       return (
                         <td key={modelName} className="py-3 px-4 text-center">
                           {decision && (
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              decision.bet < 0
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
-                            }`}>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${decision.bet < 0
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                              }`}>
                               {decision.bet.toFixed(2)}
                             </span>
                           )}
@@ -229,7 +198,7 @@ export function EventDetail({ event }: EventDetailProps) {
                       )
                     })}
                   </tr>
-                  
+
                   {/* Confidence row */}
                   <tr>
                     <td className="py-3 px-4 font-medium text-sm">Confidence</td>
