@@ -55,12 +55,6 @@ export function QuestionsPage({ events, loading: initialLoading = false }: Quest
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Events</h1>
-        <p className="text-muted-foreground">Prediction markets that LLM models are actively betting on</p>
-      </div>
-
       {/* Search and Filters */}
       <div className="mb-8 space-y-4">
         {/* Search Bar */}
