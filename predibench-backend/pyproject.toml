@@ -17,7 +17,6 @@ dependencies = [
     "requests>=2.31.0",
     "tenacity>=8.0.0",
     "coloredlogs>=15.0.0",
-    "firebase-admin>=6.0.0",
     "predibench",
 ]
 
