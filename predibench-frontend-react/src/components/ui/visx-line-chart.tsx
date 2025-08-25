@@ -15,6 +15,7 @@ const tickLabelOffset = 10
 interface DataPoint {
   x: string | Date
   y: number
+  position?: number
   [key: string]: unknown
 }
 
@@ -65,6 +66,8 @@ export function VisxLineChart({
   showGrid = true,
   numTicks = 4
 }: VisxLineChartProps) {
+  // Ensure minimum of 4 ticks for better readability
+  const effectiveNumTicks = Math.max(numTicks, 4)
   const containerRef = useRef<HTMLDivElement>(null)
   const [hoverState, setHoverState] = useState<HoverState | null>(null)
 
@@ -72,18 +75,79 @@ export function VisxLineChart({
 
   // Update container width when component mounts/resizes
   useEffect(() => {
-    if (containerRef.current) {
-      setContainerWidth(containerRef.current.clientWidth)
+    const updateWidth = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect()
+        const width = rect.width || containerRef.current.offsetWidth || containerRef.current.clientWidth
+        // Ensure minimum width to prevent zero-width chart
+        const finalWidth = Math.max(width, 400)
+        console.log(`Container width update: rect.width=${rect.width}, offsetWidth=${containerRef.current.offsetWidth}, clientWidth=${containerRef.current.clientWidth}, final=${finalWidth}`)
+        setContainerWidth(finalWidth)
+      }
     }
+    
+    // Try multiple times to catch when DOM is ready
+    updateWidth()
+    setTimeout(updateWidth, 0)
+    setTimeout(updateWidth, 100)
+    
+    // Also listen for resize events
+    const resizeObserver = new ResizeObserver(updateWidth)
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current)
+    }
+    
+    return () => resizeObserver.disconnect()
   }, [])
 
   // Create scales for proper coordinate conversion
   const scales = useMemo(() => {
+    console.log(`Scales recalc: series.length=${series.length}, yDomain=${yDomain ? `[${yDomain[0]}, ${yDomain[1]}]` : 'null'}, effectiveNumTicks=${effectiveNumTicks}`)
+    
     const allData = series.flatMap(s => s.data)
+    console.log(`All data length: ${allData.length}`)
     if (allData.length === 0) return null
 
     const xExtent = extent(allData, xAccessor) as [Date, Date]
-    const yExtent = yDomain || extent(allData, yAccessor) as [number, number]
+    let yExtent = yDomain || extent(allData, yAccessor) as [number, number]
+    console.log(`Initial yExtent: [${yExtent[0]}, ${yExtent[1]}], yDomain provided: ${!!yDomain}`)
+    
+    // Ensure Y domain supports at least 4 meaningful ticks (apply to both provided and calculated domains)
+    const shouldAdjustDomain = true // Always adjust for better tick count
+    if (shouldAdjustDomain) {
+      const [dataMin, dataMax] = yExtent
+      console.log(`Adjusting domain from [${dataMin}, ${dataMax}] for better ticks`)
+      const dataRange = dataMax - dataMin
+      
+      // Nice intervals in ascending order
+      const niceIntervals = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]
+      
+      // Function to count how many ticks an interval would produce
+      const countTicks = (interval: number, min: number, max: number) => {
+        const minTick = Math.floor(min / interval) * interval
+        const maxTick = Math.ceil(max / interval) * interval
+        return Math.round((maxTick - minTick) / interval) + 1
+      }
+      
+      // Find the largest interval that still gives us at least effectiveNumTicks
+      let bestInterval = niceIntervals[0]
+      for (let i = niceIntervals.length - 1; i >= 0; i--) {
+        const interval = niceIntervals[i]
+        if (countTicks(interval, dataMin, dataMax) >= effectiveNumTicks) {
+          bestInterval = interval
+          break
+        }
+      }
+      
+      // Calculate final domain
+      const minTick = Math.floor(dataMin / bestInterval) * bestInterval
+      const maxTick = Math.ceil(dataMax / bestInterval) * bestInterval
+      
+      yExtent = [minTick, maxTick]
+      
+      // Debug log
+      console.log(`Domain calc: data=[${dataMin.toFixed(3)}, ${dataMax.toFixed(3)}], interval=${bestInterval}, domain=[${minTick.toFixed(3)}, ${maxTick.toFixed(3)}], ticks=${countTicks(bestInterval, minTick, maxTick)}, containerWidth=${containerWidth}`)
+    }
 
     const xScale = scaleTime({
       domain: xExtent,
@@ -95,8 +159,9 @@ export function VisxLineChart({
       range: [height - margin.bottom, margin.top]
     })
 
-    return { xScale, yScale }
-  }, [series, xAccessor, yAccessor, yDomain, margin, height, containerWidth])
+    console.log(`Final domain being passed to XYChart: [${yExtent[0]}, ${yExtent[1]}]`)
+    return { xScale, yScale, yDomain: yExtent }
+  }, [series, xAccessor, yAccessor, yDomain, margin, height, containerWidth, effectiveNumTicks])
 
   const handlePointerMove = useCallback((params: { event?: React.PointerEvent<Element> | React.FocusEvent<Element, Element>; svgPoint?: { x: number; y: number } }) => {
     if (!params.event || !containerRef.current || !scales) return
@@ -145,16 +210,28 @@ export function VisxLineChart({
     })
   }, [series, xAccessor, yAccessor, scales])
 
+  // Don't render chart until we have valid dimensions
+  if (!scales || containerWidth < 100) {
+    return (
+      <ChartWrapper ref={containerRef}>
+        <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
+          Loading chart...
+        </div>
+      </ChartWrapper>
+    )
+  }
+
   return (
     <ChartWrapper
       ref={containerRef}
       onMouseLeave={() => setHoverState(null)}
     >
       <XYChart
+        width={containerWidth}
         height={height}
         margin={margin}
         xScale={{ type: 'time' }}
-        yScale={{ type: 'linear', domain: yDomain }}
+        yScale={{ type: 'linear', domain: scales?.yDomain }}
         onPointerMove={handlePointerMove}
       >
         <defs>
@@ -175,7 +252,7 @@ export function VisxLineChart({
           <Grid
             columns={false}
             rows={true}
-            numTicks={numTicks}
+            numTicks={effectiveNumTicks}
             lineStyle={{
               stroke: 'hsl(var(--border))',
               strokeLinecap: 'round',
@@ -190,13 +267,13 @@ export function VisxLineChart({
           hideTicks
           orientation="bottom"
           tickLabelProps={() => ({ dy: tickLabelOffset })}
-          numTicks={numTicks}
+          numTicks={effectiveNumTicks}
         />
         <Axis
           hideAxisLine
           hideTicks
           orientation="left"
-          numTicks={numTicks}
+          numTicks={effectiveNumTicks}
           tickLabelProps={() => ({ dx: -10 })}
         />
 
@@ -240,14 +317,19 @@ export function VisxLineChart({
               position: 'absolute',
               left: hoverState.xPosition,
               top: margin.top - 20,
-              transform: 'translateX(-50%)',
+              transform: (() => {
+                const tooltipWidth = 150
+                const chartWidth = containerWidth - margin.left - margin.right
+                const wouldHitRightEdge = hoverState.xPosition + tooltipWidth > margin.left + chartWidth
+                return wouldHitRightEdge ? 'translateX(-100%)' : 'translateX(0%)'
+              })(),
               pointerEvents: 'none',
               zIndex: 1000,
               color: '#9ca3af',
               fontSize: '11px',
               fontWeight: '500',
               whiteSpace: 'nowrap',
-              transition: 'left 0.02s ease-out'
+              transition: 'left 0.02s ease-out, transform 0.02s ease-out'
             }}
           >
             {hoverState.tooltips.length > 0 && formatTooltipX(xAccessor(hoverState.tooltips[0].datum))}
@@ -256,7 +338,7 @@ export function VisxLineChart({
           {/* Tooltips and hover points */}
           {(() => {
             // Filter out duplicate y=0 tooltips
-            const filteredTooltips = []
+            const filteredTooltips: TooltipState[] = []
             let hasSeenZero = false
             
             hoverState.tooltips.forEach(tooltip => {
@@ -277,6 +359,13 @@ export function VisxLineChart({
             // Sort from bottom to top (highest Y position first)
             const sortedTooltips = [...filteredTooltips].sort((a, b) => b.y - a.y)
             
+            // Check if tooltips would hit right edge (assume ~150px tooltip width)
+            const tooltipWidth = 150
+            const chartWidth = containerWidth - margin.left - margin.right
+            const anchorRight = sortedTooltips.some(tooltip => 
+              tooltip.x + tooltipWidth > margin.left + chartWidth
+            )
+            
             // Position tooltips bottom-up with overlap prevention
             const tooltipHeight = 24
             const gap = 2
@@ -291,7 +380,8 @@ export function VisxLineChart({
               
               return {
                 ...tooltip,
-                adjustedY: newTop + tooltipHeight / 2
+                adjustedY: newTop + tooltipHeight / 2,
+                anchorRight
               }
             })
             
@@ -318,9 +408,9 @@ export function VisxLineChart({
                 <div
                   style={{
                     position: 'absolute',
-                    left: tooltip.x + 8,
+                    left: tooltip.anchorRight ? tooltip.x - 8 : tooltip.x + 8,
                     top: tooltip.adjustedY,
-                    transform: 'translateY(-50%)',
+                    transform: tooltip.anchorRight ? 'translate(-100%, -50%)' : 'translateY(-50%)',
                     pointerEvents: 'none',
                     zIndex: 1001,
                     backgroundColor: tooltip.lineConfig.stroke,
@@ -331,7 +421,7 @@ export function VisxLineChart({
                     fontWeight: '500',
                     whiteSpace: 'nowrap',
                     boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                    transition: 'left 0.02s ease-out, top 0.02s ease-out'
+                    transition: 'left 0.02s ease-out, top 0.02s ease-out, transform 0.02s ease-out'
                   }}
                 >
                   <strong>{yAccessor(tooltip.datum).toFixed(2)}</strong> - {(tooltip.lineConfig.name || tooltip.lineConfig.dataKey).substring(0, 20)}
@@ -371,4 +461,5 @@ const ChartWrapper = styled.div`
     }
   }
 `
+
 
