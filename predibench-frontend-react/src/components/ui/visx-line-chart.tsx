@@ -70,6 +70,8 @@ export function VisxLineChart({
   const effectiveNumTicks = Math.max(numTicks, 4)
   const containerRef = useRef<HTMLDivElement>(null)
   const [hoverState, setHoverState] = useState<HoverState | null>(null)
+  const calculationQueueRef = useRef<{ x: number; timestamp: number }[]>([])
+  const isProcessingRef = useRef<boolean>(false)
 
   const [containerWidth, setContainerWidth] = useState(800)
 
@@ -84,18 +86,18 @@ export function VisxLineChart({
         setContainerWidth(finalWidth)
       }
     }
-    
+
     // Try multiple times to catch when DOM is ready
     updateWidth()
     setTimeout(updateWidth, 0)
     setTimeout(updateWidth, 100)
-    
+
     // Also listen for resize events
     const resizeObserver = new ResizeObserver(updateWidth)
     if (containerRef.current) {
       resizeObserver.observe(containerRef.current)
     }
-    
+
     return () => resizeObserver.disconnect()
   }, [])
 
@@ -106,23 +108,22 @@ export function VisxLineChart({
 
     const xExtent = extent(allData, xAccessor) as [Date, Date]
     let yExtent = yDomain || extent(allData, yAccessor) as [number, number]
-    
+
     // Ensure Y domain supports at least 4 meaningful ticks (apply to both provided and calculated domains)
     const shouldAdjustDomain = true // Always adjust for better tick count
     if (shouldAdjustDomain) {
       const [dataMin, dataMax] = yExtent
-      const dataRange = dataMax - dataMin
-      
+
       // Nice intervals in ascending order
       const niceIntervals = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]
-      
+
       // Function to count how many ticks an interval would produce
       const countTicks = (interval: number, min: number, max: number) => {
         const minTick = Math.floor(min / interval) * interval
         const maxTick = Math.ceil(max / interval) * interval
         return Math.round((maxTick - minTick) / interval) + 1
       }
-      
+
       // Find the largest interval that still gives us at least effectiveNumTicks
       let bestInterval = niceIntervals[0]
       for (let i = niceIntervals.length - 1; i >= 0; i--) {
@@ -132,13 +133,13 @@ export function VisxLineChart({
           break
         }
       }
-      
+
       // Calculate final domain
       const minTick = Math.floor(dataMin / bestInterval) * bestInterval
       const maxTick = Math.ceil(dataMax / bestInterval) * bestInterval
-      
+
       yExtent = [minTick, maxTick]
-      
+
     }
 
     const xScale = scaleTime({
@@ -154,15 +155,10 @@ export function VisxLineChart({
     return { xScale, yScale, yDomain: yExtent }
   }, [series, xAccessor, yAccessor, yDomain, margin, height, containerWidth, effectiveNumTicks])
 
-  const handlePointerMove = useCallback((params: { event?: React.PointerEvent<Element> | React.FocusEvent<Element, Element>; svgPoint?: { x: number; y: number } }) => {
-    if (!params.event || !containerRef.current || !scales) return
+  const processCalculationQueue = useCallback((targetX: number) => {
+    if (!containerRef.current || !scales) return
 
-    const containerRect = containerRef.current.getBoundingClientRect()
-    const mouseX = (params.event as React.PointerEvent<Element>).clientX - containerRect.left
-
-    // Convert mouse X to time domain
-    const hoveredTime = scales.xScale.invert(mouseX)
-
+    const hoveredTime = scales.xScale.invert(targetX)
     const newTooltips: TooltipState[] = []
 
     series.forEach((line) => {
@@ -193,13 +189,71 @@ export function VisxLineChart({
     })
 
     // Use the x position from the first tooltip for the vertical line
-    const alignedXPosition = newTooltips.length > 0 ? newTooltips[0].x : mouseX
+    const alignedXPosition = newTooltips.length > 0 ? newTooltips[0].x : targetX
 
     setHoverState({
       xPosition: alignedXPosition,
       tooltips: newTooltips
     })
-  }, [series, xAccessor, yAccessor, scales])
+  }, [series, xAccessor, yAccessor, scales, containerRef])
+
+  const handlePointerMove = useCallback((params: { event?: React.PointerEvent<Element> | React.FocusEvent<Element, Element>; svgPoint?: { x: number; y: number } }) => {
+    if (!params.event || !containerRef.current || !scales) return
+
+    const containerRect = containerRef.current.getBoundingClientRect()
+    const mouseX = (params.event as React.PointerEvent<Element>).clientX - containerRect.left
+    const now = Date.now()
+
+    // Add to queue
+    calculationQueueRef.current.push({ x: mouseX, timestamp: now })
+
+    // Prune queue if it gets too large (keep only quantiles)
+    const pruneThreshold = 5
+    const quantiles = 4 // Can be adjusted: 4=quartiles, 10=deciles, etc.
+    
+    if (calculationQueueRef.current.length > pruneThreshold) {
+      const queue = calculationQueueRef.current
+      const prunedQueue: { x: number; timestamp: number }[] = []
+      
+      // Keep quantiles of the queue
+      const step = Math.floor(queue.length / quantiles)
+      for (let i = step - 1; i < queue.length; i += step) {
+        prunedQueue.push(queue[i])
+      }
+      
+      // Always keep the last item (most recent)
+      if (prunedQueue[prunedQueue.length - 1] !== queue[queue.length - 1]) {
+        prunedQueue.push(queue[queue.length - 1])
+      }
+      
+      calculationQueueRef.current = prunedQueue
+    }
+
+    // Process queue if not already processing
+    if (!isProcessingRef.current && calculationQueueRef.current.length > 0) {
+      isProcessingRef.current = true
+      
+      const processNext = () => {
+        if (calculationQueueRef.current.length === 0) {
+          isProcessingRef.current = false
+          return
+        }
+        
+        // Take the most recent item from queue
+        const item = calculationQueueRef.current.pop()!
+        processCalculationQueue(item.x)
+        
+        // Continue processing if there are more items
+        if (calculationQueueRef.current.length > 0) {
+          setTimeout(processNext, 0) // Use setTimeout to avoid blocking
+        } else {
+          isProcessingRef.current = false
+        }
+      }
+      
+      processNext()
+    }
+  }, [processCalculationQueue])
 
   // Don't render chart until we have valid dimensions
   if (!scales || containerWidth < 100) {
@@ -215,7 +269,12 @@ export function VisxLineChart({
   return (
     <ChartWrapper
       ref={containerRef}
-      onMouseLeave={() => setHoverState(null)}
+      onMouseLeave={() => {
+        // Clear queue and state when mouse leaves
+        calculationQueueRef.current = []
+        isProcessingRef.current = false
+        setHoverState(null)
+      }}
     >
       <XYChart
         width={containerWidth}
@@ -237,6 +296,18 @@ export function VisxLineChart({
               }}
             />
           </clipPath>
+
+          {/* Dynamic hover clip paths for colored lines */}
+          {hoverState && series.map((_, index) => (
+            <clipPath key={index} id={`hover-clip-${index}`}>
+              <rect
+                x={margin.left}
+                y={margin.top}
+                width={Math.max(0, hoverState.xPosition - margin.left)}
+                height={height - margin.top - margin.bottom}
+              />
+            </clipPath>
+          ))}
         </defs>
         {/* Horizontal grid lines for each Y tick */}
         {showGrid && (
@@ -268,160 +339,167 @@ export function VisxLineChart({
           tickLabelProps={() => ({ dx: -10 })}
         />
 
-        {series.map((line) => (
-          <AnimatedLineSeries
-            key={line.dataKey}
-            stroke={line.stroke}
-            dataKey={line.dataKey}
-            data={line.data}
-            xAccessor={xAccessor}
-            yAccessor={yAccessor}
-            style={{
-              clipPath: 'url(#reveal-clip)'
-            }}
-          />
+        {series.map((line, index) => (
+          <g key={line.dataKey}>
+            {/* Gray background line */}
+            <AnimatedLineSeries
+              stroke="#9ca3af"
+              dataKey={`${line.dataKey}-gray`}
+              data={line.data}
+              xAccessor={xAccessor}
+              yAccessor={yAccessor}
+              style={{
+                clipPath: 'url(#reveal-clip)'
+              }}
+            />
+
+            {/* Colored line clipped to hover position */}
+            <AnimatedLineSeries
+              stroke={line.stroke}
+              dataKey={`${line.dataKey}-colored`}
+              data={line.data}
+              xAccessor={xAccessor}
+              yAccessor={yAccessor}
+              style={{
+                clipPath: hoverState ? `url(#hover-clip-${index})` : 'url(#reveal-clip)'
+              }}
+            />
+          </g>
         ))}
       </XYChart>
 
-      {/* Hover state: vertical line and tooltips */}
-      {hoverState && (
-        <>
-          {/* Vertical hover line */}
+      {/* Hover state: single sliding container */}
+      {hoverState && (() => {
+        // Calculate anchoring once for the entire hover container
+        const tooltipWidth = 150
+        const chartWidth = containerWidth - margin.left - margin.right
+        const anchorRight = hoverState.xPosition + tooltipWidth > margin.left + chartWidth
+
+        return (
           <div
             style={{
               position: 'absolute',
               left: hoverState.xPosition,
-              top: margin.top,
-              bottom: margin.bottom,
-              width: '1px',
-              backgroundColor: '#9ca3af',
+              top: 0,
               pointerEvents: 'none',
               zIndex: 999,
-              height: height - margin.top - margin.bottom,
-              transition: 'left 0.02s ease-out'
-            }}
-          />
-
-          {/* Date label on top of vertical line */}
-          <div
-            style={{
-              position: 'absolute',
-              left: hoverState.xPosition,
-              top: margin.top - 20,
-              transform: (() => {
-                const tooltipWidth = 150
-                const chartWidth = containerWidth - margin.left - margin.right
-                const wouldHitRightEdge = hoverState.xPosition + tooltipWidth > margin.left + chartWidth
-                return wouldHitRightEdge ? 'translateX(-100%)' : 'translateX(0%)'
-              })(),
-              pointerEvents: 'none',
-              zIndex: 1000,
-              color: '#9ca3af',
-              fontSize: '11px',
-              fontWeight: '500',
-              whiteSpace: 'nowrap',
-              transition: 'left 0.02s ease-out, transform 0.02s ease-out'
+              // Remove transition for smoother sliding performance
+              transform: anchorRight ? 'translateX(-100%)' : 'translateX(0%)'
             }}
           >
-            {hoverState.tooltips.length > 0 && formatTooltipX(xAccessor(hoverState.tooltips[0].datum))}
-          </div>
+            {/* Vertical hover line */}
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: margin.top,
+                width: '1px',
+                backgroundColor: '#9ca3af',
+                height: height - margin.top - margin.bottom
+              }}
+            />
 
-          {/* Tooltips and hover points */}
-          {(() => {
-            // Filter out duplicate y=0 tooltips
-            const filteredTooltips: TooltipState[] = []
-            let hasSeenZero = false
-            
-            hoverState.tooltips.forEach(tooltip => {
-              const yValue = yAccessor(tooltip.datum)
-              const isZero = Math.abs(yValue) < 0.001
-              
-              if (isZero) {
-                if (!hasSeenZero) {
-                  filteredTooltips.push(tooltip) // Keep first zero value
-                  hasSeenZero = true
+            {/* Date label */}
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: margin.top - 20,
+                transform: 'translateX(-50%)',
+                color: '#9ca3af',
+                fontSize: '11px',
+                fontWeight: '500',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {hoverState.tooltips.length > 0 && formatTooltipX(xAccessor(hoverState.tooltips[0].datum))}
+            </div>
+
+            {/* Tooltips and hover points - positioned relative to container */}
+            {(() => {
+              // Filter out duplicate y=0 tooltips
+              const filteredTooltips: TooltipState[] = []
+              let hasSeenZero = false
+
+              hoverState.tooltips.forEach(tooltip => {
+                const yValue = yAccessor(tooltip.datum)
+                const isZero = Math.abs(yValue) < 0.001
+
+                if (isZero) {
+                  if (!hasSeenZero) {
+                    filteredTooltips.push(tooltip)
+                    hasSeenZero = true
+                  }
+                } else {
+                  filteredTooltips.push(tooltip)
                 }
-                // Skip subsequent zero values
-              } else {
-                filteredTooltips.push(tooltip) // Keep all non-zero values
-              }
-            })
-            
-            // Sort from bottom to top (highest Y position first)
-            const sortedTooltips = [...filteredTooltips].sort((a, b) => b.y - a.y)
-            
-            // Check if tooltips would hit right edge (assume ~150px tooltip width)
-            const tooltipWidth = 150
-            const chartWidth = containerWidth - margin.left - margin.right
-            const anchorRight = sortedTooltips.some(tooltip => 
-              tooltip.x + tooltipWidth > margin.left + chartWidth
-            )
-            
-            // Position tooltips bottom-up with overlap prevention
-            const tooltipHeight = 24
-            const gap = 2
-            let lastBottom = height
-            
-            const repositionedTooltips = sortedTooltips.map(tooltip => {
-              const originalTop = tooltip.y - tooltipHeight / 2
-              let newTop = Math.min(originalTop, lastBottom - tooltipHeight - gap)
-              newTop = Math.max(margin.top, newTop)
-              
-              lastBottom = newTop
-              
-              return {
-                ...tooltip,
-                adjustedY: newTop + tooltipHeight / 2,
-                anchorRight
-              }
-            })
-            
-            return repositionedTooltips.map((tooltip, index) => (
-              <div key={`tooltip-${tooltip.lineConfig.dataKey}-${index}`}>
-                {/* Simple hover point - circle with white stroke */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: tooltip.x - 5,
-                    top: tooltip.y - 5,
-                    width: '10px',
-                    height: '10px',
-                    borderRadius: '50%',
-                    backgroundColor: tooltip.lineConfig.stroke,
-                    border: '2px solid white',
-                    pointerEvents: 'none',
-                    zIndex: 1000,
-                    transition: 'left 0.02s ease-out, top 0.02s ease-out'
-                  }}
-                />
-                
-                {/* Repositioned tooltip */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: tooltip.anchorRight ? tooltip.x - 8 : tooltip.x + 8,
-                    top: tooltip.adjustedY,
-                    transform: tooltip.anchorRight ? 'translate(-100%, -50%)' : 'translateY(-50%)',
-                    pointerEvents: 'none',
-                    zIndex: 1001,
-                    backgroundColor: tooltip.lineConfig.stroke,
-                    color: 'white',
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    fontSize: '11px',
-                    fontWeight: '500',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                    transition: 'left 0.02s ease-out, top 0.02s ease-out, transform 0.02s ease-out'
-                  }}
-                >
-                  <strong>{yAccessor(tooltip.datum).toFixed(2)}</strong> - {(tooltip.lineConfig.name || tooltip.lineConfig.dataKey).substring(0, 20)}
+              })
+
+              // Sort from bottom to top
+              const sortedTooltips = [...filteredTooltips].sort((a, b) => b.y - a.y)
+
+              // Position tooltips with overlap prevention
+              const tooltipHeight = 24
+              const gap = 2
+              let lastBottom = height
+
+              const repositionedTooltips = sortedTooltips.map(tooltip => {
+                const originalTop = tooltip.y - tooltipHeight / 2
+                let newTop = Math.min(originalTop, lastBottom - tooltipHeight - gap)
+                newTop = Math.max(margin.top, newTop)
+                lastBottom = newTop
+
+                return {
+                  ...tooltip,
+                  adjustedY: newTop + tooltipHeight / 2,
+                  // Convert absolute positions to relative positions within container
+                  relativeX: tooltip.x - hoverState.xPosition
+                }
+              })
+
+              return repositionedTooltips.map((tooltip, index) => (
+                <div key={`tooltip-${tooltip.lineConfig.dataKey}-${index}`}>
+                  {/* Hover point - positioned relative to container */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: tooltip.relativeX - 5,
+                      top: tooltip.y - 5,
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      backgroundColor: tooltip.lineConfig.stroke,
+                      border: '2px solid white',
+                      zIndex: 1000
+                    }}
+                  />
+
+                  {/* Tooltip - positioned relative to container */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: anchorRight ? tooltip.relativeX - 8 : tooltip.relativeX + 8,
+                      top: tooltip.adjustedY,
+                      transform: anchorRight ? 'translate(-100%, -50%)' : 'translateY(-50%)',
+                      zIndex: 1001,
+                      backgroundColor: tooltip.lineConfig.stroke,
+                      color: 'white',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      fontWeight: '500',
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                    }}
+                  >
+                    <strong>{yAccessor(tooltip.datum).toFixed(2)}</strong> - {(tooltip.lineConfig.name || tooltip.lineConfig.dataKey).substring(0, 20)}
+                  </div>
                 </div>
-              </div>
-            ))
-          })()}
-        </>
-      )}
+              ))
+            })()}
+          </div>
+        )
+      })()}
     </ChartWrapper>
   )
 }
@@ -452,5 +530,3 @@ const ChartWrapper = styled.div`
     }
   }
 `
-
-
