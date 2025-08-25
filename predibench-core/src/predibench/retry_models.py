@@ -1,4 +1,5 @@
 from typing import Generator, Type, TypeVar
+import logging
 
 from smolagents import ChatMessage, ChatMessageStreamDelta, Tool
 from smolagents.models import ApiModel, InferenceClientModel, LiteLLMModel, OpenAIModel
@@ -27,8 +28,8 @@ def add_retry_logic(base_class: Type[T]) -> Type[T]:
             wait=wait_fixed(61),
             retry=retry_if_exception_type((Exception,)),
             reraise=True,
-            before_sleep=before_sleep_log(logger, "INFO"),
-            after=after_log(logger, "INFO"),
+            before_sleep=before_sleep_log(logger, logging.INFO),
+            after=after_log(logger, logging.INFO),
         )
         def generate(
             self,
@@ -51,8 +52,8 @@ def add_retry_logic(base_class: Type[T]) -> Type[T]:
             wait=wait_fixed(61),
             retry=retry_if_exception_type((Exception,)),
             reraise=True,
-            before_sleep=before_sleep_log(logger, "INFO"),
-            after=after_log(logger, "INFO"),
+            before_sleep=before_sleep_log(logger, logging.INFO),
+            after=after_log(logger, logging.INFO),
         )
         def generate_stream(
             self,

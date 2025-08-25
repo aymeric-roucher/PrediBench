@@ -50,8 +50,8 @@ def test_choose_events_event_caching_e2e():
             else:
                 nb_markets_without_prices += 1
     assert (
-        nb_markets_with_prices > 10
-    )  # NOTE: this test might fail depending on the date, but it should be enough
+        nb_markets_with_prices > 3 
+    )  # NOTE: There are 3 events, so at least 3 markets should have prices
     assert nb_markets_without_prices == 0
     assert (
         nb_markets_with_many_prices >= nb_markets_with_prices * 0.5
