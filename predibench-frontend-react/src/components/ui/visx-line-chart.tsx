@@ -1,14 +1,14 @@
-import styled from 'styled-components'
-import { format } from 'date-fns'
-import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
+import { scaleLinear, scaleTime } from '@visx/scale'
 import {
+  AnimatedLineSeries,
   Axis,
   Grid,
-  AnimatedLineSeries,
   XYChart
 } from '@visx/xychart'
-import { scaleTime, scaleLinear } from '@visx/scale'
 import { extent } from 'd3-array'
+import { format } from 'date-fns'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import styled from 'styled-components'
 
 const tickLabelOffset = 10
 
@@ -103,19 +103,19 @@ export function VisxLineChart({
 
     const containerRect = containerRef.current.getBoundingClientRect()
     const mouseX = (params.event as React.PointerEvent<Element>).clientX - containerRect.left
-    
+
     // Convert mouse X to time domain
     const hoveredTime = scales.xScale.invert(mouseX)
-    
+
     const newTooltips: TooltipState[] = []
-    
+
     series.forEach((line) => {
       if (line.data.length === 0) return
-      
+
       // Find closest data point by time
       let closestPoint = line.data[0]
       let minDistance = Infinity
-      
+
       line.data.forEach((point) => {
         const distance = Math.abs(xAccessor(point).getTime() - hoveredTime.getTime())
         if (distance < minDistance) {
@@ -138,7 +138,7 @@ export function VisxLineChart({
 
     // Use the x position from the first tooltip for the vertical line
     const alignedXPosition = newTooltips.length > 0 ? newTooltips[0].x : mouseX
-    
+
     setHoverState({
       xPosition: alignedXPosition,
       tooltips: newTooltips
@@ -146,7 +146,7 @@ export function VisxLineChart({
   }, [series, xAccessor, yAccessor, scales])
 
   return (
-    <ChartWrapper 
+    <ChartWrapper
       ref={containerRef}
       onMouseLeave={() => setHoverState(null)}
     >
@@ -184,7 +184,7 @@ export function VisxLineChart({
             }}
           />
         )}
-        
+
         <Axis
           hideAxisLine
           hideTicks
@@ -229,10 +229,11 @@ export function VisxLineChart({
               backgroundColor: '#9ca3af',
               pointerEvents: 'none',
               zIndex: 999,
-              height: height - margin.top - margin.bottom
+              height: height - margin.top - margin.bottom,
+              transition: 'left 0.02s ease-out'
             }}
           />
-          
+
           {/* Date label on top of vertical line */}
           <div
             style={{
@@ -245,62 +246,99 @@ export function VisxLineChart({
               color: '#9ca3af',
               fontSize: '11px',
               fontWeight: '500',
-              whiteSpace: 'nowrap'
+              whiteSpace: 'nowrap',
+              transition: 'left 0.02s ease-out'
             }}
           >
             {hoverState.tooltips.length > 0 && formatTooltipX(xAccessor(hoverState.tooltips[0].datum))}
           </div>
-          
+
           {/* Tooltips and hover points */}
-          {hoverState.tooltips.map((tooltip, index) => {
-            // Check if this Y position already has a tooltip (to avoid duplicates)
-            const yValue = Math.round(tooltip.y * 100) / 100; // Round to avoid floating point issues
-            const isFirstAtThisY = hoverState.tooltips.findIndex(t => Math.round(t.y * 100) / 100 === yValue) === index;
+          {(() => {
+            // Filter out duplicate y=0 tooltips
+            const filteredTooltips = []
+            let hasSeenZero = false
             
-            return (
+            hoverState.tooltips.forEach(tooltip => {
+              const yValue = yAccessor(tooltip.datum)
+              const isZero = Math.abs(yValue) < 0.001
+              
+              if (isZero) {
+                if (!hasSeenZero) {
+                  filteredTooltips.push(tooltip) // Keep first zero value
+                  hasSeenZero = true
+                }
+                // Skip subsequent zero values
+              } else {
+                filteredTooltips.push(tooltip) // Keep all non-zero values
+              }
+            })
+            
+            // Sort from bottom to top (highest Y position first)
+            const sortedTooltips = [...filteredTooltips].sort((a, b) => b.y - a.y)
+            
+            // Position tooltips bottom-up with overlap prevention
+            const tooltipHeight = 24
+            const gap = 2
+            let lastBottom = height
+            
+            const repositionedTooltips = sortedTooltips.map(tooltip => {
+              const originalTop = tooltip.y - tooltipHeight / 2
+              let newTop = Math.min(originalTop, lastBottom - tooltipHeight - gap)
+              newTop = Math.max(margin.top, newTop)
+              
+              lastBottom = newTop
+              
+              return {
+                ...tooltip,
+                adjustedY: newTop + tooltipHeight / 2
+              }
+            })
+            
+            return repositionedTooltips.map((tooltip, index) => (
               <div key={`tooltip-${tooltip.lineConfig.dataKey}-${index}`}>
                 {/* Simple hover point - circle with white stroke */}
                 <div
                   style={{
                     position: 'absolute',
-                    left: tooltip.x - 5, // Center the 10px dot
-                    top: tooltip.y - 5,  // Center the 10px dot at exact Y
+                    left: tooltip.x - 5,
+                    top: tooltip.y - 5,
                     width: '10px',
                     height: '10px',
                     borderRadius: '50%',
                     backgroundColor: tooltip.lineConfig.stroke,
                     border: '2px solid white',
                     pointerEvents: 'none',
-                    zIndex: 1000
+                    zIndex: 1000,
+                    transition: 'left 0.02s ease-out, top 0.02s ease-out'
                   }}
                 />
                 
-                {/* Condensed single-line tooltip - only show for first occurrence at this Y */}
-                {isFirstAtThisY && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: tooltip.x + 8, // Reduced offset horizontally from the point
-                      top: tooltip.y,       // Same exact Y as the hover point
-                      transform: 'translateY(-50%)', // Center vertically on the point
-                      pointerEvents: 'none',
-                      zIndex: 1001,
-                      backgroundColor: tooltip.lineConfig.stroke,
-                      color: 'white',
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      fontSize: '11px',
-                      fontWeight: '500',
-                      whiteSpace: 'nowrap',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                    }}
-                  >
-                    <strong>{yAccessor(tooltip.datum).toFixed(2)}</strong> - {(tooltip.lineConfig.name || tooltip.lineConfig.dataKey).substring(0, 20)}
-                  </div>
-                )}
+                {/* Repositioned tooltip */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: tooltip.x + 8,
+                    top: tooltip.adjustedY,
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                    zIndex: 1001,
+                    backgroundColor: tooltip.lineConfig.stroke,
+                    color: 'white',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: '500',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                    transition: 'left 0.02s ease-out, top 0.02s ease-out'
+                  }}
+                >
+                  <strong>{yAccessor(tooltip.datum).toFixed(2)}</strong> - {(tooltip.lineConfig.name || tooltip.lineConfig.dataKey).substring(0, 20)}
+                </div>
               </div>
-            )
-          })}
+            ))
+          })()}
         </>
       )}
     </ChartWrapper>
