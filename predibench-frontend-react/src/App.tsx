@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Route, BrowserRouter as Router, Routes, useLocation } from 'react-router-dom'
 import type { Event, LeaderboardEntry, Stats } from './api'
 import { apiService } from './api'
+import { AboutPage } from './components/AboutPage'
 import { EventDetail } from './components/EventDetail'
 import { HomePage } from './components/HomePage'
 import { Layout } from './components/Layout'
@@ -64,6 +65,7 @@ function AppContent() {
     if (location.pathname === '/leaderboard') return 'leaderboard'
     if (location.pathname === '/events') return 'events'
     if (location.pathname === '/models') return 'models'
+    if (location.pathname === '/about') return 'about'
     if (location.pathname.startsWith('/events/')) return 'events'
     return 'home'
   }
@@ -100,6 +102,7 @@ function AppContent() {
         <Route path="/leaderboard" element={<LeaderboardPage leaderboard={leaderboard} loading={loading} />} />
         <Route path="/events" element={<QuestionsPage events={events} leaderboard={leaderboard} loading={loading} />} />
         <Route path="/models" element={<ModelsPage leaderboard={leaderboard} />} />
+        <Route path="/about" element={<AboutPage />} />
         <Route
           path="/events/:eventId"
           element={
