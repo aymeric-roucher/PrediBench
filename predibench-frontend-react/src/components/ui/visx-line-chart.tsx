@@ -188,12 +188,33 @@ export function VisxLineChart({
       })
     })
 
+    // Filter out duplicate y=0 tooltips before setting state
+    const filteredTooltips: TooltipState[] = []
+    let hasSeenZero = false
+
+    newTooltips.forEach(tooltip => {
+      const yValue = yAccessor(tooltip.datum)
+      // Check if the value would display as "0.00" when formatted with .toFixed(2)
+      const displayValue = yValue.toFixed(2)
+      const isDisplayZero = displayValue === '0.00'
+
+      if (isDisplayZero) {
+        if (!hasSeenZero) {
+          filteredTooltips.push(tooltip)
+          hasSeenZero = true
+        }
+        // Skip subsequent tooltips that display as 0.00
+      } else {
+        filteredTooltips.push(tooltip)
+      }
+    })
+
     // Use the x position from the first tooltip for the vertical line
-    const alignedXPosition = newTooltips.length > 0 ? newTooltips[0].x : targetX
+    const alignedXPosition = filteredTooltips.length > 0 ? filteredTooltips[0].x : targetX
 
     setHoverState({
       xPosition: alignedXPosition,
-      tooltips: newTooltips
+      tooltips: filteredTooltips
     })
   }, [series, xAccessor, yAccessor, scales, containerRef])
 
@@ -383,7 +404,6 @@ export function VisxLineChart({
               top: 0,
               pointerEvents: 'none',
               zIndex: 999,
-              // Remove transition for smoother sliding performance
               transform: anchorRight ? 'translateX(-100%)' : 'translateX(0%)'
             }}
           >
@@ -405,7 +425,7 @@ export function VisxLineChart({
                 position: 'absolute',
                 left: 0,
                 top: margin.top - 20,
-                transform: 'translateX(-50%)',
+                transform: anchorRight ? 'translateX(-100%)' : 'translateX(0%)',
                 color: '#9ca3af',
                 fontSize: '11px',
                 fontWeight: '500',
@@ -417,26 +437,8 @@ export function VisxLineChart({
 
             {/* Tooltips and hover points - positioned relative to container */}
             {(() => {
-              // Filter out duplicate y=0 tooltips
-              const filteredTooltips: TooltipState[] = []
-              let hasSeenZero = false
-
-              hoverState.tooltips.forEach(tooltip => {
-                const yValue = yAccessor(tooltip.datum)
-                const isZero = Math.abs(yValue) < 0.001
-
-                if (isZero) {
-                  if (!hasSeenZero) {
-                    filteredTooltips.push(tooltip)
-                    hasSeenZero = true
-                  }
-                } else {
-                  filteredTooltips.push(tooltip)
-                }
-              })
-
-              // Sort from bottom to top
-              const sortedTooltips = [...filteredTooltips].sort((a, b) => b.y - a.y)
+              // Sort from bottom to top (filtering is now done earlier)
+              const sortedTooltips = [...hoverState.tooltips].sort((a, b) => b.y - a.y)
 
               // Position tooltips with overlap prevention
               const tooltipHeight = 24
