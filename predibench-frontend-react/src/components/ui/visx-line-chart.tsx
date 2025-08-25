@@ -81,7 +81,6 @@ export function VisxLineChart({
         const width = rect.width || containerRef.current.offsetWidth || containerRef.current.clientWidth
         // Ensure minimum width to prevent zero-width chart
         const finalWidth = Math.max(width, 400)
-        console.log(`Container width update: rect.width=${rect.width}, offsetWidth=${containerRef.current.offsetWidth}, clientWidth=${containerRef.current.clientWidth}, final=${finalWidth}`)
         setContainerWidth(finalWidth)
       }
     }
@@ -102,21 +101,16 @@ export function VisxLineChart({
 
   // Create scales for proper coordinate conversion
   const scales = useMemo(() => {
-    console.log(`Scales recalc: series.length=${series.length}, yDomain=${yDomain ? `[${yDomain[0]}, ${yDomain[1]}]` : 'null'}, effectiveNumTicks=${effectiveNumTicks}`)
-    
     const allData = series.flatMap(s => s.data)
-    console.log(`All data length: ${allData.length}`)
     if (allData.length === 0) return null
 
     const xExtent = extent(allData, xAccessor) as [Date, Date]
     let yExtent = yDomain || extent(allData, yAccessor) as [number, number]
-    console.log(`Initial yExtent: [${yExtent[0]}, ${yExtent[1]}], yDomain provided: ${!!yDomain}`)
     
     // Ensure Y domain supports at least 4 meaningful ticks (apply to both provided and calculated domains)
     const shouldAdjustDomain = true // Always adjust for better tick count
     if (shouldAdjustDomain) {
       const [dataMin, dataMax] = yExtent
-      console.log(`Adjusting domain from [${dataMin}, ${dataMax}] for better ticks`)
       const dataRange = dataMax - dataMin
       
       // Nice intervals in ascending order
@@ -145,8 +139,6 @@ export function VisxLineChart({
       
       yExtent = [minTick, maxTick]
       
-      // Debug log
-      console.log(`Domain calc: data=[${dataMin.toFixed(3)}, ${dataMax.toFixed(3)}], interval=${bestInterval}, domain=[${minTick.toFixed(3)}, ${maxTick.toFixed(3)}], ticks=${countTicks(bestInterval, minTick, maxTick)}, containerWidth=${containerWidth}`)
     }
 
     const xScale = scaleTime({
@@ -159,7 +151,6 @@ export function VisxLineChart({
       range: [height - margin.bottom, margin.top]
     })
 
-    console.log(`Final domain being passed to XYChart: [${yExtent[0]}, ${yExtent[1]}]`)
     return { xScale, yScale, yDomain: yExtent }
   }, [series, xAccessor, yAccessor, yDomain, margin, height, containerWidth, effectiveNumTicks])
 
