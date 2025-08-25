@@ -6,7 +6,6 @@ import type { LeaderboardEntry, ModelMarketDetails } from '../api'
 import { apiService } from '../api'
 import { getChartColor } from './ui/chart-colors'
 import { VisxLineChart } from './ui/visx-line-chart'
-import { VisxPnLChart } from './ui/visx-pnl-chart'
 
 interface ModelsPageProps {
   leaderboard: LeaderboardEntry[]
@@ -146,7 +145,7 @@ export function ModelsPage({ leaderboard }: ModelsPageProps) {
                 <div>
                   <h3 className="text-lg font-semibold mb-4">Cumulative PnL</h3>
                   <div className="h-80">
-                    <VisxPnLChart
+                    <VisxLineChart
                       height={320}
                       margin={{ left: 60, top: 35, bottom: 38, right: 27 }}
                       series={Object.values(marketDetails)

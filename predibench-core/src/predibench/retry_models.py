@@ -1,4 +1,5 @@
 from typing import Generator, Type, TypeVar
+import logging
 
 from smolagents import ChatMessage, ChatMessageStreamDelta, Tool
 from smolagents.models import ApiModel, InferenceClientModel, LiteLLMModel, OpenAIModel
